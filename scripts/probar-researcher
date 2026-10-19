@@ -1,0 +1,75 @@
+#!/usr/bin/env node
+// Prueba de integración explícita con LLM y web. No integra la suite sin LLM.
+import { mkdtempSync, readFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { agentDir, importPi, vaultDir } from "./lib/pi-sdk.mjs";
+
+if (!process.env.TMUX) {
+  console.error("✗ Abrí esta prueba dentro de tmux con pi-learn.");
+  process.exit(1);
+}
+const sdk = await importPi();
+const artifacts = mkdtempSync(join(tmpdir(), "pi-learning-researcher-"));
+const settingsManager = sdk.SettingsManager.create(vaultDir, agentDir, { projectTrusted: true });
+let deliver;
+const completion = new Promise(resolve => { deliver = resolve; });
+const loader = new sdk.DefaultResourceLoader({
+  cwd: vaultDir, agentDir, settingsManager,
+  extensionFactories: [(pi) => {
+    pi.on("before_agent_start", (event, ctx) => {
+      if (event.messageType === "custom" && event.message.customType === "subagent_result") {
+        // Capturar la entrega real sin gastar otra respuesta del modelo padre.
+        ctx.abort();
+        deliver(event.message);
+      }
+    });
+  }],
+});
+await loader.reload();
+if (loader.getExtensions().errors.length) throw new Error("Falló la carga de extensiones de la prueba.");
+const manager = sdk.SessionManager.create(vaultDir, artifacts);
+manager.appendCustomEntry("prueba-researcher", { objetivo: "Verificar arranque, web y entrega al padre" });
+const { session } = await sdk.createAgentSession({
+  cwd: vaultDir, agentDir, settingsManager, resourceLoader: loader, sessionManager: manager,
+});
+let timer;
+try {
+  await session.bindExtensions({});
+  const runner = session.extensionRunner;
+  const signal = AbortSignal.timeout(15000);
+  const launched = await runner.getToolDefinition("subagent").execute("prueba-researcher", {
+    agent: "researcher",
+    name: "prueba-base-researcher",
+    task: "Prueba breve de integración. Verificá la regla de la cadena para funciones reales derivables con una consulta web_search y la lectura web_fetch de una fuente universitaria o de OpenStax. Mencioná las hipótesis y citá la URL leída. No leas archivos locales ni escribas archivos. Acotá el informe a 150 palabras, en español. No hagas más de dos búsquedas ni leas más de dos páginas.",
+  }, signal, undefined, runner.createToolContext("prueba-researcher", signal));
+  if (launched.details?.error) throw new Error(`No se lanzó el researcher: ${launched.details.error}`);
+  console.log("✓ Researcher lanzado en un panel de tmux; esperando entrega automática.");
+  const result = await Promise.race([
+    completion,
+    new Promise((_, reject) => { timer = setTimeout(() => reject(new Error("El researcher no entregó resultado en 180 segundos.")), 180000); }),
+  ]);
+  if (result.details?.exitCode !== 0) throw new Error("El proceso del researcher terminó con error.");
+  const entries = readFileSync(result.details.sessionFile, "utf8").trim().split("\n").map(line => JSON.parse(line));
+  const messages = entries.filter(entry => entry.type === "message").map(entry => entry.message);
+  for (const name of ["web_search", "web_fetch"]) {
+    if (!messages.some(message => message.role === "toolResult" && message.toolName === name && !message.isError)) {
+      throw new Error(`No consta una ejecución correcta de ${name} en el hijo.`);
+    }
+    console.log(`✓ ${name} ejecutada correctamente por el hijo.`);
+  }
+  if (!messages.some(message => message.role === "assistant" && message.model === "gpt-6-luna")) {
+    throw new Error("No consta una respuesta del modelo gpt-6-luna.");
+  }
+  console.log("✓ Resultado del researcher recibido por el padre con gpt-6-luna.");
+  console.log(`Artefactos de la prueba: ${artifacts}`);
+  console.log(typeof result.content === "string" ? result.content : JSON.stringify(result.content));
+} catch (error) {
+  console.error(`✗ ${error.message}\nArtefactos: ${artifacts}`);
+  process.exitCode = 1;
+} finally {
+  clearTimeout(timer);
+  await session.abort();
+  await session.extensionRunner.emit({ type: "session_shutdown" });
+  session.dispose();
+}

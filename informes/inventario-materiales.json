@@ -1,0 +1,322 @@
+{
+  "version": 1,
+  "metodo": "pdfinfo; pdftotext -layout en páginas 1, 2 y central; no es ingesta ni clasificación exhaustiva",
+  "documentos": [
+    {
+      "archivo": "_entrada/muestras/materiales/bibliografia/Capitulo3-CapaTransporte.pdf",
+      "bytes": 2399097,
+      "paginas": 108,
+      "sha256": "351871f4c34d4a75cd6bf5ea452f094ecf60cab0ca7ceaacd29a6c4ca481fa16",
+      "paginas_muestreadas": [
+        {
+          "pagina": 1,
+          "caracteres_sin_espacios": 760
+        },
+        {
+          "pagina": 2,
+          "caracteres_sin_espacios": 311
+        },
+        {
+          "pagina": 54,
+          "caracteres_sin_espacios": 500
+        }
+      ]
+    },
+    {
+      "archivo": "_entrada/muestras/materiales/bibliografia/Capitulo4-CapaRed-Datos.pdf",
+      "bytes": 1633504,
+      "paginas": 67,
+      "sha256": "d1f95dcd1c1b7ea73c9fa3cfc8e27c87bef58d4af7a3707e5fd911dfd327e326",
+      "paginas_muestreadas": [
+        {
+          "pagina": 1,
+          "caracteres_sin_espacios": 779
+        },
+        {
+          "pagina": 2,
+          "caracteres_sin_espacios": 208
+        },
+        {
+          "pagina": 33,
+          "caracteres_sin_espacios": 386
+        }
+      ]
+    },
+    {
+      "archivo": "_entrada/muestras/materiales/bibliografia/Capitulo5-CapaRed-Control.pdf",
+      "bytes": 1490086,
+      "paginas": 58,
+      "sha256": "6c10cfd97cedcdd0e841a1cb3499fc424bbb5870cc5141f9c8685d9a75bba169",
+      "paginas_muestreadas": [
+        {
+          "pagina": 1,
+          "caracteres_sin_espacios": 785
+        },
+        {
+          "pagina": 2,
+          "caracteres_sin_espacios": 243
+        },
+        {
+          "pagina": 29,
+          "caracteres_sin_espacios": 510
+        }
+      ]
+    },
+    {
+      "archivo": "_entrada/muestras/materiales/bibliografia/GRIMALDI.pdf",
+      "bytes": 108759799,
+      "paginas": 1044,
+      "sha256": "f926e86afc98ff4576141ecbd151435f38225df0099d4d256eaebe3ea86f8b8f",
+      "paginas_muestreadas": [
+        {
+          "pagina": 1,
+          "caracteres_sin_espacios": 227
+        },
+        {
+          "pagina": 2,
+          "caracteres_sin_espacios": 852
+        },
+        {
+          "pagina": 522,
+          "caracteres_sin_espacios": 1698
+        }
+      ]
+    },
+    {
+      "archivo": "_entrada/muestras/materiales/bibliografia/Redes_de_computadoras_Un_enfoque_descend.pdf",
+      "bytes": 8702980,
+      "paginas": 699,
+      "sha256": "d3daf1f6b55402d5c4b9a172722fd9a4194cfbe5198e06a90dc8210f26894b93",
+      "paginas_muestreadas": [
+        {
+          "pagina": 1,
+          "caracteres_sin_espacios": 73
+        },
+        {
+          "pagina": 2,
+          "caracteres_sin_espacios": 53
+        },
+        {
+          "pagina": 349,
+          "caracteres_sin_espacios": 3592
+        }
+      ]
+    },
+    {
+      "archivo": "_entrada/muestras/materiales/evaluaciones/practico1.pdf",
+      "bytes": 141575,
+      "paginas": 3,
+      "sha256": "ae1bc82e96c66749f02c4e81646990a7eb25e7b96f02beddf1220eb01886be2d",
+      "paginas_muestreadas": [
+        {
+          "pagina": 1,
+          "caracteres_sin_espacios": 2698
+        },
+        {
+          "pagina": 2,
+          "caracteres_sin_espacios": 2138
+        }
+      ]
+    },
+    {
+      "archivo": "_entrada/muestras/materiales/evaluaciones/practico2.pdf",
+      "bytes": 109634,
+      "paginas": 3,
+      "sha256": "8e81ee3f2d1c6cf28d0930ee32b77a1711bac9933f86392c594c2908074a5a21",
+      "paginas_muestreadas": [
+        {
+          "pagina": 1,
+          "caracteres_sin_espacios": 2108
+        },
+        {
+          "pagina": 2,
+          "caracteres_sin_espacios": 2892
+        }
+      ]
+    },
+    {
+      "archivo": "_entrada/muestras/materiales/evaluaciones/practico3.pdf",
+      "bytes": 154340,
+      "paginas": 5,
+      "sha256": "9a8ea1b4f67db737d6d2c1488e71e6cbfb4b6437ff91b9181ab0b272c7addf55",
+      "paginas_muestreadas": [
+        {
+          "pagina": 1,
+          "caracteres_sin_espacios": 2025
+        },
+        {
+          "pagina": 2,
+          "caracteres_sin_espacios": 1959
+        }
+      ]
+    },
+    {
+      "archivo": "_entrada/muestras/materiales/evaluaciones/practico4.pdf",
+      "bytes": 90929,
+      "paginas": 3,
+      "sha256": "843e94a234d1069fee35b112caecf103a8d2e44bcbe3fb0522e10e3a917bf3a6",
+      "paginas_muestreadas": [
+        {
+          "pagina": 1,
+          "caracteres_sin_espacios": 2234
+        },
+        {
+          "pagina": 2,
+          "caracteres_sin_espacios": 1597
+        }
+      ]
+    },
+    {
+      "archivo": "_entrada/muestras/materiales/evaluaciones/practico5.pdf",
+      "bytes": 141892,
+      "paginas": 4,
+      "sha256": "e0407eca8ad3c5c60caee2101b98be4e2a232733003fbec5e52101ae19b1a252",
+      "paginas_muestreadas": [
+        {
+          "pagina": 1,
+          "caracteres_sin_espacios": 2501
+        },
+        {
+          "pagina": 2,
+          "caracteres_sin_espacios": 3098
+        }
+      ]
+    },
+    {
+      "archivo": "_entrada/muestras/materiales/evaluaciones/practico6.pdf",
+      "bytes": 549367,
+      "paginas": 6,
+      "sha256": "475aa3ba32669b809f8ee7db5ada3e11552a1f4c3a7fee2d81433c88f676a4d7",
+      "paginas_muestreadas": [
+        {
+          "pagina": 1,
+          "caracteres_sin_espacios": 1262
+        },
+        {
+          "pagina": 2,
+          "caracteres_sin_espacios": 1844
+        },
+        {
+          "pagina": 3,
+          "caracteres_sin_espacios": 2020
+        }
+      ]
+    },
+    {
+      "archivo": "_entrada/muestras/materiales/evaluaciones/practico7.pdf",
+      "bytes": 410950,
+      "paginas": 5,
+      "sha256": "831a1855a8ebecc15108e5df119aea266c0036199e82d76ae201b06d08d6125f",
+      "paginas_muestreadas": [
+        {
+          "pagina": 1,
+          "caracteres_sin_espacios": 1388
+        },
+        {
+          "pagina": 2,
+          "caracteres_sin_espacios": 1169
+        }
+      ]
+    },
+    {
+      "archivo": "_entrada/muestras/materiales/evaluaciones/sol_prc20230918.pdf",
+      "bytes": 119004,
+      "paginas": 3,
+      "sha256": "2d5157b1dc46b1d7fdd777d47942ed0307959b1eac600fcbc015f5df53ee9762",
+      "paginas_muestreadas": [
+        {
+          "pagina": 1,
+          "caracteres_sin_espacios": 3145
+        },
+        {
+          "pagina": 2,
+          "caracteres_sin_espacios": 3109
+        }
+      ]
+    },
+    {
+      "archivo": "_entrada/muestras/materiales/evaluaciones/sol_prc20240926.pdf",
+      "bytes": 185668,
+      "paginas": 4,
+      "sha256": "8c1f9c588765290b5b7f25bcd62df3b2f8c7fa2c9478402493903bc9d98d46a6",
+      "paginas_muestreadas": [
+        {
+          "pagina": 1,
+          "caracteres_sin_espacios": 2284
+        },
+        {
+          "pagina": 2,
+          "caracteres_sin_espacios": 2602
+        }
+      ]
+    },
+    {
+      "archivo": "_entrada/muestras/materiales/evaluaciones/sol_prc2024123.pdf",
+      "bytes": 395851,
+      "paginas": 4,
+      "sha256": "58ac849d487f3bb0f6b3855fac5e507f24e57d419765bfb2f11bd19510805c61",
+      "paginas_muestreadas": [
+        {
+          "pagina": 1,
+          "caracteres_sin_espacios": 1284
+        },
+        {
+          "pagina": 2,
+          "caracteres_sin_espacios": 2205
+        }
+      ]
+    },
+    {
+      "archivo": "_entrada/muestras/materiales/evaluaciones/sol_prc20250924.pdf",
+      "bytes": 162811,
+      "paginas": 4,
+      "sha256": "75901428eefdc308b10ce958a79ea486998aa7b195b5fba2120aaae4acd25096",
+      "paginas_muestreadas": [
+        {
+          "pagina": 1,
+          "caracteres_sin_espacios": 2542
+        },
+        {
+          "pagina": 2,
+          "caracteres_sin_espacios": 2248
+        }
+      ]
+    },
+    {
+      "archivo": "_entrada/muestras/materiales/evaluaciones/sol_prc20251126.pdf",
+      "bytes": 214229,
+      "paginas": 5,
+      "sha256": "82a8e6bc88bc36ea23a112c6cd9e1e3b23e2cea0b24e8d5c48fb2bfa94e363b3",
+      "paginas_muestreadas": [
+        {
+          "pagina": 1,
+          "caracteres_sin_espacios": 2012
+        },
+        {
+          "pagina": 2,
+          "caracteres_sin_espacios": 1214
+        }
+      ]
+    },
+    {
+      "archivo": "_entrada/muestras/materiales/programa/Programa de Unidad Curricular Redes de Computadoras - 20191022.pdf",
+      "bytes": 119125,
+      "paginas": 6,
+      "sha256": "84756d3f88e6ae206b8e62b9b9c7861db20a68d2584621b96b60079710d1badc",
+      "paginas_muestreadas": [
+        {
+          "pagina": 1,
+          "caracteres_sin_espacios": 674
+        },
+        {
+          "pagina": 2,
+          "caracteres_sin_espacios": 1778
+        },
+        {
+          "pagina": 3,
+          "caracteres_sin_espacios": 291
+        }
+      ]
+    }
+  ]
+}

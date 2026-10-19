@@ -1,0 +1,31 @@
+{
+  "searchRouting": {
+    "providers": ["exa", "parallel-mcp", "duckduckgo"],
+    "fallbackOn": ["unsupported", "transient", "quota", "network", "invalid-response"]
+  },
+  "webSearch": { "allowedProviders": ["exa", "parallel-mcp", "duckduckgo"] },
+  "workflow": "none",
+  "autoOpenBrowser": false,
+  "allowBrowserCookies": false,
+  "toolActivation": "eager",
+  "toolNames": { "fetchContent": "web_fetch" },
+  "tools": {
+    "sourceCheck": { "enabled": false },
+    "getSearchContent": { "enabled": false }
+  },
+  "commands": {
+    "websearch": { "enabled": false },
+    "curator": { "enabled": false },
+    "search": { "enabled": false },
+    "google-account": { "enabled": false }
+  },
+  "fetchRouting": { "providers": ["http"], "allowRemoteHostedProviders": false },
+  "fetch": { "timeout": 20, "allowedModes": ["readable", "raw"], "defaultMode": "readable" },
+  "maxInlineContentChars": 20000,
+  "githubClone": { "enabled": false },
+  "githubPrIssue": { "enabled": false },
+  "youtube": { "enabled": false },
+  "video": { "enabled": false },
+  "pdf": { "enabled": false },
+  "image": { "enabled": false }
+}

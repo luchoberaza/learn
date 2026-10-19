@@ -1,0 +1,107 @@
+#!/usr/bin/env node
+import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { homedir } from "node:os";
+import { join, resolve } from "node:path";
+import { spawnSync } from "node:child_process";
+import { loadProject, piDir, vaultDir, webConfigPath } from "./lib/pi-sdk.mjs";
+
+const sinRed = process.argv.includes("--sin-red");
+if (process.argv.some(arg => arg === "--help" || arg === "--ayuda")) {
+  console.log("Uso: .pi/scripts/doctor [--sin-red]\nVerifica la Fase 0. Por defecto hace dos pings breves a modelos y prueba búsqueda y lectura web.\n--sin-red omite esas llamadas y las marca como NO verificadas. No lee el portapapeles.");
+  process.exit(0);
+}
+let fallos = 0;
+function check(ok, label, detail) {
+  if (!ok) fallos++;
+  console.log(`${ok ? "✓" : "✗"} ${label}: ${detail}`);
+}
+function run(program, args = []) {
+  const result = spawnSync(program, args, { encoding: "utf8", timeout: 15000, cwd: vaultDir });
+  return { ok: result.status === 0, text: (result.stdout || "").trim() };
+}
+function json(file) { return JSON.parse(readFileSync(file, "utf8")); }
+const config = json(join(piDir, "curso.config.json"));
+const version = run("pi", ["--version"]);
+check(version.ok && version.text === "1.3.0", "pi", `${version.text || "no encontrado"}; se requiere 1.3.0 (ver SETUP.md)`);
+check(process.version === "v26.1.0", "Node.js", `${process.version}; versión verificada: v26.1.0`);
+const fish = run("fish", ["--version"]);
+check(fish.ok && fish.text === "fish, version 4.9.3", "fish", `${fish.text || "ausente"}; versión verificada: 4.9.3`);
+const tmux = run("tmux", ["-V"]);
+check(tmux.ok && tmux.text === "tmux 3.8", "tmux instalado", tmux.ok ? tmux.text : "instalá tmux 3.8");
+check(Boolean(process.env.TMUX) && run("tmux", ["display-message", "-p", "#{pane_id}"]).ok,
+  "Dentro de tmux", process.env.TMUX ? "sesión detectada" : "abrí pi con pi-learn desde fish");
+const fishFile = join(homedir(), ".config/fish/functions/pi-learn.fish");
+check(existsSync(fishFile) && readFileSync(fishFile, "utf8") === readFileSync(join(piDir, "config/fish/pi-learn.fish"), "utf8"),
+  "Lanzador fish", "~/.config/fish/functions/pi-learn.fish; reinstalación en SETUP.md");
+const wayland = process.env.XDG_SESSION_TYPE === "wayland" || Boolean(process.env.WAYLAND_DISPLAY);
+const clipboard = wayland ? "wl-paste" : "xclip";
+check(run(clipboard, [wayland ? "--version" : "-version"]).ok,
+  "Portapapeles", `${wayland ? "Wayland" : "X11"}: se necesita ${clipboard}; prueba Ctrl+V manual en SETUP.md`);
+const vault = config.vault.replace(/^~(?=\/|$)/, homedir());
+check(resolve(vault) === vaultDir && ["_entrada", "cursos"].every(name => existsSync(join(vault, name))),
+  "Rutas del vault", `${vault}; creá _entrada/ y cursos/ si faltan`);
+let obsidian = false;
+try { obsidian = json(join(vault, ".obsidian/app.json")).userIgnoreFilters?.includes("_procesado") === true; } catch {}
+check(obsidian, "Obsidian", obsidian ? "_procesado excluido" : "con Obsidian cerrado, agregá _procesado a userIgnoreFilters");
+const head = run("git", ["-C", join(piDir, "git/github.com/amosblomqvist/pi-interactive-subagents"), "rev-parse", "HEAD"]);
+check(head.text === "c3e8b53c0754ae5ccc19fdab5a7481ec039bc2f7", "Subagentes fijados", "3.7.2 / c3e8b53; reinstalá con el comando de SETUP.md si difiere");
+let webVersion;
+try { webVersion = json(join(piDir, "npm/node_modules/pi-web-access/package.json")).version; } catch {}
+check(webVersion === "0.42.0", "Extensión web fijada", `${webVersion || "ausente"}; ejecutá npm ci --ignore-scripts --prefix .pi/npm`);
+const webConfig = webConfigPath();
+check(existsSync(webConfig) && readFileSync(webConfig, "utf8") === readFileSync(join(piDir, "config/web-search.json"), "utf8"),
+  "Configuración web", `${webConfig}; instalación reproducible en SETUP.md (sin cookies; uso actual sin claves de búsqueda)`);
+const researcher = readFileSync(join(piDir, "agents/researcher.md"), "utf8");
+check(researcher.match(/^model: (.+)$/m)?.[1] === config.modelo_researcher, "Modelo del researcher", "agents/researcher.md debe coincidir con curso.config.json");
+check(run("git", ["-C", piDir, "diff", "--exit-code", "7cfd8942f82ab9476e63572387e1fe9bcea5082c", "--", "skills/teach/SKILL.md"]).ok,
+  "teach original", "skills/teach/SKILL.md sin cambios");
+let project;
+try {
+  project = await loadProject();
+  const { session } = project;
+  const tools = new Set(session.getActiveToolNames());
+  check(project.errors.length === 0 && !(project.loader.getExtensions().warnings?.length),
+    "Carga de extensiones / alias", project.errors.length ? "hay errores; abrí pi --verbose" : "API instalada compatible, sin errores de carga");
+  for (const name of ["quiz", "ask_user_question", "subagent", "web_search", "web_fetch"]) {
+    check(tools.has(name), `Herramienta ${name}`, tools.has(name) ? "cargada y activa" : "revisá la confianza del proyecto y SETUP.md");
+  }
+  const safeBash = join(piDir, "git/github.com/amosblomqvist/pi-interactive-subagents/pi-extension/subagents/tools/safe-bash.ts");
+  check(existsSync(safeBash) && Boolean(globalThis.__pi_interactive_subagents?.registerToolExtension),
+    "safe_bash / puente web", "safe_bash incluido; puente de herramientas para hijos registrado");
+  const registry = session.modelRuntime;
+  for (const [rol, id] of [["researcher", config.modelo_researcher], ["visión", config.modelo_vision]]) {
+    const slash = id.indexOf("/");
+    const model = registry.getModel(id.slice(0, slash), id.slice(slash + 1));
+    if (sinRed) { check(false, `Modelo ${rol}`, `${id}: sin verificar (--sin-red)`); continue; }
+    if (!model) { check(false, `Modelo ${rol}`, `${id}: no está en el catálogo; revisá /model`); continue; }
+    try {
+      const content = [{ type: "text", text: "Respondé únicamente OK." }];
+      if (rol === "visión") content.push({ type: "image", mimeType: "image/png", data: readFileSync(join(piDir, "tests/fixtures/rojo.png")).toString("base64") });
+      const result = await registry.completeSimple(model, {
+        messages: [{ role: "user", content, timestamp: Date.now() }],
+      }, { maxTokens: 64, reasoning: "off", signal: AbortSignal.timeout(30000) });
+      const ok = result.stopReason === "stop" && result.content.some(block => block.type === "text" && block.text.trim());
+      check(ok, `Modelo ${rol}`, ok ? `${id}: respondió${rol === "visión" ? " con imagen" : ""}` : `${id}: el proveedor rechazó o no completó el ping; revisá /login y el acceso REAL al modelo`);
+    } catch { check(false, `Modelo ${rol}`, `${id}: falló el ping; revisá /login o la conexión`); }
+  }
+  for (const [name, args] of [["web_search", { query: "regla de la cadena derivada universidad", numResults: 2 }], ["web_fetch", { url: "https://es.wikipedia.org/wiki/Regla_de_la_cadena" }]]) {
+    if (sinRed) { check(false, `Prueba ${name}`, "sin verificar (--sin-red)"); continue; }
+    try {
+      const runner = session.extensionRunner;
+      const signal = AbortSignal.timeout(45000);
+      const result = await runner.getToolDefinition(name).execute(`doctor-${name}`, args, signal, undefined, runner.createToolContext(`doctor-${name}`, signal));
+      const data = result.structuredContent;
+      const ok = !result.isError && (name === "web_search"
+        ? data?.queries?.some(q => !q.error && q.results?.length > 0)
+        : data?.urls?.some(u => !u.error && u.content?.length > 0));
+      check(ok, `Prueba ${name}`, ok ? "respuesta real recibida" : "sin resultados válidos; verificá red/proveedor en SETUP.md");
+    } catch { check(false, `Prueba ${name}`, "falló; revisá conexión y proveedor web en SETUP.md"); }
+  }
+} catch {
+  check(false, "Carga de pi", "falló el SDK o una extensión; ejecutá pi --verbose (SETUP.md)");
+} finally { if (project) await project.close(); }
+console.log("✓ Ingesta / OCR: diferidos a Fase 1; no se requiere venv ni se eligió motor todavía");
+const cursos = readdirSync(join(vaultDir, "cursos"), { withFileTypes: true }).filter(entry => entry.isDirectory());
+check(cursos.length === 0, "Validación de cursos", cursos.length ? "hay cursos, pero /curso-check se implementa en Fase 3" : "sin cursos todavía; validador previsto para Fase 3");
+console.log(`\n${fallos ? `Diagnóstico con ${fallos} comprobaciones fallidas o pendientes.` : "Diagnóstico automático correcto."} La sesión teach y Ctrl+V requieren además la prueba manual de SETUP.md.`);
+process.exitCode = fallos ? 1 : 0;

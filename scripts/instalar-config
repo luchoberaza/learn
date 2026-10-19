@@ -1,0 +1,24 @@
+#!/usr/bin/env node
+import { copyFileSync, existsSync, mkdirSync, readFileSync, constants } from "node:fs";
+import { homedir } from "node:os";
+import { dirname, join } from "node:path";
+import { piDir, webConfigPath } from "./lib/pi-sdk.mjs";
+
+// Nunca reemplaza una configuración distinta: requiere revisión del usuario.
+let fallos = 0;
+for (const [source, destination] of [
+  [join(piDir, "config/fish/pi-learn.fish"), join(homedir(), ".config/fish/functions/pi-learn.fish")],
+  [join(piDir, "config/web-search.json"), webConfigPath()],
+]) {
+  if (existsSync(destination)) {
+    if (!readFileSync(source).equals(readFileSync(destination))) {
+      console.error(`✗ Ya existe una configuración distinta: ${destination}. No se modificó; revisá el diff antes de reemplazarla.`);
+      fallos++;
+    } else console.log(`✓ Ya instalado: ${destination}`);
+  } else {
+    mkdirSync(dirname(destination), { recursive: true });
+    copyFileSync(source, destination, constants.COPYFILE_EXCL);
+    console.log(`✓ Instalado: ${destination}`);
+  }
+}
+process.exitCode = fallos ? 1 : 0;

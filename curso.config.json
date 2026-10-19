@@ -1,0 +1,10 @@
+{
+  "vault": "~/Projects/pi-learning",
+  "modelo_vision": "openai/gpt-6-luna",
+  "modelo_researcher": "openai/gpt-6-luna",
+  "umbral_calidad_pagina": 0.6,
+  "max_paginas_vision_sin_confirmar": 50,
+  "max_tokens_dossier": 3000,
+  "max_tokens_curso_md": 1500,
+  "idioma_ocr": ["spa", "eng"]
+}
