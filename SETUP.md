@@ -1,6 +1,6 @@
-# Instalación reproducible — Fase 0
+# Instalación reproducible — Fases 0 y 1
 
-**Estado:** Fase 0 aceptada por el usuario (opción «1») con el smoke técnico de preguntas, quiz, log e imagen, más la prueba independiente del researcher real. Los 11 tests y el diagnóstico automático se repitieron en verde dentro de tmux para el commit de cierre. La lección quedó en el probe; no se afirma que se haya completado. Ver `informes/verificacion-base.md`. No se inició ni se autorizó la Fase 1.
+**Estado:** Fase 0 aceptada por el usuario (opción «1») con el smoke técnico de preguntas, quiz, log e imagen, más la prueba independiente del researcher real. Los 11 tests y el diagnóstico automático se repitieron en verde dentro de tmux para el commit de cierre. La lección quedó en el probe; no se afirma que se haya completado. Ver `informes/verificacion-base.md`. El usuario aprobó después la base de Fase 1 con «aprobado, sigamos», conociendo las limitaciones del informe, y autorizó Fase 2. El parcial escaneado real sigue sin evaluarse; no se declara cumplido ese caso.
 
 Actualizar entre semestres, no en semana de parciales.
 
@@ -18,9 +18,13 @@ Actualizar entre semestres, no en semana de parciales.
 | wl-clipboard | `2.3.0` (paquete existente `1:2.3.0-1.1`) |
 | Poppler | `26.08.0` (paquete existente `26.08.0-1.1`); inventario preliminar de muestras |
 | Git | `2.56.0`, existente |
-| uv | `0.13.1`, existente; se usará recién en Fase 1 |
+| uv | `0.13.1`, existente |
+| Python de ingesta | `3.13.13`, entorno `.pi/.venv` |
+| PyMuPDF / OCRmyPDF / wordfreq | `1.28.2` / `17.13.0` / `3.1.1`; transitivas en `scripts/ingesta/uv.lock` |
+| Tesseract utilizado | `5.5.2`, Conda `h1f36d38_0`, con `spa` y `eng` |
+| Ghostscript existente | `10.08.0`, paquete `10.08.0-1.1` |
 
-No se instalaron paquetes del sistema ni dependencias Python. Las herramientas de visualización originales no se modificaron: los mapas Mermaid del skill se renderizan directamente en Obsidian. No se instalaron todavía las dependencias opcionales para generar PNG de Mermaid.
+No se instalaron paquetes del sistema. Las dependencias Python de Fase 1 están aisladas; los ensayos ML no son dependencias de uso diario. Las herramientas de visualización originales no se modificaron: los mapas Mermaid del skill se renderizan directamente en Obsidian. No se instalaron todavía las dependencias opcionales para generar PNG de Mermaid.
 
 Si hace falta una instalación nueva de pi, el comando npm con versión exacta es:
 
@@ -88,7 +92,7 @@ Por elección explícita del usuario:
 
 El frontmatter de `agents/researcher.md` coincide con `curso.config.json`. Las dos llamadas reales de `doctor` respondieron correctamente con la autenticación existente, incluida la petición con un PNG sintético. No se agregaron claves ni se cambió el login.
 
-Esto confirma disponibilidad y aceptación de imágenes, **no** la fidelidad del OCR matemático: el benchmark sigue pendiente de Fase 1.
+Esto confirma disponibilidad y aceptación de imágenes, **no** la fidelidad del OCR matemático. En Fase 1 se transcribieron tres páginas con Luna solo como referencia del benchmark; todavía requieren revisión. Ver `informes/fase1.md`.
 
 La primera propuesta (`gpt-5.4-mini` / `gpt-5.5`) había fallado con HTTP 400 porque esta cuenta ChatGPT/Codex no admite esos ids, pese a figurar en el catálogo. Se conserva el antecedente en `DECISIONES.md`: aparecer en `/model` no prueba el acceso real.
 
@@ -130,6 +134,55 @@ En Wayland, pi usa `wl-paste` (`wl-clipboard`); en X11 necesita `xclip`. Pi admi
 
 El guardado de imágenes en el log se implementa en Fase 5; no está listo en el md-log original.
 
+## Ingesta base — Fase 1
+
+Desde la raíz del vault:
+
+```bash
+UV_PROJECT_ENVIRONMENT="$PWD/.pi/.venv" uv sync --project .pi/scripts/ingesta --python 3.13.13 --locked
+.pi/.venv/bin/python .pi/scripts/ingesta/comprobar.py
+```
+
+Se usan **PyMuPDF para digital/mixta** y **OCRmyPDF + Tesseract para escaneada**, sin GPU, Torch ni servidores. El manifiesto solo necesita documentos y páginas; `config/muestras-fase1.json` es un ejemplo con 9 páginas, no una orden de procesar los 18 PDFs completos. Los overrides de motor se conservan para el benchmark.
+
+Tesseract se resuelve por `PATH`. En esta máquina se utiliza `/home/sesquerre/miniconda3/bin/tesseract`, con datos en `/home/sesquerre/miniconda3/share/tessdata/`, **no** el Tesseract `5.5.3` del sistema. Comprobar:
+
+```bash
+command -v tesseract
+tesseract --version
+tesseract --list-langs
+```
+
+Solo si falta esa versión, puede restaurarse en un entorno separado, sin modificar Conda base:
+
+```bash
+conda create --prefix "$HOME/.cache/pi-learning/ocr" --channel conda-forge 'tesseract=5.5.2=h1f36d38_0'
+# Bash; en fish: set -gx PATH "$HOME/.cache/pi-learning/ocr/bin" $PATH
+export PATH="$HOME/.cache/pi-learning/ocr/bin:$PATH"
+```
+
+Paquete oficial observado: `https://conda.anaconda.org/conda-forge/linux-64/tesseract-5.5.2-h1f36d38_0.conda`, SHA-256 `67125e3aa53a069c1cd5b17ff2b9cb66019b8bc8615a45c456dbd9093721ebd6`. La restauración alternativa no se ejecutó: ya estaba instalado.
+
+### Procesar, consultar y reanudar
+
+```bash
+.pi/.venv/bin/python .pi/scripts/ingesta/ingestar.py iniciar --manifiesto .pi/config/muestras-fase1.json --salida _procesado/fase1/base-simple
+.pi/.venv/bin/python .pi/scripts/ingesta/ingestar.py estado --salida _procesado/fase1/base-simple
+```
+
+Repetir `iniciar` con los mismos argumentos reanuda/reutiliza la caché. `procesar` hace lo mismo en primer plano. El umbral y los idiomas salen de `curso.config.json`; cambios de motor, versión, calidad, tipo o ruta de cita invalidan la caché correspondiente. Los originales solo se leen; si cambia un PDF o alguien edita el Markdown generado, se informa un conflicto en vez de borrar su trabajo.
+
+Las salidas contienen metadatos, clasificación, Markdown por página, calidad, estructura, `busqueda.json`, estado e informe. Los fallos quedan por página. Los ejercicios, evaluaciones y soluciones quedan provisionales hasta visión en Fase 2, aunque su texto parezca bueno. Un puntaje alto no certifica las fórmulas ni las figuras.
+
+Para revisar ahora en Obsidian: **`informes/fase1/resumen.md`** e **`informes/fase1/ingesta-base.md`**. Como `_procesado` está excluido, una copia manual de otro informe puede publicarse sin pisar notas:
+
+```bash
+mkdir -p informes/fase1
+cp -n _procesado/fase1/base-simple/informe-ingesta.md informes/fase1/ingesta-base.md
+```
+
+No hay todavía `/curso-nuevo`, `/curso-estado` ni `/estudiar`: corresponden a fases posteriores. Los ensayos de marker, docling y visión están separados en [`scripts/ingesta/benchmark/`](scripts/ingesta/benchmark/README.md); **no es necesario restaurarlos para usar la ingesta**.
+
 ## Comprobaciones y checkpoint
 
 ```bash
@@ -141,7 +194,7 @@ node --test .pi/tests/*.test.mjs
 
 El diagnóstico carga las extensiones locales con confianza solo para su propio proceso, sin modificar `trust.json`. No envía un prompt de enseñanza ni lee el portapapeles. Por defecto ejecuta dos pings de hasta 64 tokens (uno con un PNG sintético), una búsqueda y una lectura web. No consulta material privado del curso.
 
-Resultado automático actual: **11 tests sin LLM en verde** y **`doctor` completamente en verde dentro de tmux**, con pings reales de `gpt-6-luna` y pruebas web. El lanzador se comprobó además con un pseudoterminal real ejecutando `pi-learn --version`.
+Resultado automático de Fase 1: **18 tests Node sin LLM en verde**, incluida una suite de **20 tests Python**, y **`doctor` completamente en verde dentro de tmux**, con pings reales de `gpt-6-luna` y pruebas web. El diagnóstico comprueba la instalación de uso diario; no exige los entornos ML experimentales ni confunde la aprobación humana de calidad con una dependencia rota. El lanzador se comprobó además con un pseudoterminal real ejecutando `pi-learn --version`.
 
 ### Prueba del researcher real (opcional, con LLM y red)
 
@@ -166,4 +219,4 @@ El usuario aceptó la prueba técnica parcial para cerrar Fase 0. La lista sigui
 7. Verificar en Obsidian el log de texto y los quizzes; `/md-unlog` al terminar.
 8. Correr `doctor` desde otra terminal dentro de tmux, o pedir a pi que ejecute `.pi/scripts/doctor`.
 
-La Fase 0 se cierra con la aceptación explícita del smoke técnico, los tests y el doctor en verde, mediante un único commit en `.pi/`. La Fase 1 requiere un nuevo OK. La autorización de cierre no implica aceptar una muestra rasterizada en reemplazo de un parcial escaneado real.
+La Fase 0 se cierra con la aceptación explícita del smoke técnico, los tests y el doctor en verde, mediante un único commit en `.pi/`. La base de Fase 1 fue aprobada explícitamente y se cierra con un único commit. La Fase 2 está autorizada; su prueba con un parcial escaneado real sigue pendiente. La autorización de cierre no implica aceptar una muestra rasterizada en reemplazo de un parcial escaneado real.

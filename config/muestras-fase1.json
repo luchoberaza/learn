@@ -1,0 +1,43 @@
+{
+  "version": 1,
+  "proposito": "Prueba de ingesta base con muestras reales; no sustituye el parcial escaneado pendiente.",
+  "umbral_calidad": 0.6,
+  "idiomas_ocr": ["spa", "eng"],
+  "documentos": [
+    {
+      "id": "redes-digital",
+      "titulo": "Redes: retardos, fórmulas y figuras (muestra digital)",
+      "tipo": "bibliografia",
+      "archivo": "_entrada/muestras/materiales/bibliografia/Redes_de_computadoras_Un_enfoque_descend.pdf",
+      "paginas": [55, 56, 58]
+    },
+    {
+      "id": "grimaldi-escaneado",
+      "titulo": "GRIMALDI: recurrencias y combinatoria (escaneo con OCR previo)",
+      "tipo": "bibliografia",
+      "archivo": "_entrada/muestras/materiales/bibliografia/GRIMALDI.pdf",
+      "paginas": [521, 522, 523]
+    },
+    {
+      "id": "redes-practico-1",
+      "titulo": "Redes: práctico 1 (digital, no es la muestra escaneada faltante)",
+      "tipo": "ejercicios",
+      "archivo": "_entrada/muestras/materiales/evaluaciones/practico1.pdf",
+      "paginas": [1]
+    },
+    {
+      "id": "redes-parcial-tabla",
+      "titulo": "Redes: parcial con tabla rasterizada (página digital)",
+      "tipo": "evaluaciones",
+      "archivo": "_entrada/muestras/materiales/evaluaciones/sol_prc20240926.pdf",
+      "paginas": [4]
+    },
+    {
+      "id": "redes-parcial-diagramas",
+      "titulo": "Redes: parcial con diagramas TCP rasterizados (página digital)",
+      "tipo": "evaluaciones",
+      "archivo": "_entrada/muestras/materiales/evaluaciones/sol_prc2024123.pdf",
+      "paginas": [1]
+    }
+  ]
+}

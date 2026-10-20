@@ -1,0 +1,293 @@
+{
+  "version": 1,
+  "estado": "parcial_pendiente_de_revision_humana_y_parcial_escaneado_real",
+  "fecha_revision": "2026-10-20",
+  "originales_intactos": 18,
+  "sha256_fuentes": {
+    "_entrada/muestras/materiales/bibliografia/Redes_de_computadoras_Un_enfoque_descend.pdf": "d3daf1f6b55402d5c4b9a172722fd9a4194cfbe5198e06a90dc8210f26894b93",
+    "_entrada/muestras/materiales/bibliografia/GRIMALDI.pdf": "f926e86afc98ff4576141ecbd151435f38225df0099d4d256eaebe3ea86f8b8f",
+    "_entrada/muestras/materiales/evaluaciones/practico1.pdf": "ae1bc82e96c66749f02c4e81646990a7eb25e7b96f02beddf1220eb01886be2d",
+    "_entrada/muestras/materiales/evaluaciones/sol_prc20240926.pdf": "8c1f9c588765290b5b7f25bcd62df3b2f8c7fa2c9478402493903bc9d98d46a6",
+    "_entrada/muestras/materiales/evaluaciones/sol_prc2024123.pdf": "58ac849d487f3bb0f6b3855fac5e507f24e57d419765bfb2f11bd19510805c61"
+  },
+  "seleccion_comun": [
+    {
+      "doc": "redes-digital",
+      "pagina": 56
+    },
+    {
+      "doc": "grimaldi-escaneado",
+      "pagina": 522
+    },
+    {
+      "doc": "redes-parcial-tabla",
+      "pagina": 4
+    }
+  ],
+  "nota": "Mediciones historicas; sus puntajes no certifican fidelidad. No se repitieron los ensayos ML.",
+  "base": {
+    "pymupdf": {
+      "segundos_pagina": 0.5013,
+      "peso_modulo_bytes": 61702419,
+      "nota_peso": "Módulo propio, sin sumar dependencias; comparten el venv base. Medir también el venv con du.",
+      "paginas": [
+        {
+          "doc": "redes-digital",
+          "pagina": 55,
+          "segundos": 1.7947,
+          "puntaje": 0.9867,
+          "ruta": "digital"
+        },
+        {
+          "doc": "redes-digital",
+          "pagina": 56,
+          "segundos": 0.5399,
+          "puntaje": 0.55,
+          "ruta": "pendiente"
+        },
+        {
+          "doc": "redes-digital",
+          "pagina": 58,
+          "segundos": 0.4736,
+          "puntaje": 0.55,
+          "ruta": "pendiente"
+        },
+        {
+          "doc": "grimaldi-escaneado",
+          "pagina": 521,
+          "segundos": 0.2286,
+          "puntaje": 0.9723,
+          "ruta": "ocr"
+        },
+        {
+          "doc": "grimaldi-escaneado",
+          "pagina": 522,
+          "segundos": 0.2571,
+          "puntaje": 0.9706,
+          "ruta": "ocr"
+        },
+        {
+          "doc": "grimaldi-escaneado",
+          "pagina": 523,
+          "segundos": 0.1556,
+          "puntaje": 0.55,
+          "ruta": "pendiente"
+        },
+        {
+          "doc": "redes-practico-1",
+          "pagina": 1,
+          "segundos": 0.3333,
+          "puntaje": 0.55,
+          "ruta": "pendiente"
+        },
+        {
+          "doc": "redes-parcial-tabla",
+          "pagina": 4,
+          "segundos": 0.3776,
+          "puntaje": 0.55,
+          "ruta": "pendiente"
+        },
+        {
+          "doc": "redes-parcial-diagramas",
+          "pagina": 1,
+          "segundos": 0.3514,
+          "puntaje": 0.55,
+          "ruta": "pendiente"
+        }
+      ]
+    },
+    "ocrmypdf": {
+      "segundos_pagina": 12.5065,
+      "peso_modulo_bytes": 1459946,
+      "nota_peso": "Módulo propio, sin sumar dependencias; comparten el venv base. Medir también el venv con du.",
+      "paginas": [
+        {
+          "doc": "redes-digital",
+          "pagina": 55,
+          "segundos": 17.5552,
+          "puntaje": 0.9925,
+          "ruta": "ocr"
+        },
+        {
+          "doc": "redes-digital",
+          "pagina": 56,
+          "segundos": 15.8412,
+          "puntaje": 0.55,
+          "ruta": "pendiente"
+        },
+        {
+          "doc": "redes-digital",
+          "pagina": 58,
+          "segundos": 28.9441,
+          "puntaje": 0.55,
+          "ruta": "pendiente"
+        },
+        {
+          "doc": "grimaldi-escaneado",
+          "pagina": 521,
+          "segundos": 8.9093,
+          "puntaje": 0.9642,
+          "ruta": "ocr"
+        },
+        {
+          "doc": "grimaldi-escaneado",
+          "pagina": 522,
+          "segundos": 8.2052,
+          "puntaje": 0.4,
+          "ruta": "pendiente"
+        },
+        {
+          "doc": "grimaldi-escaneado",
+          "pagina": 523,
+          "segundos": 7.4233,
+          "puntaje": 0.55,
+          "ruta": "pendiente"
+        },
+        {
+          "doc": "redes-practico-1",
+          "pagina": 1,
+          "segundos": 13.0722,
+          "puntaje": 0.55,
+          "ruta": "pendiente"
+        },
+        {
+          "doc": "redes-parcial-tabla",
+          "pagina": 4,
+          "segundos": 5.6313,
+          "puntaje": 0.55,
+          "ruta": "pendiente"
+        },
+        {
+          "doc": "redes-parcial-diagramas",
+          "pagina": 1,
+          "segundos": 6.9766,
+          "puntaje": 0.55,
+          "ruta": "pendiente"
+        }
+      ]
+    }
+  },
+  "ensayos": {
+    "docling": {
+      "version_paquete": "2.140.0",
+      "cpu_hilos": 4,
+      "formula_enrichment": true,
+      "paginas": [
+        {
+          "doc": "redes-digital",
+          "pagina": 56,
+          "sha256_fuente": "d3daf1f6b55402d5c4b9a172722fd9a4194cfbe5198e06a90dc8210f26894b93",
+          "archivo": "redes-digital-p0056.md",
+          "estado": "ConversionStatus.SUCCESS",
+          "caracteres": 3512,
+          "segundos": 108.143
+        },
+        {
+          "doc": "grimaldi-escaneado",
+          "pagina": 522,
+          "sha256_fuente": "f926e86afc98ff4576141ecbd151435f38225df0099d4d256eaebe3ea86f8b8f",
+          "archivo": "grimaldi-escaneado-p0522.md",
+          "estado": "ConversionStatus.SUCCESS",
+          "caracteres": 2023,
+          "segundos": 14.671
+        },
+        {
+          "doc": "redes-parcial-tabla",
+          "pagina": 4,
+          "sha256_fuente": "8c1f9c588765290b5b7f25bcd62df3b2f8c7fa2c9478402493903bc9d98d46a6",
+          "archivo": "redes-parcial-tabla-p0004.md",
+          "estado": "ConversionStatus.PARTIAL_SUCCESS",
+          "caracteres": 0,
+          "segundos": 120.428
+        }
+      ]
+    },
+    "marker": {
+      "version_paquete": "2.0.0",
+      "cpu_hilos": 4,
+      "servidores_propios_detenidos": true,
+      "paginas": [
+        {
+          "doc": "redes-digital",
+          "pagina": 56,
+          "sha256_fuente": "d3daf1f6b55402d5c4b9a172722fd9a4194cfbe5198e06a90dc8210f26894b93",
+          "archivo": "redes-digital-p0056.md",
+          "caracteres": 3530,
+          "estado": "convertida",
+          "segundos": 164.284
+        },
+        {
+          "doc": "grimaldi-escaneado",
+          "pagina": 522,
+          "sha256_fuente": "f926e86afc98ff4576141ecbd151435f38225df0099d4d256eaebe3ea86f8b8f",
+          "error": "AttributeError",
+          "aviso": "Falló esta página; no se infiere su calidad.",
+          "segundos": 0.113
+        },
+        {
+          "doc": "redes-parcial-tabla",
+          "pagina": 4,
+          "sha256_fuente": "8c1f9c588765290b5b7f25bcd62df3b2f8c7fa2c9478402493903bc9d98d46a6",
+          "error": "AttributeError",
+          "aviso": "Falló esta página; no se infiere su calidad.",
+          "segundos": 0.03
+        }
+      ]
+    },
+    "vision": {
+      "modelo": "openai/gpt-6-luna",
+      "paginas": [
+        {
+          "doc": "redes-digital",
+          "pagina": 56,
+          "archivo": "redes-digital-p0056.md",
+          "completa": true,
+          "stopReason": "stop",
+          "segundos": 19.673788635,
+          "sha256_imagen": "e72ce2cc68e53e1647763a728b1e9a77fe4c81b24a76f1bf2b29f25a7c0ed142",
+          "sha256_fuente": "d3daf1f6b55402d5c4b9a172722fd9a4194cfbe5198e06a90dc8210f26894b93",
+          "tokens": {
+            "input": 3195,
+            "output": 826,
+            "totalTokens": 4021
+          }
+        },
+        {
+          "doc": "grimaldi-escaneado",
+          "pagina": 522,
+          "archivo": "grimaldi-escaneado-p0522.md",
+          "completa": true,
+          "stopReason": "stop",
+          "segundos": 14.488360043,
+          "sha256_imagen": "efe3a92548f4f2136383e0f7fe4a0c786e836a2762b2851fce5ac4918d127739",
+          "sha256_fuente": "f926e86afc98ff4576141ecbd151435f38225df0099d4d256eaebe3ea86f8b8f",
+          "tokens": {
+            "input": 3058,
+            "output": 599,
+            "totalTokens": 3657
+          }
+        },
+        {
+          "doc": "redes-parcial-tabla",
+          "pagina": 4,
+          "archivo": "redes-parcial-tabla-p0004.md",
+          "completa": true,
+          "stopReason": "stop",
+          "segundos": 29.961330292000007,
+          "sha256_imagen": "8454410ee7377620acdfd2451dc4b56ef9a7901389b9e36487ee91b4fd6e99cf",
+          "sha256_fuente": "8c1f9c588765290b5b7f25bcd62df3b2f8c7fa2c9478402493903bc9d98d46a6",
+          "tokens": {
+            "input": 2853,
+            "output": 1389,
+            "totalTokens": 4242
+          }
+        }
+      ]
+    }
+  },
+  "ingesta_base_simple": {
+    "estado": "completada_con_pendientes",
+    "procesadas": 9,
+    "pendientes": 7
+  }
+}

@@ -1,0 +1,13 @@
+[project]
+name = "pi-learning-ingesta"
+version = "0.1.0"
+description = "Ingesta local, reanudable y por página para cursos"
+requires-python = ">=3.13,<3.14"
+dependencies = [
+  "pymupdf==1.28.2",
+  "ocrmypdf==17.13.0",
+  "wordfreq==3.1.1",
+]
+
+[tool.uv]
+package = false

@@ -7,7 +7,7 @@ import { loadProject, piDir, vaultDir, webConfigPath } from "./lib/pi-sdk.mjs";
 
 const sinRed = process.argv.includes("--sin-red");
 if (process.argv.some(arg => arg === "--help" || arg === "--ayuda")) {
-  console.log("Uso: .pi/scripts/doctor [--sin-red]\nVerifica la Fase 0. Por defecto hace dos pings breves a modelos y prueba búsqueda y lectura web.\n--sin-red omite esas llamadas y las marca como NO verificadas. No lee el portapapeles.");
+  console.log("Uso: .pi/scripts/doctor [--sin-red]\nVerifica la base y el avance de la ingesta (Fase 1). Por defecto hace dos pings breves a modelos y prueba búsqueda y lectura web.\n--sin-red omite esas llamadas y las marca como NO verificadas. No lee el portapapeles.");
   process.exit(0);
 }
 let fallos = 0;
@@ -100,7 +100,16 @@ try {
 } catch {
   check(false, "Carga de pi", "falló el SDK o una extensión; ejecutá pi --verbose (SETUP.md)");
 } finally { if (project) await project.close(); }
-console.log("✓ Ingesta / OCR: diferidos a Fase 1; no se requiere venv ni se eligió motor todavía");
+const pythonIngesta = join(piDir, ".venv/bin/python");
+if (!existsSync(pythonIngesta)) {
+  check(false, "Entorno de ingesta", "falta .pi/.venv; ejecutá uv sync según SETUP.md");
+} else {
+  const ingesta = run(pythonIngesta, [join(piDir, "scripts/ingesta/comprobar.py")]);
+  try {
+    if (!ingesta.ok) throw new Error("diagnóstico fallido");
+    for (const entrada of JSON.parse(ingesta.text).chequeos) check(entrada.ok, entrada.nombre, entrada.detalle);
+  } catch { check(false, "Entorno de ingesta", "no se pudo verificar; ejecutá .pi/.venv/bin/python .pi/scripts/ingesta/comprobar.py"); }
+}
 const cursos = readdirSync(join(vaultDir, "cursos"), { withFileTypes: true }).filter(entry => entry.isDirectory());
 check(cursos.length === 0, "Validación de cursos", cursos.length ? "hay cursos, pero /curso-check se implementa en Fase 3" : "sin cursos todavía; validador previsto para Fase 3");
 console.log(`\n${fallos ? `Diagnóstico con ${fallos} comprobaciones fallidas o pendientes.` : "Diagnóstico automático correcto."} La sesión teach y Ctrl+V requieren además la prueba manual de SETUP.md.`);
