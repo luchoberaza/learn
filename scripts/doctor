@@ -7,7 +7,7 @@ import { loadProject, piDir, vaultDir, webConfigPath } from "./lib/pi-sdk.mjs";
 
 const sinRed = process.argv.includes("--sin-red");
 if (process.argv.some(arg => arg === "--help" || arg === "--ayuda")) {
-  console.log("Uso: .pi/scripts/doctor [--sin-red]\nVerifica instalación, ingesta y estructura de los cursos (Fases 0–3). Por defecto hace dos pings breves a modelos y prueba búsqueda y lectura web.\n--sin-red omite esas llamadas y las marca como NO verificadas. No lee el portapapeles.");
+  console.log("Uso: .pi/scripts/doctor [--sin-red]\nVerifica instalación, ingesta y estructura de los cursos (Fases 0–4). Por defecto hace dos pings breves a modelos y prueba búsqueda y lectura web.\n--sin-red omite esas llamadas y las marca como NO verificadas. No lee el portapapeles.");
   process.exit(0);
 }
 let fallos = 0;
@@ -62,13 +62,14 @@ try {
   const tools = new Set(session.getActiveToolNames());
   check(project.errors.length === 0 && !(project.loader.getExtensions().warnings?.length),
     "Carga de extensiones / alias", project.errors.length ? "hay errores; abrí pi --verbose" : "API instalada compatible, sin errores de carga");
-  for (const name of ["quiz", "ask_user_question", "subagent", "web_search", "web_fetch", "transcribir_paginas", "guardar_items", "guardar_curso"]) {
+  for (const name of ["quiz", "ask_user_question", "subagent", "web_search", "web_fetch", "transcribir_paginas", "guardar_items", "guardar_curso", "leer_paginas", "ver_pagina", "buscar_material", "leer_items"]) {
     check(tools.has(name), `Herramienta ${name}`, tools.has(name) ? "cargada y activa" : "revisá la confianza del proyecto y SETUP.md");
   }
   const commands = new Set(session.extensionRunner.getRegisteredCommands().map(c => c.name));
-  for (const name of ["curso-nuevo", "curso-agregar", "curso-check", "curso-estado"]) {
+  for (const name of ["curso-nuevo", "curso-agregar", "curso-check", "curso-estado", "estudiar", "cursos"]) {
     check(commands.has(name), `Comando /${name}`, commands.has(name) ? "registrado" : "ejecutá /reload y revisá extensions/curso/");
   }
+  check(existsSync(join(piDir, "modo-curso.md")) && existsSync(join(piDir, "scripts/ingesta/sesion.py")), "Contexto de sesión", "modo-curso y lector/render local presentes; no requiere dependencias nuevas");
   const skills = project.loader.getSkills();
   check(["curso-nuevo", "curso-agregar"].every(n => skills.skills.some(s => s.name === n)), "Skills de cursos", "curso-nuevo y curso-agregar; /reload tras cambios");
   const safeBash = join(piDir, "git/github.com/amosblomqvist/pi-interactive-subagents/pi-extension/subagents/tools/safe-bash.ts");

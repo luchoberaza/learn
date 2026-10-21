@@ -1,6 +1,6 @@
-# Instalación reproducible — Fases 0 a 3
+# Instalación reproducible — Fases 0 a 4
 
-**Estado:** Fase 0 aceptada por el usuario (opción «1») con el smoke técnico de preguntas, quiz, log e imagen, más la prueba independiente del researcher real. Los 11 tests y el diagnóstico automático se repitieron en verde dentro de tmux para el commit de cierre. La lección quedó en el probe; no se afirma que se haya completado. Ver `informes/verificacion-base.md`. El usuario aprobó después la base de Fase 1 con «aprobado, sigamos», conociendo las limitaciones del informe, y autorizó Fase 2. Fase 1 quedó en `352c249`; Fase 2 tiene implementación, piloto digital y prueba con escaneos reales externos comprobados, y fue aprobada por el usuario con «Fase 2 aprobada, continuá». Fase 2 quedó cerrada en `6409acd`. Fase 3 aprobada con «Aprobado; continuá»: se aplicó la tabla de Redes y la incorporación de las tres diapositivas, conservando contrato/progreso/PDFs existentes. El curso final tiene 17 documentos y 8 temas; las revisiones individuales siguen pendientes. Este cierre precede a Fase 4. La muestra externa se buscó a pedido del usuario; es papel impreso, no un parcial manuscrito.
+**Estado:** Fases 0–3 aprobadas y cerradas (`79b1976`, `352c249`, `6409acd`, `3616e71`). Redes: 17 documentos / 987 páginas y 8 temas, con 268 páginas referidas todavía pendientes; aprobación de organización no equivale a revisión individual. Fase 4 implementada con primera pregunta real, compactación y reapertura comprobadas; checkpoint pendiente de aprobación. Historial y límites de las pruebas en `informes/fase1.md` a `informes/fase4.md` y `DECISIONES.md`. No se inicia Fase 5.
 
 Actualizar entre semestres, no en semana de parciales.
 
@@ -182,7 +182,7 @@ mkdir -p informes/fase1
 cp -n _procesado/fase1/base-simple/informe-ingesta.md informes/fase1/ingesta-base.md
 ```
 
-Están disponibles `/curso-nuevo`, `/curso-agregar`, `/curso-check` y `/curso-estado` (Fase 3). `/estudiar` sigue reservado a Fase 4. Los ensayos de marker, docling y visión están separados en [`scripts/ingesta/benchmark/`](scripts/ingesta/benchmark/README.md); **no es necesario restaurarlos para usar la ingesta**.
+Están disponibles `/curso-nuevo`, `/curso-agregar`, `/curso-check` y `/curso-estado` (Fase 3). `/estudiar` y `/cursos` están disponibles desde Fase 4 (ver abajo). Los ensayos de marker, docling y visión están separados en [`scripts/ingesta/benchmark/`](scripts/ingesta/benchmark/README.md); **no es necesario restaurarlos para usar la ingesta**.
 
 ## Visión e ítems — Fase 2
 
@@ -231,6 +231,32 @@ El curso real está en `cursos/redes/`: **17 PDFs / 987 páginas, 8 temas** y 52
 
 El informe visible se regenera sólo si conserva su huella generada; si se editó manualmente, se preserva y se avisa. Los detalles de fuentes, resultados y límites están en `informes/fase3.md` y `informes/verificacion-fase3.json`. Las fuentes y enunciados reales permanecen fuera de Git. Los datos del curso no se restauran desde el commit del código: conservar el vault o volver a preparar los originales.
 
+## Sesión de estudio — Fase 4
+
+No agrega dependencias: mismo `uv sync --locked`, pi 1.3.0 y Node 26.1.0. El parser YAML se reutiliza en Python al activar/restaurar; páginas/BM25 se leen en TypeScript, sin OCR. Después de `/reload` o de abrir una sesión nueva:
+
+```text
+/cursos
+/estudiar redes retardos
+/estudiar redes
+```
+
+El último muestra un selector; tema por id, nombre o alias, sin tildes, con selector ante ambigüedad. Fuera del índice se ofrece un modo ad hoc sin escribirlo automáticamente al curso. El comando arranca hasta la primera pregunta sin otra orden. Cambia nombre/estado y vincula una **nota nueva**, sin rellenarla con la historia previa ni pisar notas del mismo día. Tras `/curso-agregar`, reactivá el tema para tomar la nueva curación.
+
+Las tools `leer_paginas`, `buscar_material`, `leer_items` y `ver_pagina` requieren curso activo. Devuelven citas/texto acotado, sin rutas de derivados que el modelo deba recorrer; las soluciones se omiten por defecto. `ver_pagina` sólo renderiza localmente, con caché y protección de originales/renders. Los resultados de lectura no van al log. `teach` permanece intacto y se reinyecta junto a modo/dossier en cada arranque. Progreso existente se lee, **no se escribe**.
+
+La sesión y el vínculo se restauran desde la rama activa. Para retomar una sesión real, cerrá pi y usá `pi --resume` o `/resume` en la próxima apertura; buscá el nombre `<Curso> · <Tema>`. `/compact` conserva el mecanismo de inyección y las entradas de estado. El log queda en `cursos/<curso>/sesiones/`. Si se inicia otra sesión sin progreso registrado, se señala el log anterior; la reconstrucción automática sigue en Fase 7.
+
+Prueba opcional con el modelo principal real, en una sesión independiente:
+
+```bash
+node .pi/scripts/probar-sesion
+```
+
+Consume LLM para la primera pregunta y compactación; se detiene sin responder por vos. Usa sólo seis tools de lectura/preguntas y crea su propio JSONL bajo `_procesado/fase4/`. Primera prueba completa correcta: quiz a los **20,08 s**, compactación real y reapertura del mismo archivo con curso/tema/log restaurados. Dossier 6296 bytes, lectura 0,45 ms, BM25 4,75 ms y render frío adicional 388,6 ms. No son garantías ni una clase completa. `informes/fase4.md` documenta también dos intentos previos fallidos del harness, sus correcciones y una descarga redundante a la caché global; el harness final conserva el scope de paquetes y no modifica settings personales.
+
+El modo no promete funciones futuras: fotos persistentes en Fase 5, researcher anclado/caché en Fase 6, `/fin`, `/progreso` y `registrar_progreso` en Fase 7. Por ahora, un cierre se resume en chat/log sin editar YAML de progreso. El md-log manual ahora pide confirmación para rellenar una nota no vacía; el vínculo de curso nunca la reemplaza.
+
 ## Comprobaciones y checkpoint
 
 ```bash
@@ -242,7 +268,7 @@ node --test .pi/tests/*.test.mjs
 
 El diagnóstico carga las extensiones locales con confianza solo para su propio proceso, sin modificar `trust.json`. No envía un prompt de enseñanza ni lee el portapapeles. Por defecto ejecuta dos pings de hasta 64 tokens (uno con un PNG sintético), una búsqueda y una lectura web. No consulta material privado del curso.
 
-Resultado automático actual, Fase 3: **34 tests Node sin LLM en verde**, incluida una suite de **52 tests Python**, y **`doctor` completamente en verde dentro de tmux**, con pings reales de `gpt-6-luna` y pruebas web. El diagnóstico comprueba la instalación de uso diario; no exige los entornos ML experimentales ni confunde la aprobación humana de calidad con una dependencia rota. El lanzador se comprobó además con un pseudoterminal real ejecutando `pi-learn --version`.
+Resultado automático actual, Fase 4: **46 tests Node sin LLM en verde**, incluida una suite de **56 tests Python**, y **`doctor` completamente en verde dentro de tmux**, con pings reales de `gpt-6-luna` y pruebas web. El diagnóstico comprueba la instalación de uso diario; no exige los entornos ML experimentales ni confunde la aprobación humana de calidad con una dependencia rota. El lanzador se comprobó además con un pseudoterminal real ejecutando `pi-learn --version`.
 
 ### Prueba del researcher real (opcional, con LLM y red)
 
@@ -267,4 +293,4 @@ El usuario aceptó la prueba técnica parcial para cerrar Fase 0. La lista sigui
 7. Verificar en Obsidian el log de texto y los quizzes; `/md-unlog` al terminar.
 8. Correr `doctor` desde otra terminal dentro de tmux, o pedir a pi que ejecute `.pi/scripts/doctor`.
 
-La Fase 0 se cierra con la aceptación explícita del smoke técnico, los tests y el doctor en verde, mediante un único commit en `.pi/`. La base de Fase 1 fue aprobada explícitamente y se cierra con un único commit. La Fase 2 fue aprobada explícitamente con «Fase 2 aprobada, continuá», aceptando el checkpoint con problemas escaneados reales externos y sus límites declarados; se cierra con un único commit tras repetir tests y doctor en verde. No se declara probado un parcial manuscrito ni se usó una muestra digital rasterizada como sustituto. Fase 3 aprobada con «Aprobado; continuá», propuesta aplicada y chequeos repetidos para su único commit. La aprobación no modifica la revisión humana pendiente de las transcripciones y no equivale a aprobar Fase 4 por adelantado.
+La Fase 0 se cierra con la aceptación explícita del smoke técnico, los tests y el doctor en verde, mediante un único commit en `.pi/`. La base de Fase 1 fue aprobada explícitamente y se cierra con un único commit. La Fase 2 fue aprobada explícitamente con «Fase 2 aprobada, continuá», aceptando el checkpoint con problemas escaneados reales externos y sus límites declarados; se cierra con un único commit tras repetir tests y doctor en verde. No se declara probado un parcial manuscrito ni se usó una muestra digital rasterizada como sustituto. Fase 3 aprobada con «Aprobado; continuá», propuesta aplicada y chequeos repetidos para su único commit. La aprobación no modifica la revisión humana pendiente de las transcripciones y no equivale a aprobar Fase 4 por adelantado. Fase 4 tiene checkpoint técnico listo; se espera su OK antes de iniciar Fase 5.

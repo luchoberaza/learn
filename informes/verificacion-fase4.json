@@ -1,0 +1,59 @@
+{
+  "version": 1,
+  "estado": "fase4_checkpoint_tecnico_correcto_aprobacion_pendiente",
+  "fase3_commit": "3616e71",
+  "modelo": "openai/gpt-6.1-sol",
+  "curso": "redes",
+  "tema": "retardos",
+  "primera_pregunta": {
+    "herramienta": "quiz",
+    "latencia_ms": 20075.57,
+    "respuesta_usuario": false
+  },
+  "compactacion_real": true,
+  "reapertura_jsonl_real": true,
+  "estado_restaurado": {
+    "curso": "redes",
+    "tema": "retardos",
+    "log": "cursos/redes/sesiones/2026-10-21-retardos-3.md"
+  },
+  "tiempos_ms": {
+    "leer_paginas": 0.45,
+    "buscar_material": 4.75,
+    "ver_pagina": 201.3,
+    "ver_pagina_sin_cache": 388.63,
+    "ver_pagina_cache": 255.77
+  },
+  "bytes_dossier": 6296,
+  "tokens_estimados_bytes_sobre_4": 1574.0,
+  "progreso_intacto": true,
+  "integridad": {
+    "pdf_originales": 18,
+    "pdf_curso": 17,
+    "teach_original": true,
+    "settings_proyecto_intactos": true
+  },
+  "evidencia_local": "_procesado/fase4/prueba-1792595021792/resultado.json",
+  "pruebas": {
+    "node": 46,
+    "python": 56,
+    "doctor": "Completo correcto dentro de tmux; cuatro tools y dos comandos nuevos registrados, Luna texto/imagen y web correctos; preparación parcial informada."
+  },
+  "intentos_previos": [
+    {
+      "ruta": "_procesado/fase4/prueba-1792594688977",
+      "resultado": "Pregunta y compactación reales; no pasó chequeo final de secciones; harness usaba loader reutilizado y settings combinados en memoria."
+    },
+    {
+      "ruta": "_procesado/fase4/prueba-1792594901766",
+      "resultado": "Pregunta real; compactación sin historia suficiente por overrides descartados al reload."
+    }
+  ],
+  "limites": [
+    "Smoke técnico con seis tools de lectura/preguntas, no una clase completa ni una respuesta real del alumno; no prueba fotos ni researcher anclado.",
+    "No se hizo clic manual en /resume ni en enlaces Obsidian.",
+    "268 páginas referidas del curso aún pendientes/sin preparar.",
+    "Contar bytes/4 es una estimación, no un tokenizer exacto."
+  ],
+  "plan_sha256": "ba3ab49513e1fee2ec7c4e3ab60638fb28fb2e58460f3c24af785b987277b5fa"
+}

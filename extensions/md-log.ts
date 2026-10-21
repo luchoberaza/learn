@@ -25,7 +25,7 @@
  * .md-link extension this was modeled on).
  */
 
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
 import * as fs from "node:fs";
 import * as path from "node:path";
 
@@ -33,25 +33,27 @@ const QA_TOOLS = new Set(["quiz", "ask_user_question"]);
 
 export default function mdLog(pi: ExtensionAPI) {
 	let logFile: string | null = null;
+	let contexto: ExtensionContext | undefined;
 
 	// --- State restoration on session restart ---
 
-	pi.on("session_start", async (_event, ctx) => {
+	const restaurar = async (_event: unknown, ctx: ExtensionContext) => {
+		contexto = ctx;
+		logFile = null;
+		ctx.ui.setStatus("md-log", undefined);
 		let lastLinkData: { file: string | null } | undefined;
-		for (const entry of ctx.sessionManager.getEntries()) {
+		for (const entry of ctx.sessionManager.getBranch()) {
 			if (entry.type === "custom" && entry.customType === "md-log") {
 				lastLinkData = entry.data as { file: string | null } | undefined;
 			}
 		}
-		if (lastLinkData?.file) {
+		if (lastLinkData?.file && fs.existsSync(lastLinkData.file) && fs.lstatSync(lastLinkData.file).isFile()) {
 			logFile = lastLinkData.file;
-			const theme = ctx.ui.theme;
-			ctx.ui.setStatus(
-				"md-log",
-				theme.fg("accent", "🗒 ") + theme.fg("dim", path.basename(logFile)),
-			);
+			ctx.ui.setStatus("md-log", `🗒 ${path.basename(logFile)}`);
 		}
-	});
+	};
+	pi.on("session_start", restaurar);
+	pi.on("session_tree", restaurar);
 
 	// --- Serialization: events can fire close together; keep appends ordered ---
 
@@ -68,14 +70,11 @@ export default function mdLog(pi: ExtensionAPI) {
 	function appendToFile(text: string): void {
 		if (!logFile) return;
 		try {
-			let current = "";
-			if (fs.existsSync(logFile)) {
-				current = fs.readFileSync(logFile, "utf-8");
-			}
-			const prefix = current.trim().length > 0 ? "\n\n" : "";
-			fs.writeFileSync(logFile, current + prefix + text + "\n", "utf-8");
+			if (!fs.lstatSync(logFile).isFile()) throw new Error("El log dejó de ser un archivo regular.");
+			const prefix = fs.statSync(logFile).size > 0 ? "\n\n" : "";
+			fs.appendFileSync(logFile, prefix + text + "\n", "utf-8");
 		} catch {
-			// File may have been deleted externally; ignore.
+			contexto?.ui.notify("No se pudo escribir el log; el chat continúa y no se reemplazó la nota.", "warning");
 		}
 	}
 
@@ -90,7 +89,7 @@ export default function mdLog(pi: ExtensionAPI) {
 	}
 
 	function userBlock(text: string): string {
-		return `> [!quote] YOU\n\n${text}`;
+		return `> [!quote] VOS\n\n${text}`;
 	}
 
 	// Skill declarations (`<skill name="..." ...> ...whole SKILL.md... </skill>`)
@@ -102,7 +101,7 @@ export default function mdLog(pi: ExtensionAPI) {
 			/<skill\b([^>]*)>[\s\S]*?<\/skill>/g,
 			(_match, attrs: string) => {
 				const name = /name="([^"]+)"/.exec(attrs)?.[1];
-				return `> [!note] SKILL loaded: ${name ?? "(unknown)"}`;
+				return `> [!note] Skill cargada: ${name ?? "(desconocida)"}`;
 			},
 		);
 	}
@@ -131,11 +130,12 @@ export default function mdLog(pi: ExtensionAPI) {
 
 	function answerCalloutQuiz(details: any): string {
 		const status = details?.status;
+		if (!status) return callout("warning", "Quiz sin respuesta", ["La herramienta no registró una respuesta; no se califica."]);
 		if (status === "cancelled") {
-			return callout("warning", "Quiz — cancelled", ["(user skipped)"]);
+			return callout("warning", "Quiz — cancelado", ["(omitido por el usuario)"]);
 		}
 		if (status === "unavailable") {
-			return callout("warning", "Quiz — unavailable", [details?.message || ""]);
+			return callout("warning", "Quiz — no disponible", [details?.message || ""]);
 		}
 		// "I don't know" is neither correct nor incorrect — it's a distinct signal,
 		// so it never renders as a red ✗.
@@ -143,30 +143,30 @@ export default function mdLog(pi: ExtensionAPI) {
 		const correct = details?.correct === true;
 		const type = dontKnow ? "question" : correct ? "success" : "failure";
 		const title = dontKnow
-			? "Quiz — I don't know"
+			? "Quiz — No sé"
 			: correct
-				? "Quiz — correct ✓"
-				: "Quiz — incorrect ✗";
+				? "Quiz — correcto ✓"
+				: "Quiz — incorrecto ✗";
 		const body: string[] = [];
 
 		if (dontKnow) {
-			body.push("Your answer: I don't know");
+			body.push("Tu respuesta: No sé");
 		} else {
 			const answers: any[] = details?.answers || [];
 			const sel = answers.map((a) => `${a.index}. ${a.label}`).join(", ") || "(none)";
-			body.push(`Your answer: ${sel}`);
+			body.push(`Tu respuesta: ${sel}`);
 		}
 
 		const correctIndices: number[] = details?.correctIndices || [];
 		const correctStr = correctIndices.map((i) => `${i}`).join(", ");
-		body.push(`Correct answer: ${correctStr}`);
+		body.push(`Respuesta correcta: ${correctStr}`);
 
 		// Optional free-text note the user typed in the always-present note field.
 		// Only present (in details) when non-empty, so no guard for empty strings.
 		if (details?.note) {
 			body.push("");
 			const noteLines = String(details.note).split("\n");
-			body.push(`Note: ${noteLines[0]}`);
+			body.push(`Nota: ${noteLines[0]}`);
 			for (let i = 1; i < noteLines.length; i++) body.push(noteLines[i]);
 		}
 
@@ -180,19 +180,19 @@ export default function mdLog(pi: ExtensionAPI) {
 	function answerCalloutAsk(details: any): string {
 		const status = details?.status;
 		if (status === "cancelled") {
-			return callout("warning", "Question — cancelled", ["(user skipped)"]);
+			return callout("warning", "Pregunta — cancelada", ["(omitida por el usuario)"]);
 		}
 		if (status === "unavailable") {
-			return callout("warning", "Question — unavailable", [details?.message || ""]);
+			return callout("warning", "Pregunta — no disponible", [details?.message || ""]);
 		}
 		const answers: any[] = details?.answers || [];
 		const body: string[] = answers.map((a) => {
-			if (a.type === "other") return `Other: ${a.label}`;
+			if (a.type === "other") return `Otra: ${a.label}`;
 			if (a.type === "text") return a.label;
 			return `${a.index}. ${a.label}`;
 		});
-		if (body.length === 0) body.push("(no answer)");
-		return callout("example", "Answer", body);
+		if (body.length === 0) body.push("(sin respuesta)");
+		return callout("example", "Respuesta", body);
 	}
 
 	// --- Event handlers ---
@@ -237,7 +237,7 @@ export default function mdLog(pi: ExtensionAPI) {
 		const question: string = input.question || "";
 		const context: string | undefined = input.details?.trim() || undefined;
 		const options: Array<{ label: string }> = Array.isArray(input.options) ? input.options : [];
-		const block = questionCallout("Question", question, context, options);
+		const block = questionCallout("Pregunta", question, context, options);
 		await withLock(() => appendToFile(block));
 	});
 
@@ -276,18 +276,43 @@ export default function mdLog(pi: ExtensionAPI) {
 		await withLock(() => appendToFile(block));
 	});
 
+	// El bus necesita acuse: emit() no espera promesas ni propaga errores de listeners.
+	function vincular(file: string, ctx: ExtensionContext, rellenar: boolean) {
+		if (!fs.lstatSync(file).isFile()) throw new Error("El log debe ser un archivo regular, no un enlace.");
+		logFile = file;
+		pi.appendEntry("md-log", { file });
+		const written = rellenar ? backfill(ctx) : 0;
+		ctx.ui.setStatus("md-log", `🗒 ${path.basename(file)}`);
+		return written;
+	}
+	function desvincular() {
+		logFile = null;
+		pi.appendEntry("md-log", { file: null });
+		contexto?.ui.setStatus("md-log", undefined);
+	}
+	pi.events.on("md-log:link", async (data) => {
+		const d = data as { file: string; backfill?: boolean; onComplete?: (error?: string) => void };
+		try {
+			if (!contexto) throw new Error("md-log no tiene una sesión activa.");
+			if (d.backfill !== false && fs.statSync(d.file).size > 0) throw new Error("El bus sólo rellena notas vacías; la nota existente se preservó.");
+			await withLock(() => vincular(d.file, contexto!, d.backfill !== false));
+			d.onComplete?.();
+		} catch (e) { d.onComplete?.(e instanceof Error ? e.message : "No se pudo vincular el log."); }
+	});
+	pi.events.on("md-log:unlink", async () => { await withLock(desvincular); });
+
 	// --- Commands ---
 
 	pi.registerCommand("md-log", {
-		description: "Mirror the session to a markdown file (backfills history)",
+		description: "Vincular una nota Markdown y rellenarla con la rama activa",
 		handler: async (args, ctx: any) => {
 			const filepath = args.trim();
 			if (!filepath) {
-				ctx.ui.notify("Usage: /md-log <filepath>", "warning");
+				ctx.ui.notify("Uso: /md-log <ruta>", "warning");
 				return;
 			}
 			if (typeof ctx.isIdle === "function" && !ctx.isIdle()) {
-				ctx.ui.notify("Wait for the agent to finish before linking.", "warning");
+				ctx.ui.notify("Esperá a que termine el agente antes de vincular.", "warning");
 				return;
 			}
 
@@ -297,41 +322,34 @@ export default function mdLog(pi: ExtensionAPI) {
 			// it never creates one. This avoids silently scattering new files
 			// (and parent directories) around the vault from a typo'd path.
 			if (!fs.existsSync(resolved)) {
-				ctx.ui.notify(`File does not exist: ${resolved}`, "error");
+				ctx.ui.notify(`La nota no existe: ${resolved}`, "error");
 				return;
 			}
 			if (!fs.statSync(resolved).isFile()) {
-				ctx.ui.notify(`Not a file: ${resolved}`, "error");
+				ctx.ui.notify(`No es un archivo: ${resolved}`, "error");
 				return;
 			}
 
-			logFile = resolved;
-			pi.appendEntry("md-log", { file: resolved });
+			if (fs.statSync(resolved).size > 0 && (!ctx.hasUI || !await ctx.ui.confirm("Reemplazar nota con el historial", "La nota tiene contenido. ¿Confirmás reemplazarlo con la rama activa? Si querés conservarlo, elegí otra nota vacía."))) {
+				ctx.ui.notify("Nota preservada; no se cambió el vínculo.", "info");
+				return;
+			}
+			const written = await withLock(() => vincular(resolved, ctx, true));
 
-			// Backfill the active branch.
-			const written = backfill(ctx);
-
-			const theme = ctx.ui.theme;
-			ctx.ui.setStatus(
-				"md-log",
-				theme.fg("accent", "🗒 ") + theme.fg("dim", path.basename(resolved)),
-			);
-			ctx.ui.notify(`Linked: ${resolved} (${written} entries backfilled)`, "success");
+			ctx.ui.notify(`Nota vinculada: ${resolved} (${written} entradas recuperadas)`, "success");
 		},
 	});
 
 	pi.registerCommand("md-unlog", {
-		description: "Stop mirroring the session to a markdown file",
+		description: "Dejar de registrar la sesión en la nota Markdown",
 		handler: async (_args, ctx) => {
 			if (!logFile) {
-				ctx.ui.notify("No file linked", "warning");
+				ctx.ui.notify("No hay una nota vinculada", "warning");
 				return;
 			}
 			const name = path.basename(logFile);
-			logFile = null;
-			pi.appendEntry("md-log", { file: null });
-			ctx.ui.setStatus("md-log", undefined);
-			ctx.ui.notify(`Unlinked: ${name}`, "info");
+			await withLock(desvincular);
+			ctx.ui.notify(`Nota desvinculada: ${name}`, "info");
 		},
 	});
 
@@ -339,32 +357,7 @@ export default function mdLog(pi: ExtensionAPI) {
 
 	function backfill(ctx: any): number {
 		if (!logFile) return 0;
-		const entries: any[] = ctx.sessionManager.getEntries();
-		if (entries.length === 0) return 0;
-
-		const byId = new Map<string, any>();
-		for (const e of entries) if (e.id) byId.set(e.id, e);
-
-		// Active leaf = last entry that has an id (skip the session header).
-		let leaf: any = null;
-		for (let i = entries.length - 1; i >= 0; i--) {
-			if (entries[i].id) {
-				leaf = entries[i];
-				break;
-			}
-		}
-		if (!leaf) return 0;
-
-		// Walk parent chain to root.
-		const chain: any[] = [];
-		let cur: any = leaf;
-		const seen = new Set<string>();
-		while (cur && cur.id && !seen.has(cur.id)) {
-			seen.add(cur.id);
-			chain.push(cur);
-			cur = cur.parentId ? byId.get(cur.parentId) : null;
-		}
-		chain.reverse();
+		const chain: any[] = ctx.sessionManager.getBranch();
 
 		// Track tool-call args from assistant messages so we can pair with results.
 		const toolCallArgs = new Map<string, { name: string; args: any }>();
@@ -413,7 +406,7 @@ export default function mdLog(pi: ExtensionAPI) {
 				// shuffles, so its tool-call args are already the true order.
 				if (tc) {
 					const a = tc.args || {};
-					const label = tc.name === "quiz" ? "Quiz" : "Question";
+					const label = tc.name === "quiz" ? "Quiz" : "Pregunta";
 					const shuffled = msg.toolName === "quiz"
 						? (msg.details?.options as Array<{ index: number; label: string }> | undefined)
 						: undefined;
