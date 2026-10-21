@@ -33,12 +33,12 @@ def ruta_segura(raiz: Path, relativa: str) -> Path:
     return ruta
 
 
-def atomico(raiz: Path, relativa: str, contenido: str) -> None:
+def atomico(raiz: Path, relativa: str, contenido: str | bytes) -> None:
     destino = ruta_segura(raiz, relativa)
     destino.parent.mkdir(parents=True, exist_ok=True)
     fd, nombre = tempfile.mkstemp(prefix=".ingesta-", dir=destino.parent)
     try:
-        with os.fdopen(fd, "w", encoding="utf-8") as archivo:
+        with os.fdopen(fd, "wb" if isinstance(contenido, bytes) else "w", encoding=None if isinstance(contenido, bytes) else "utf-8") as archivo:
             archivo.write(contenido)
             archivo.flush()
             os.fsync(archivo.fileno())

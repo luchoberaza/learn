@@ -186,7 +186,7 @@ def informe(raiz: Path) -> None:
         lineas.append("")
     lineas.extend(["## Mapeo e ítems", "", "- Tabla tema → material: **pendiente de la curación de Fase 3**; no se inventó a partir de BM25.",
                    "- Temas sin material: todavía no evaluables sin un índice curado.",
-                   "- Ítems sin asignar: todavía no evaluables; segmentación de ítems prevista en Fase 2.", ""])
+                   "- Ítems sin asignar: todavía no evaluables sin un índice curado; la segmentación se guarda por documento en items.yaml.", ""])
     atomico(raiz, "informe-ingesta.md", "\n".join(lineas))
 
 

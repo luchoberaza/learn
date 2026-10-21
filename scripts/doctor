@@ -62,7 +62,7 @@ try {
   const tools = new Set(session.getActiveToolNames());
   check(project.errors.length === 0 && !(project.loader.getExtensions().warnings?.length),
     "Carga de extensiones / alias", project.errors.length ? "hay errores; abrí pi --verbose" : "API instalada compatible, sin errores de carga");
-  for (const name of ["quiz", "ask_user_question", "subagent", "web_search", "web_fetch"]) {
+  for (const name of ["quiz", "ask_user_question", "subagent", "web_search", "web_fetch", "transcribir_paginas", "guardar_items"]) {
     check(tools.has(name), `Herramienta ${name}`, tools.has(name) ? "cargada y activa" : "revisá la confianza del proyecto y SETUP.md");
   }
   const safeBash = join(piDir, "git/github.com/amosblomqvist/pi-interactive-subagents/pi-extension/subagents/tools/safe-bash.ts");

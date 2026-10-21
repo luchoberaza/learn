@@ -1,0 +1,243 @@
+{
+  "version": 1,
+  "estado": "escaneo_externo_probado_checkpoint_fase_aprobado",
+  "aprobacion_fase": {
+    "mensaje_usuario": "Fase 2 aprobada, continuá",
+    "alcance": "Aceptación del checkpoint de Fase 2 con muestra escaneada externa y límites declarados; no aprueba individualmente las transcripciones ni acredita manuscritos."
+  },
+  "origen": {
+    "version": 1,
+    "descargado": "2026-10-20T20:04:34.655357+00:00",
+    "titulo": "Algebra elemental...",
+    "autor": "Enrique G. Limric",
+    "publicacion": "1895",
+    "institucion_en_coleccion": "Library of Congress",
+    "ficha": "https://archive.org/details/algebraelemental00limr",
+    "metadata": "https://archive.org/metadata/algebraelemental00limr",
+    "imagenes": [
+      {
+        "pagina_impresa": 101,
+        "indice_bookreader": 110,
+        "url": "https://archive.org/download/algebraelemental00limr/page/n110.jpg",
+        "archivo": "101.jpg",
+        "sha256": "ae2253b0e190766737eba624d9fa54a4b281ffc3be6e2b0ce73d2ee8288bd234",
+        "bytes": 554891
+      },
+      {
+        "pagina_impresa": 102,
+        "indice_bookreader": 111,
+        "url": "https://archive.org/download/algebraelemental00limr/page/n111.jpg",
+        "archivo": "102.jpg",
+        "sha256": "cd391347304950f20ce6ce52b3ecca49137c5d172f3414da187f9508ffd36ede",
+        "bytes": 571075
+      }
+    ],
+    "pdf": "problemas-101-102.pdf",
+    "sha256_pdf": "62ab4eeadc612f99a6b1691727dcf99d60459cb30259eb72e3dd7dfbddb49d1b",
+    "preparacion": "JPEG originales escaneados insertados sin recomprimir en PDF de dos páginas, sin OCR. No se rasterizó un PDF digital.",
+    "nota": "Muestra externa autorizada por el usuario. No es material de Redes ni manuscrito; índices BookReader comprobados visualmente, distintos de leafNum."
+  },
+  "modelo": "openai/gpt-6-luna",
+  "prompt_sha256": "6f6212e2d44f7417f5b7cae406a6ea0c74a40ec2a42e4b97631ab33d164c117f",
+  "primer_ensayo": {
+    "resumen": {
+      "solicitadas": 2,
+      "transcritas": 2,
+      "cache": 0,
+      "fallidas": [],
+      "pendientes": [
+        1
+      ],
+      "avisos": [],
+      "cancelada": false
+    },
+    "usage": {
+      "input": 4972,
+      "output": 859,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "reasoning": 0,
+      "totalTokens": 5831,
+      "cost": {
+        "input": 0.0004972,
+        "output": 0.0004295,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0.0009267
+      },
+      "cacheWrite1h": 0
+    },
+    "hallazgos": [
+      "Signos de moneda sin escapar en Markdown.",
+      "Marca ilegible añadida por el salto de página del ejercicio 9."
+    ]
+  },
+  "ensayo_con_prompt_corregido": {
+    "resumen": {
+      "solicitadas": 2,
+      "transcritas": 2,
+      "cache": 0,
+      "fallidas": [],
+      "pendientes": [],
+      "avisos": [],
+      "cancelada": false
+    },
+    "usage": {
+      "input": 5060,
+      "output": 855,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "reasoning": 0,
+      "totalTokens": 5915,
+      "cost": {
+        "input": 0.000506,
+        "output": 0.0004275,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0.0009335000000000001
+      },
+      "cacheWrite1h": 0
+    }
+  },
+  "repeticion": {
+    "solicitadas": 2,
+    "transcritas": 0,
+    "cache": 2,
+    "fallidas": [],
+    "pendientes": [],
+    "avisos": [],
+    "cancelada": false
+  },
+  "comprobaciones": {
+    "imagenes_jpeg_preservadas_en_pdf": 2,
+    "paginas_sin_capa_texto": 2,
+    "fracciones_cotejadas_y_coincidentes": 6,
+    "fracciones": [
+      [
+        "3",
+        "5"
+      ],
+      [
+        "5",
+        "9"
+      ],
+      [
+        "3",
+        "8"
+      ],
+      [
+        "2",
+        "3"
+      ],
+      [
+        "2",
+        "3"
+      ],
+      [
+        "3",
+        "5"
+      ]
+    ],
+    "importes_escapados_y_coincidentes": 8,
+    "items": [
+      {
+        "id": "1",
+        "paginas": [
+          1
+        ]
+      },
+      {
+        "id": "2",
+        "paginas": [
+          1
+        ]
+      },
+      {
+        "id": "3",
+        "paginas": [
+          1
+        ]
+      },
+      {
+        "id": "4",
+        "paginas": [
+          1
+        ]
+      },
+      {
+        "id": "5",
+        "paginas": [
+          1
+        ]
+      },
+      {
+        "id": "6",
+        "paginas": [
+          1
+        ]
+      },
+      {
+        "id": "7",
+        "paginas": [
+          1
+        ]
+      },
+      {
+        "id": "8",
+        "paginas": [
+          1
+        ]
+      },
+      {
+        "id": "9",
+        "paginas": [
+          1,
+          2
+        ]
+      },
+      {
+        "id": "10",
+        "paginas": [
+          2
+        ]
+      },
+      {
+        "id": "11",
+        "paginas": [
+          2
+        ]
+      },
+      {
+        "id": "12",
+        "paginas": [
+          2
+        ]
+      },
+      {
+        "id": "13",
+        "paginas": [
+          2
+        ]
+      },
+      {
+        "id": "14",
+        "paginas": [
+          2
+        ]
+      },
+      {
+        "id": "15",
+        "paginas": [
+          2
+        ]
+      }
+    ],
+    "ejercicio_9_continuacion_completa": true
+  },
+  "revision_asistente": "Cotejo visual con imágenes originales de los 15 enunciados, seis fracciones, ocho importes y continuación del ejercicio 9. No es una aprobación humana ni un benchmark exhaustivo.",
+  "revision_humana": "pendiente",
+  "limites": [
+    "Papel impreso antiguo, no manuscrito ni parcial de Redes.",
+    "La variable C en la continuación queda sin delimitadores LaTeX, sin cambiar su valor textual."
+  ]
+}

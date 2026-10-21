@@ -1,0 +1,42 @@
+#!/usr/bin/env node
+// Pilotos opcionales: práctico digital o escaneos externos reales; no se mezclan con un curso.
+import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
+import { readFileSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { spawnSync } from "node:child_process";
+import { loadProject, piDir, vaultDir } from "./lib/pi-sdk.mjs";
+import { transcribir } from "../extensions/curso/ingesta.ts";
+
+assert.ok(process.argv.length <= 3 && (!process.argv[2] || process.argv[2] === "--escaneo"), "Uso: node .pi/scripts/probar-vision [--escaneo]");
+const escaneo = process.argv[2] === "--escaneo";
+const documento = escaneo
+  ? { id: "limric-problemas", titulo: "Limric: problemas escaneados reales (muestra externa)", tipo: "ejercicios", archivo: "_entrada/muestras/externas/limric-1895/problemas-101-102.pdf", paginas: [1, 2] }
+  : { id: "redes-practico-1", titulo: "Práctico 1: piloto digital de visión", tipo: "ejercicios", archivo: "_entrada/muestras/materiales/evaluaciones/practico1.pdf", paginas: [1, 2, 3] };
+const salida = join(vaultDir, `_procesado/fase2/${escaneo ? "piloto-escaneo" : "piloto-practico1"}`);
+const archivo = documento.archivo;
+const hash = () => createHash("sha256").update(readFileSync(join(vaultDir, archivo))).digest("hex");
+const antes = hash();
+const base = spawnSync(join(piDir, ".venv/bin/python"), ["-c", `from pathlib import Path
+from pipeline import ejecutar
+import sys,json
+ejecutar({'version':1,'documentos':[json.loads(sys.argv[3])]},Path(sys.argv[1]),Path(sys.argv[2]))`, vaultDir, salida, JSON.stringify(documento)],
+  { cwd: join(piDir, "scripts/ingesta"), encoding: "utf8", timeout: 30000 });
+assert.equal(base.status, 0, base.stderr);
+const config = JSON.parse(readFileSync(join(piDir, "curso.config.json"), "utf8"));
+let proyecto;
+try {
+  proyecto = await loadProject();
+  const signal = AbortSignal.timeout(600000);
+  const ctx = proyecto.session.extensionRunner.createToolContext("transcribir_paginas", signal);
+  const resultado = await transcribir(ctx, { vault: vaultDir, salida, doc: documento.id, paginas: documento.paginas }, config, signal,
+    texto => console.log(texto));
+  const evidencia = { version: 1, fecha: new Date().toISOString(), modelo: config.modelo_vision, fuente: archivo,
+    sha256_fuente: antes, nota: escaneo ? "Imágenes de papel escaneado real, muestra externa autorizada; no manuscrito ni material del curso." : "Piloto digital, no escaneado.", ...resultado };
+  const nombre = join(salida, `prueba-vision-${Date.now()}.json`);
+  writeFileSync(nombre, JSON.stringify(evidencia, null, 2) + "\n", { flag: "wx" });
+  assert.equal(hash(), antes, "El PDF original debe permanecer intacto");
+  assert.deepEqual(resultado.resumen.fallidas, [], "Falló alguna página; ver el informe. No se reintenta automáticamente.");
+  assert.equal(resultado.resumen.transcritas + resultado.resumen.cache, documento.paginas.length);
+  console.log(JSON.stringify({ ...resultado.resumen, evidencia: nombre }, null, 2));
+} finally { if (proyecto) await proyecto.close(); }

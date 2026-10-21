@@ -1,0 +1,92 @@
+import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
+import type { Usage } from "@earendil-works/pi-ai";
+import { spawn } from "node:child_process";
+import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { piDir } from "../../scripts/lib/pi-sdk.mjs";
+
+export function python(accion: string, datos: object, signal?: AbortSignal): Promise<any> {
+  return new Promise((resolve, reject) => {
+    const hijo = spawn(join(piDir, ".venv/bin/python"), [join(piDir, "scripts/ingesta/vision.py"), accion],
+      { stdio: ["pipe", "pipe", "pipe"], signal, timeout: 30000 });
+    let salida = "", error = "";
+    hijo.stdout.on("data", bloque => { salida += bloque; });
+    hijo.stderr.on("data", bloque => { error += bloque; });
+    hijo.on("error", reject);
+    hijo.stdin.on("error", reject);
+    hijo.on("close", codigo => {
+      if (codigo !== 0) return reject(new Error(error.trim() || "No se completó la operación de ingesta."));
+      try { resolve(JSON.parse(salida)); } catch { reject(new Error("La ingesta devolvió un resultado inválido.")); }
+    });
+    hijo.stdin.end(JSON.stringify(datos));
+  });
+}
+
+type Solicitud = { vault: string; salida: string; doc: string; paginas: number[] };
+type Config = { modelo_vision: string; max_paginas_vision_sin_confirmar: number; umbral_calidad_pagina: number };
+
+export async function transcribir(ctx: Pick<ExtensionContext, "modelRegistry" | "hasUI" | "ui">,
+  solicitud: Solicitud, config: Config, signal?: AbortSignal, informar?: (texto: string) => void) {
+  if (!Array.isArray(solicitud.paginas) || !solicitud.paginas.length || solicitud.paginas.some(n => !Number.isSafeInteger(n) || n < 1)) {
+    throw new Error("Indicá páginas PDF enteras y positivas (base 1).");
+  }
+  if (!Number.isSafeInteger(config.max_paginas_vision_sin_confirmar) || config.max_paginas_vision_sin_confirmar < 1 ||
+      !Number.isFinite(config.umbral_calidad_pagina) || config.umbral_calidad_pagina < 0 || config.umbral_calidad_pagina > 1) {
+    throw new Error("Límite de visión o umbral de calidad inválido en curso.config.json.");
+  }
+  if (typeof config.modelo_vision !== "string" || config.modelo_vision.indexOf("/") < 1) throw new Error("Modelo de visión inválido en curso.config.json.");
+  const paginas = [...new Set(solicitud.paginas)].sort((a, b) => a - b);
+  const resumen = { solicitadas: paginas.length, transcritas: 0, cache: 0, fallidas: [] as number[], pendientes: [] as number[], avisos: [] as string[], cancelada: false };
+  if (paginas.length > config.max_paginas_vision_sin_confirmar) {
+    if (!ctx.hasUI) throw new Error(`La tanda de ${paginas.length} páginas necesita confirmación interactiva; no se envió ninguna página.`);
+    resumen.cancelada = !(await ctx.ui.confirm("Confirmar gasto de visión",
+      `Solicitaste ${paginas.length} páginas con ${config.modelo_vision}. Se reutilizará la caché disponible. ¿Autorizás esta tanda?`, { signal }));
+    if (resumen.cancelada) return { resumen, usage: undefined };
+  }
+  let usage: Usage | undefined;
+  const separador = config.modelo_vision.indexOf("/");
+  const modelo = ctx.modelRegistry.find(config.modelo_vision.slice(0, separador), config.modelo_vision.slice(separador + 1));
+  for (const pagina of paginas) {
+    if (signal?.aborted) { resumen.cancelada = true; break; }
+    informar?.(`${solicitud.doc}: página PDF ${pagina} (${resumen.transcritas + resumen.cache + resumen.fallidas.length + 1}/${paginas.length}).`);
+    let preparada;
+    let etapa = "preparar";
+    const datos = { ...solicitud, pagina, modelo: config.modelo_vision, umbral: config.umbral_calidad_pagina };
+    try {
+      preparada = await python("preparar", datos, signal);
+      if (preparada.cache) { resumen.cache++; continue; }
+      etapa = "modelo";
+      if (!modelo?.input.includes("image")) throw new Error("Modelo de visión no disponible.");
+      const imagen = readFileSync(preparada.imagen);
+      if (createHash("sha256").update(imagen).digest("hex") !== preparada.sha256_imagen) throw new Error("Cambió el render.");
+      const llamada = AbortSignal.any([...(signal ? [signal] : []), AbortSignal.timeout(180000)]);
+      const respuesta = await ctx.modelRegistry.streamSimple(modelo, { messages: [{ role: "user", timestamp: Date.now(), content: [
+        { type: "text", text: preparada.prompt },
+        { type: "image", mimeType: "image/png", data: imagen.toString("base64") },
+      ] }] }, { maxTokens: 8000, reasoning: "off", maxRetries: 0, signal: llamada }).result();
+      if (!usage) usage = structuredClone(respuesta.usage);
+      else {
+        for (const k of ["input", "output", "cacheRead", "cacheWrite", "cacheWrite1h", "reasoning", "totalTokens"] as const) usage[k] = (usage[k] || 0) + (respuesta.usage[k] || 0);
+        for (const k of ["input", "output", "cacheRead", "cacheWrite", "total"] as const) usage.cost[k] += respuesta.usage.cost[k];
+      }
+      const texto = respuesta.content.filter(b => b.type === "text").map(b => b.text).join("\n");
+      if (respuesta.stopReason !== "stop" || !texto.trim()) throw new Error("Respuesta incompleta.");
+      etapa = "guardar";
+      const guardada = await python("guardar", { ...datos, ...preparada, texto, completa: true, uso: respuesta.usage,
+        umbral: config.umbral_calidad_pagina }, signal);
+      resumen.transcritas++;
+      if (guardada.pendiente) resumen.pendientes.push(pagina);
+    } catch (error) {
+      resumen.fallidas.push(pagina);
+      resumen.avisos.push(`PDF ${pagina}: ${etapa !== "modelo" && error instanceof Error ? error.message.slice(0, 350) : "No se completó la llamada de visión; no se reintentó ni se cambió de modelo."}`);
+      if (preparada && !preparada.cache) {
+        // Persistir el fallo aunque se haya cancelado la petición; nunca reemplaza texto ajeno.
+        try { await python("fallar", { ...datos, ...preparada }, AbortSignal.timeout(10000)); }
+        catch { resumen.avisos.push(`PDF ${pagina}: no se pudo actualizar el estado; se preservaron los archivos existentes.`); }
+      }
+      if (signal?.aborted) { resumen.cancelada = true; break; }
+    }
+  }
+  return { resumen, usage };
+}

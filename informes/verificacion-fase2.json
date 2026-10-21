@@ -1,0 +1,96 @@
+{
+  "version": 1,
+  "estado": "piloto_digital_comprobado",
+  "verificacion_escaneo_real": "informes/verificacion-escaneo-fase2.json",
+  "modelo": "openai/gpt-6-luna",
+  "fuente": "_entrada/muestras/materiales/evaluaciones/practico1.pdf",
+  "sha256_fuente": "ae1bc82e96c66749f02c4e81646990a7eb25e7b96f02beddf1220eb01886be2d",
+  "primera_ejecucion": {
+    "solicitadas": 3,
+    "transcritas": 3,
+    "cache": 0,
+    "fallidas": [],
+    "pendientes": [],
+    "avisos": [],
+    "cancelada": false
+  },
+  "repeticion": {
+    "solicitadas": 3,
+    "transcritas": 0,
+    "cache": 3,
+    "fallidas": [],
+    "pendientes": [],
+    "avisos": [],
+    "cancelada": false
+  },
+  "tokens_primera_ejecucion": {
+    "input": 9510,
+    "output": 2143,
+    "totalTokens": 11653
+  },
+  "items": [
+    {
+      "id": "1",
+      "paginas": [
+        1
+      ]
+    },
+    {
+      "id": "2",
+      "paginas": [
+        1
+      ]
+    },
+    {
+      "id": "3",
+      "paginas": [
+        1
+      ]
+    },
+    {
+      "id": "4",
+      "paginas": [
+        2
+      ]
+    },
+    {
+      "id": "5",
+      "paginas": [
+        2
+      ]
+    },
+    {
+      "id": "6",
+      "paginas": [
+        2
+      ]
+    },
+    {
+      "id": "7",
+      "paginas": [
+        2,
+        3
+      ]
+    },
+    {
+      "id": "8",
+      "paginas": [
+        3
+      ]
+    },
+    {
+      "id": "9",
+      "paginas": [
+        3
+      ]
+    },
+    {
+      "id": "10",
+      "paginas": [
+        3
+      ]
+    }
+  ],
+  "originales_intactos": 18,
+  "revision_humana": "pendiente"
+}

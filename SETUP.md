@@ -1,6 +1,6 @@
-# Instalación reproducible — Fases 0 y 1
+# Instalación reproducible — Fases 0 a 2
 
-**Estado:** Fase 0 aceptada por el usuario (opción «1») con el smoke técnico de preguntas, quiz, log e imagen, más la prueba independiente del researcher real. Los 11 tests y el diagnóstico automático se repitieron en verde dentro de tmux para el commit de cierre. La lección quedó en el probe; no se afirma que se haya completado. Ver `informes/verificacion-base.md`. El usuario aprobó después la base de Fase 1 con «aprobado, sigamos», conociendo las limitaciones del informe, y autorizó Fase 2. El parcial escaneado real sigue sin evaluarse; no se declara cumplido ese caso.
+**Estado:** Fase 0 aceptada por el usuario (opción «1») con el smoke técnico de preguntas, quiz, log e imagen, más la prueba independiente del researcher real. Los 11 tests y el diagnóstico automático se repitieron en verde dentro de tmux para el commit de cierre. La lección quedó en el probe; no se afirma que se haya completado. Ver `informes/verificacion-base.md`. El usuario aprobó después la base de Fase 1 con «aprobado, sigamos», conociendo las limitaciones del informe, y autorizó Fase 2. Fase 1 quedó en `352c249`; Fase 2 tiene implementación, piloto digital y prueba con escaneos reales externos comprobados, y fue aprobada por el usuario con «Fase 2 aprobada, continuá». Se completa su commit de cierre con los chequeos repetidos en verde; no se inició Fase 3. La muestra externa se buscó a pedido del usuario; es papel impreso, no un parcial manuscrito.
 
 Actualizar entre semestres, no en semana de parciales.
 
@@ -21,6 +21,7 @@ Actualizar entre semestres, no en semana de parciales.
 | uv | `0.13.1`, existente |
 | Python de ingesta | `3.13.13`, entorno `.pi/.venv` |
 | PyMuPDF / OCRmyPDF / wordfreq | `1.28.2` / `17.13.0` / `3.1.1`; transitivas en `scripts/ingesta/uv.lock` |
+| PyYAML (Fase 2: ítems) | `6.0.3`; transitivas en el mismo `uv.lock` |
 | Tesseract utilizado | `5.5.2`, Conda `h1f36d38_0`, con `spa` y `eng` |
 | Ghostscript existente | `10.08.0`, paquete `10.08.0-1.1` |
 
@@ -183,6 +184,29 @@ cp -n _procesado/fase1/base-simple/informe-ingesta.md informes/fase1/ingesta-bas
 
 No hay todavía `/curso-nuevo`, `/curso-estado` ni `/estudiar`: corresponden a fases posteriores. Los ensayos de marker, docling y visión están separados en [`scripts/ingesta/benchmark/`](scripts/ingesta/benchmark/README.md); **no es necesario restaurarlos para usar la ingesta**.
 
+## Visión e ítems — Fase 2
+
+Se restaura con el mismo `uv sync --locked` de arriba; se añade únicamente PyYAML `6.0.3` para `items.yaml`. No requiere GPU ni dependencias ML. Después de cambiar los archivos de la extensión, ejecutar `/reload` o abrir una sesión nueva para que pi registre las tools.
+
+- `transcribir_paginas(curso, doc, paginas)` usa Luna, renderiza las páginas ya preparadas, guarda Markdown, actualiza BM25/informe y devuelve solo un resumen. Más de 50 páginas —límite configurable— exige confirmación interactiva; sin UI se rechaza. La caché evita repetir llamadas vigentes; cambiar modelo, prompt o umbral puede invalidarla y consumir nuevamente.
+- `guardar_items(curso, doc, items)` guarda la segmentación hecha por el agente: `{id, paginas, enunciado, solucion?: {doc, id}}`. Los ids conservan la numeración del documento. Requiere páginas transcritas, valida referencias y no pisa ediciones manuales.
+
+Son tools de preparación, no comandos `/`. Todavía no hay un curso creado: su creación queda para Fase 3. Para comprobar la misma lógica sin inventar un curso, existe un piloto aislado con el práctico digital disponible:
+
+```bash
+# Opcional, con LLM: puede enviar tres páginas a Luna si no hay caché vigente.
+node .pi/scripts/probar-vision
+# Dos páginas de papel escaneado real, ya descargadas en _entrada/muestras/externas/limric-1895/.
+# También puede consumir llamadas si la caché no está vigente.
+node .pi/scripts/probar-vision --escaneo
+```
+
+Primera prueba real: 3/3 páginas transcritas; segunda: 3/3 en caché y ninguna llamada nueva. Se guardaron diez ejercicios, incluido el 7 en páginas 2–3. Informes visibles: `informes/fase2/resumen.md`, `transcripciones.md` e `items.md`. Los datos internos están en `_procesado/fase2/piloto-practico1/`.
+
+Prueba externa: dos imágenes de papel escaneado de *Algebra elemental* (Limric, 1895), procedentes de Internet Archive / colección Library of Congress. El PDF de prueba contiene esos JPEG sin recomprimir y sin capa de texto; no deriva de un PDF digital rasterizado. Se cotejaron seis fracciones y ocho importes; quince ítems, incluido el 9 multipágina. Segunda ejecución con el prompt corregido: dos aciertos de caché y cero llamadas nuevas. Fuente, SHA-256, fallos iniciales y límites en `informes/verificacion-escaneo-fase2.json`; comparación visible en `informes/fase2/escaneo-real.md`.
+
+Un error o cancelación conserva el texto previo. Las transcripciones incompletas se rechazan; `[ilegible]` o LaTeX roto quedan pendientes. El prompt distingue moneda (`\$`) de LaTeX y un salto de página de contenido ilegible. `revision_humana: pendiente` no cambia automáticamente por tener puntaje alto. Las fotos/manuscritos siguen sin verificarse. El usuario aprobó el checkpoint de Fase 2 con sus límites; esa aceptación global no modifica la revisión pendiente de páginas e ítems individuales.
+
 ## Comprobaciones y checkpoint
 
 ```bash
@@ -194,7 +218,7 @@ node --test .pi/tests/*.test.mjs
 
 El diagnóstico carga las extensiones locales con confianza solo para su propio proceso, sin modificar `trust.json`. No envía un prompt de enseñanza ni lee el portapapeles. Por defecto ejecuta dos pings de hasta 64 tokens (uno con un PNG sintético), una búsqueda y una lectura web. No consulta material privado del curso.
 
-Resultado automático de Fase 1: **18 tests Node sin LLM en verde**, incluida una suite de **20 tests Python**, y **`doctor` completamente en verde dentro de tmux**, con pings reales de `gpt-6-luna` y pruebas web. El diagnóstico comprueba la instalación de uso diario; no exige los entornos ML experimentales ni confunde la aprobación humana de calidad con una dependencia rota. El lanzador se comprobó además con un pseudoterminal real ejecutando `pi-learn --version`.
+Resultado automático actual, Fase 2: **28 tests Node sin LLM en verde**, incluida una suite de **34 tests Python**, y **`doctor` completamente en verde dentro de tmux**, con pings reales de `gpt-6-luna` y pruebas web. El diagnóstico comprueba la instalación de uso diario; no exige los entornos ML experimentales ni confunde la aprobación humana de calidad con una dependencia rota. El lanzador se comprobó además con un pseudoterminal real ejecutando `pi-learn --version`.
 
 ### Prueba del researcher real (opcional, con LLM y red)
 
@@ -219,4 +243,4 @@ El usuario aceptó la prueba técnica parcial para cerrar Fase 0. La lista sigui
 7. Verificar en Obsidian el log de texto y los quizzes; `/md-unlog` al terminar.
 8. Correr `doctor` desde otra terminal dentro de tmux, o pedir a pi que ejecute `.pi/scripts/doctor`.
 
-La Fase 0 se cierra con la aceptación explícita del smoke técnico, los tests y el doctor en verde, mediante un único commit en `.pi/`. La base de Fase 1 fue aprobada explícitamente y se cierra con un único commit. La Fase 2 está autorizada; su prueba con un parcial escaneado real sigue pendiente. La autorización de cierre no implica aceptar una muestra rasterizada en reemplazo de un parcial escaneado real.
+La Fase 0 se cierra con la aceptación explícita del smoke técnico, los tests y el doctor en verde, mediante un único commit en `.pi/`. La base de Fase 1 fue aprobada explícitamente y se cierra con un único commit. La Fase 2 fue aprobada explícitamente con «Fase 2 aprobada, continuá», aceptando el checkpoint con problemas escaneados reales externos y sus límites declarados; se cierra con un único commit tras repetir tests y doctor en verde. No se declara probado un parcial manuscrito ni se usó una muestra digital rasterizada como sustituto.

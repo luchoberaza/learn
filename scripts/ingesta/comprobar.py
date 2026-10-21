@@ -14,7 +14,7 @@ def verificar(ok, nombre, detalle):
 
 
 verificar(sys.version_info[:3] == (3, 13, 13), "Python de ingesta", f"{sys.version.split()[0]}; entorno .pi/.venv, creación en SETUP.md")
-for nombre, esperada in {"pymupdf": "1.28.2", "ocrmypdf": "17.13.0", "wordfreq": "3.1.1"}.items():
+for nombre, esperada in {"pymupdf": "1.28.2", "ocrmypdf": "17.13.0", "wordfreq": "3.1.1", "pyyaml": "6.0.3"}.items():
     try:
         encontrada = version(nombre)
     except PackageNotFoundError:

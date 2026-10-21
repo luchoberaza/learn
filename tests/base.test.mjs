@@ -15,7 +15,7 @@ test("pi carga las extensiones originales y los alias sin errores", () => {
   assert.deepEqual(project.errors, []);
   assert.deepEqual(project.loader.getExtensions().warnings || [], []);
   const names = project.session.getActiveToolNames();
-  for (const name of ["quiz", "ask_user_question", "subagent", "web_search", "web_fetch"]) assert.ok(names.includes(name), name);
+  for (const name of ["quiz", "ask_user_question", "subagent", "web_search", "web_fetch", "transcribir_paginas", "guardar_items"]) assert.ok(names.includes(name), name);
   assert.equal(typeof globalThis.__pi_interactive_subagents.registerToolExtension, "function");
 });
 
