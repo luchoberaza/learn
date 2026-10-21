@@ -18,6 +18,47 @@ async function entorno(t, vincular = true) {
   return { dir, file, handlers, comandos, entradas, avisos, ctx, adjuntos: join(dir, "adjuntos"),
     enviar: content => handlers.get("message_end")({ message: { role: "user", timestamp: 123456, content } }, ctx) };
 }
+test("Ctrl+V nativo: una ruta de imagen en bloque text se copia y se embebe", async t => {
+  const e = await entorno(t), foto = join(e.dir, "pi-clipboard-11111111-2222-4333-8444-555555555555.png");
+  writeFileSync(foto, png);
+  await e.enviar([{ type: "text", text: foto }]);
+  assert.ok(existsSync(e.adjuntos), "La ruta quedó como texto, sin copiar la imagen");
+  const [nombre] = readdirSync(e.adjuntos);
+  assert.deepEqual(readFileSync(join(e.adjuntos, nombre)), png);
+  assert.ok(readFileSync(e.file, "utf8").includes(`![[adjuntos/${nombre}]]`));
+  assert.ok(!readFileSync(e.file, "utf8").includes(foto));
+  assert.deepEqual(readFileSync(foto), png);
+});
+test("Ctrl+V en medio de texto conserva el texto y las citas, no sólo la ruta", async t => {
+  const e = await entorno(t), foto = join(e.dir, "pi-clipboard-11111111-2222-4333-8444-555555555555.png"); writeFileSync(foto, png);
+  await e.enviar(`Mi intento: ${foto} listo. [[fuente.pdf#page=2]]`);
+  const texto = readFileSync(e.file, "utf8");
+  assert.match(texto, /Mi intento: !\[\[/); assert.match(texto, /listo\. \[\[fuente\.pdf#page=2\]\]/); assert.ok(!texto.includes(foto));
+});
+test("ruta relativa explícita y entre comillas admite espacios sin copiar menciones en prosa", async t => {
+  const e = await entorno(t), foto = join(e.dir, "mi foto.PNG"); writeFileSync(foto, png);
+  await e.enviar([{ type: "text", text: 'Antes\n@"mi foto.PNG"\nDespués' }]);
+  assert.deepEqual(readFileSync(join(e.adjuntos, readdirSync(e.adjuntos)[0])), png);
+  const texto = readFileSync(e.file, "utf8"); assert.match(texto, /Antes\n!\[\[/); assert.match(texto, /\]\]\nDespués/);
+  const otra = await entorno(t); writeFileSync(join(otra.dir, "ejemplo.png"), png);
+  await otra.enviar(`Sólo menciono ${join(otra.dir, "ejemplo.png")}, no lo adjunto.`);
+  assert.ok(!existsSync(otra.adjuntos));
+});
+test("ruta inexistente, enlazada o no regular conserva el texto sin leer el destino", async t => {
+  const e = await entorno(t), foto = join(e.dir, "foto.png"), enlace = join(e.dir, "enlace.png"), falta = join(e.dir, "falta.png"), carpeta = join(e.dir, "carpeta.png");
+  writeFileSync(foto, png); symlinkSync(foto, enlace); mkdirSync(carpeta); await e.enviar(`${enlace}\n${falta}\n${carpeta}`);
+  const texto = readFileSync(e.file, "utf8"); assert.ok(texto.includes(enlace) && texto.includes(falta) && texto.includes(carpeta));
+  assert.equal(e.avisos.length, 3); assert.ok(!existsSync(e.adjuntos)); assert.deepEqual(readFileSync(foto), png);
+});
+test("historial con ruta nativa reutiliza el mismo adjunto sin reescribir la foto", async t => {
+  const e = await entorno(t), foto = join(e.dir, "foto.png"); writeFileSync(foto, png);
+  const mensaje = { role: "user", timestamp: 123456, content: [{ type: "text", text: foto }] };
+  e.entradas.push({ type: "message", message: mensaje }); await e.enviar(mensaje.content);
+  const [nombre] = readdirSync(e.adjuntos); e.ctx.hasUI = true; e.ctx.ui.confirm = async () => true;
+  await e.comandos.get("md-log").handler(e.file, e.ctx); const texto = readFileSync(e.file, "utf8");
+  await e.comandos.get("md-log").handler(e.file, e.ctx);
+  assert.deepEqual(readdirSync(e.adjuntos), [nombre]); assert.equal(readFileSync(e.file, "utf8"), texto); assert.deepEqual(readFileSync(foto), png);
+});
 test("un mensaje sólo con imagen se guarda y embebe sin convertir ni volcar base64", async t => {
   const e = await entorno(t); await e.enviar([imagen()]);
   const [nombre] = readdirSync(e.adjuntos);

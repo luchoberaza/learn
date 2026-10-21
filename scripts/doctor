@@ -73,11 +73,12 @@ try {
   try {
     if (!commands.has("md-log") || !commands.has("md-unlog")) throw new Error("Falta md-log.");
     const file = join(pruebaFotos, "sesion.md"), png = readFileSync(join(piDir, "tests/fixtures/rojo.png"));
-    writeFileSync(file, "");
+    const foto = join(pruebaFotos, "pi-clipboard-11111111-2222-4333-8444-555555555555.png");
+    writeFileSync(file, ""); writeFileSync(foto, png);
     await session.prompt(`/md-log ${file}`);
-    await session.extensionRunner.emit({ type: "message_end", message: { role: "user", timestamp: Date.now(), content: [{ type: "image", mimeType: "image/png", data: png.toString("base64") }] } });
-    const enlace = readFileSync(file, "utf8").match(/!\[\[(adjuntos\/[a-z0-9.-]+\.png)\]\]/)?.[1];
-    check(Boolean(enlace) && readFileSync(join(pruebaFotos, enlace)).equals(png), "Fotos en md-log", "PNG idéntico y embed comprobados sin modelo; manuscrito/Ctrl+V requieren prueba aparte");
+    await session.extensionRunner.emit({ type: "message_end", message: { role: "user", timestamp: Date.now(), content: [{ type: "text", text: foto }, { type: "image", mimeType: "image/png", data: png.toString("base64") }] } });
+    const texto = readFileSync(file, "utf8"), enlaces = [...texto.matchAll(/!\[\[(adjuntos\/[a-z0-9.-]+\.png)\]\]/g)].map(m => m[1]);
+    check(enlaces.length === 2 && enlaces.every(e => readFileSync(join(pruebaFotos, e)).equals(png)) && !texto.includes(foto), "Fotos en md-log", "ruta de pegado nativo y bloque image copiados/embebidos sin modelo; render Obsidian requiere prueba aparte");
   } catch { check(false, "Fotos en md-log", "falló el guardado/embed local; ejecutá tests/md-log-fotos.test.mjs"); }
   finally { if (commands.has("md-unlog")) await session.prompt("/md-unlog"); rmSync(pruebaFotos, { recursive: true, force: true }); }
   check(existsSync(join(piDir, "modo-curso.md")) && existsSync(join(piDir, "scripts/ingesta/sesion.py")), "Contexto de sesión", "modo-curso y lector/render local presentes; no requiere dependencias nuevas");

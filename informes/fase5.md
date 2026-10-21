@@ -1,6 +1,6 @@
 # Fase 5 — fotos persistentes y corrección
 
-**Implementada y comprobada técnicamente; checkpoint pendiente del usuario.** Fase 4 fue aprobada con «Aprobado; continuá» y está en `c757542`. Los mensajes repetidos se tomaron como una sola aprobación, no como permiso para saltar fases. No se inicia Fase 6.
+**Implementada; pendiente de confirmar el render del adjunto recuperado.** Ver actualización al final: la primera prueba SDK no cubría el pegado nativo; se agregó regresión y arreglo. Doctor ahora advierte una diferencia de versión de pi. Fase 4 fue aprobada con «Aprobado; continuá» y está en `c757542`. Los mensajes repetidos se tomaron como una sola aprobación, no como permiso para saltar fases. No se inicia Fase 6.
 
 ## Cambio
 
@@ -54,3 +54,15 @@ Para un smoke corto sin completar una clase, se dejó una nota vacía nueva `inf
 4. Abrí esa nota en Obsidian y verificá que se ve la foto, no sólo el nombre del adjunto. `/md-unlog` al terminar.
 
 Durante una práctica real del curso el guardado es igual y no requiere `/md-log`: `/estudiar` ya vincula la nota. No se probó aún una respuesta manuscrita real de Redes, una clase completa ni calificación por una rúbrica detallada del curso, que no está disponible. Fotos/JSONL pueden contener datos personales: permanecen locales, fuera del Git de `.pi/`; pi conserva además su propio historial y temporales nativos, que esta fase no purga.
+
+## Corrección posterior — pegado nativo
+
+El usuario envió una foto y reportó que el modelo la entendía, pero el log mostraba sólo la ruta. La entrada real del JSONL tiene **un bloque `text` con la ruta temporal**, no `ImageContent`; el modelo la abrió con `read`. La función nativa `handleClipboardPaste()` guarda el portapapeles en un archivo e inserta esa ruta en el editor. Su implementación es idéntica en pi 1.3.0 y 1.4.0: el error no se atribuye a la actualización.
+
+Se reprodujo con `node --test --test-name-pattern='Ctrl\+V nativo' .pi/tests/md-log-fotos.test.mjs`: rojo «La ruta quedó como texto, sin copiar la imagen», luego verde. El arreglo acepta rutas explícitas de imagen por línea, con comillas/`@`/relativas cuando corresponda, y rutas `pi-clipboard-<UUID>` en medio de texto; comparte el copiado protegido y el formato de historial. No modifica el mensaje que recibe el modelo ni registra imágenes devueltas por tools. Abre la fuente sólo para lectura con `O_NOFOLLOW`/`O_NONBLOCK`, valida archivo regular y cierra el descriptor. Si falta o no es regular, preserva la ruta y avisa.
+
+Se repitió la entrada real por el logger corregido sin reenviar la foto al modelo. Se copió y cotejó byte por byte y se agregó el embed **al final de `informes/fase5/prueba-manual.md`**, sin reescribir el texto anterior ni modificar la foto original. Copia previa y comprobación privada en `_procesado/fase5/reparacion-log-nativo/`, fuera de Git; no se versiona el contenido de esa imagen o respuesta.
+
+**60 tests Node / 56 Python en verde.** Doctor comprueba ahora tanto ruta nativa como bloque `image`; fotos, modelos y web pasan. El único fallo es que el entorno responde **pi 1.4.0 frente al pin 1.3.0**: no se reinstaló pi ni se cambió el pin. Se leyeron docs actuales de extensiones/TUI; SDK/message-types/session-format son idénticos a los ya leídos de 1.3.0. Esto no reemplaza una decisión de migración de versión.
+
+Para las próximas fotos, ejecutar `/reload` o abrir una sesión nueva. No volver a vincular/rellenar la nota manual no vacía. Resta que el usuario confirme la imagen recuperada en Obsidian; Fase 6 sigue detenida.

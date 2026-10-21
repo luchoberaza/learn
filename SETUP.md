@@ -2,6 +2,8 @@
 
 **Estado:** Fases 0–4 aprobadas y cerradas (`79b1976`, `352c249`, `6409acd`, `3616e71`, `c757542`). Redes: 17 documentos / 987 páginas y 8 temas, con 268 páginas referidas todavía pendientes; aprobación de organización no equivale a revisión individual. Fase 5 implementada con manuscrito público y modelo principal reales; checkpoint pendiente, incluido Ctrl+V físico/render Obsidian. Historial y límites en `informes/fase1.md` a `informes/fase5.md` y `DECISIONES.md`. No se inicia Fase 6.
 
+**Aviso posterior al chequeo manual de fotos:** el entorno ahora responde `pi 1.4.0`, mientras este proyecto conserva el pin `1.3.0`. Los 60 tests y el chequeo de fotos con el runtime actual pasan; doctor señala sólo esa diferencia de versión. No se reinstaló pi ni se relajó el pin como parte del arreglo. La migración/versionado queda pendiente.
+
 Actualizar entre semestres, no en semana de parciales.
 
 ## Versiones fijadas / verificadas
@@ -260,7 +262,7 @@ El modo incorpora fotos persistentes desde Fase 5, sin prometer funciones futura
 
 ## Fotos persistentes — Fase 5
 
-Mismo `uv sync --locked`, sin dependencias nuevas ni comando propio de transferencia. Después de `/reload`, cualquier imagen del usuario recibida por pi con un log vinculado se copia a `adjuntos/` junto a la nota, incluidos mensajes sin texto. En el curso es `cursos/<curso>/sesiones/adjuntos/`; `/estudiar` ya vincula el log. Se conservan PNG/JPEG/WebP/GIF y su orden, con nombre de timestamp, posición y SHA-256. Los embeds dentro del vault usan su ruta desde el vault.
+Mismo `uv sync --locked`, sin dependencias nuevas ni comando propio de transferencia. El pegado real de pi puede enviar sólo una **ruta en un bloque de texto**, que el modelo abre con `read`, no un bloque `image`: el logger admite ambos. Copia rutas explícitas de imagen por línea (absolutas, `./`, `../`, `~/` o `@`, con comillas si hay espacios) y las rutas nativas `pi-clipboard-<UUID>` insertadas dentro de una respuesta; no captura menciones genéricas en prosa ni imágenes de resultados de herramientas. La fuente se abre sólo para lectura, sin seguir symlinks y verificando archivo regular. Después de `/reload`, cualquier imagen del usuario recibida por pi con un log vinculado se copia a `adjuntos/` junto a la nota, incluidos mensajes sin texto. En el curso es `cursos/<curso>/sesiones/adjuntos/`; `/estudiar` ya vincula el log. Se conservan PNG/JPEG/WebP/GIF y su orden, con nombre de timestamp, posición y SHA-256. Los embeds dentro del vault usan su ruta desde el vault.
 
 La misma ruta se usa al recuperar historial; reutiliza sólo copias idénticas y preserva cambios manuales. No sigue symlinks en adjuntos ni reemplaza archivos. Los nuevos archivos tienen permisos `0600` y los directorios nuevos `0700`; no se cambian permisos preexistentes. Un fallo deja aviso en el log/UI, sin perder texto ni las demás fotos. No hay limpieza automática de copias parciales o temporales nativos de pi.
 
@@ -289,7 +291,7 @@ node --test .pi/tests/*.test.mjs
 
 El diagnóstico carga las extensiones locales con confianza solo para su propio proceso, sin modificar `trust.json`. No envía un prompt de enseñanza ni lee el portapapeles. Por defecto ejecuta dos pings de hasta 64 tokens (uno con un PNG sintético), una búsqueda y una lectura web. No envía material del curso a modelos o proveedores web. Desde Fase 5 prueba además el guardado/embed de un PNG sintético en una carpeta temporal propia, sin LLM y sin leer el portapapeles.
 
-Resultado automático actual, Fase 5: **55 tests Node sin LLM en verde**, incluida una suite de **56 tests Python**, y **`doctor` completamente en verde dentro de tmux**, con pings reales de `gpt-6-luna` y pruebas web. El diagnóstico comprueba la instalación de uso diario; no exige los entornos ML experimentales ni confunde la aprobación humana de calidad con una dependencia rota. El lanzador se comprobó además con un pseudoterminal real ejecutando `pi-learn --version`.
+Resultado automático actual, tras corregir el pegado nativo: **60 tests Node sin LLM en verde**, incluida una suite de **56 tests Python**. Doctor valida ambas entradas de foto (ruta y bloque `image`), modelos y web, pero **no está completamente verde**: el único fallo es pi `1.4.0` frente al pin `1.3.0`. El diagnóstico comprueba la instalación de uso diario; no exige los entornos ML experimentales ni confunde la aprobación humana de calidad con una dependencia rota. El lanzador se comprobó además con un pseudoterminal real ejecutando `pi-learn --version`.
 
 ### Prueba del researcher real (opcional, con LLM y red)
 

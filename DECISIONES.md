@@ -12,7 +12,7 @@
 
 **Fase 4 aprobada:** «Aprobado; continuá», commit `c757542`. `/estudiar`, tools de lectura/render, dossier, inyección estructurada, persistencia y puente de md-log. Smoke con `gpt-6.1-sol`: primera pregunta en 20,08 s, compactación real y reapertura del JSONL con estado/log restaurados; sin respuestas inventadas ni progreso escrito. 46 tests Node y 56 Python. Evidencia y límites: `informes/fase4.md`.
 
-**Fase 5 implementada, checkpoint pendiente:** fotos del usuario guardadas/embebidas, protocolo transcribir → aclarar → corregir. Dos turnos reales con manuscrito público externo y modelo principal, sin incorporarlo a Redes ni inventar escala. 55 tests Node y 56 Python; doctor completo correcto. Ctrl+V físico dentro de tmux y render Obsidian pendientes; portapapeles personal intacto. No se inicia Fase 6. Detalle: `informes/fase5.md`.
+**Fase 5 implementada, checkpoint pendiente:** fotos del usuario guardadas/embebidas, protocolo transcribir → aclarar → corregir. Dos turnos reales con manuscrito público externo y modelo principal, sin incorporarlo a Redes ni inventar escala. El chequeo manual reveló una ruta en texto no cubierta por el smoke SDK; corregido con regresión roja → verde, reproducción de la entrada real y recuperación append-only de la foto. 60 tests Node y 56 Python. Doctor valida fotos/modelos/web y falla sólo por pi actual 1.4.0 frente al pin 1.3.0, sin cambiar versiones. Render Obsidian pendiente de confirmar; portapapeles personal intacto. No se inicia Fase 6. Detalle: `informes/fase5.md`.
 
 ## D0.1 — Conservar el upstream y fijar los subagentes
 

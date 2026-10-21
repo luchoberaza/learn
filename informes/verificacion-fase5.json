@@ -1,5 +1,17 @@
 {
   "version": 1,
+  "correccion_pegado_nativo": {
+    "causa": "Entrada interactiva text con ruta de archivo; ensayo SDK sólo cubría ImageContent.",
+    "regresion_roja_y_verde": true,
+    "tests_node_con_sdk_1_3_0": 60,
+    "tests_node_con_sdk_1_4_0": 60,
+    "entrada_real_reproducida_sin_llm": true,
+    "foto_usuario_recuperada_sin_reescribir_nota": true,
+    "original_y_prefijo_nota_verificados": true,
+    "ensayo_sdk_original_se_conserva_como_evidencia_parcial": true,
+    "pi_instalado_detectado": "1.4.0",
+    "pin_proyecto_sin_cambios": "1.3.0"
+  },
   "estado": "fase5_implementada_checkpoint_usuario_pendiente",
   "fase4_commit": "c757542",
   "fase4_aprobada_por_usuario": true,
@@ -54,14 +66,14 @@
     "plan_intacto": true
   },
   "pruebas": {
-    "node": 55,
+    "node": 60,
     "python": 56,
-    "doctor": "Completo correcto dentro de tmux; PNG sintético guardado/embebido con runtime real, Luna texto/imagen y web."
+    "doctor": "Guardado/embed de ruta nativa y bloque image correctos; modelos y web correctos. Único fallo: pi actual 1.4.0 frente al pin 1.3.0, no modificado."
   },
   "evidencia_local": "_procesado/fase5/prueba-1792607375280/resultado.json",
   "incidente_harness": "Exigía ?; respuesta válida Mandame la foto completa. Se corrigió y reanudó el mismo JSONL, sin repetir la primera llamada.",
   "manual": {
-    "ctrl_v_fisico_tmux": "pendiente",
+    "ctrl_v_fisico_tmux": "Usuario reportó envío de foto; traza de portapapeles nativo confirmada, sin observación directa de tecla/tmux.",
     "render_obsidian": "pendiente",
     "contenido_portapapeles_leido": false,
     "portapapeles_modificado": false

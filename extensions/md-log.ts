@@ -29,6 +29,7 @@ import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-age
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { createHash } from "node:crypto";
+import { homedir } from "node:os";
 
 const QA_TOOLS = new Set(["quiz", "ask_user_question"]);
 
@@ -91,12 +92,24 @@ export default function mdLog(pi: ExtensionAPI) {
 
 	function guardarImagen(image: any, timestamp: number, numero: number): string {
 		if (!logFile) throw new Error("No hay nota vinculada.");
-		const mime = String(image.mimeType).split(";")[0].trim().toLowerCase();
+		const mime = typeof image === "string"
+			? `image/${path.extname(image).slice(1).toLowerCase().replace(/^jpg$/, "jpeg")}`
+			: String(image.mimeType).split(";")[0].trim().toLowerCase();
 		const formatos: Record<string, string> = { "image/png": "png", "image/jpeg": "jpg", "image/webp": "webp", "image/gif": "gif" };
 		const extension = Object.hasOwn(formatos, mime) ? formatos[mime] : undefined;
-		if (!extension || typeof image.data !== "string") throw new Error("Formato no compatible.");
-		const bytes = Buffer.from(image.data, "base64");
-		if (!bytes.length || bytes.toString("base64") !== image.data) throw new Error("Base64 inválido.");
+		if (!extension) throw new Error("Formato no compatible.");
+		let bytes: Buffer;
+		if (typeof image === "string") {
+			const fd = fs.openSync(image, fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW | fs.constants.O_NONBLOCK);
+			try {
+				if (!fs.fstatSync(fd).isFile()) throw new Error("La imagen debe ser un archivo regular.");
+				bytes = fs.readFileSync(fd);
+			} finally { fs.closeSync(fd); }
+		} else {
+			if (typeof image.data !== "string") throw new Error("Base64 inválido.");
+			bytes = Buffer.from(image.data, "base64");
+			if (!bytes.length || bytes.toString("base64") !== image.data) throw new Error("Base64 inválido.");
+		}
 		// shortcut: sólo se valida la firma; usar un decodificador si se exige certificar integridad del formato.
 		const firmaValida = mime === "image/png" ? bytes.subarray(0, 8).equals(Buffer.from("89504e470d0a1a0a", "hex"))
 			: mime === "image/jpeg" ? bytes.subarray(0, 3).equals(Buffer.from("ffd8ff", "hex"))
@@ -126,15 +139,27 @@ export default function mdLog(pi: ExtensionAPI) {
 		if (!Array.isArray(contenido)) return null;
 		let numero = 0;
 		const timestamp = Number.isFinite(msg.timestamp) && msg.timestamp >= 0 ? Math.trunc(msg.timestamp) : 0;
-		const partes = contenido.map((c: any) => {
-			if (c.type === "text") return stripSkillBlocks(c.text.trim());
-			if (c.type !== "image") return "";
+		const insertarImagen = (image: any): string => {
 			numero++;
-			try { return guardarImagen(c, timestamp, numero); }
+			try { return guardarImagen(image, timestamp, numero); }
 			catch {
 				contexto?.ui.notify(`No se pudo guardar la imagen ${numero} en el log; el chat continúa. Revisala en la sesión de pi.`, "warning");
-				return `> [!warning] Imagen ${numero} no guardada\n> Revisá el adjunto original en la sesión de pi; no se reemplazaron archivos existentes.`;
+				return `> [!warning] Imagen ${numero} no guardada\n> Revisá el adjunto original en la sesión de pi; no se reemplazaron archivos existentes.${typeof image === "string" ? `\n\n${image}` : ""}`;
 			}
+		};
+		const partes = contenido.map((c: any) => {
+			if (c.type === "image") return insertarImagen(c);
+			if (c.type !== "text") return "";
+			return stripSkillBlocks(c.text.trim()).split("\n").map((linea: string) => {
+				const adjuntoExplicito = linea.trim().startsWith("@");
+				let ruta = linea.trim().replace(/^@/, "");
+				if ((ruta.startsWith('"') && ruta.endsWith('"')) || (ruta.startsWith("'") && ruta.endsWith("'"))) ruta = ruta.slice(1, -1);
+				if ((adjuntoExplicito || /^(?:\/|~\/|\.{1,2}\/)/.test(ruta)) && /\.(?:png|jpe?g|webp|gif)$/i.test(ruta)) {
+					return insertarImagen(path.resolve(contexto?.cwd || ".", ruta.startsWith("~/") ? path.join(homedir(), ruta.slice(2)) : ruta));
+				}
+				// Pi 1.3 pega una ruta en el editor, también en medio de una respuesta.
+				return linea.replace(/\/[^\s"'`<>]*\bpi-clipboard-[a-f0-9-]{36}\.(?:png|jpe?g|webp|gif)(?=$|[\s"'`<>),;:])/gi, ruta => insertarImagen(ruta));
+			}).join("\n");
 		}).filter(Boolean);
 		return partes.length ? `> [!quote] VOS\n\n${partes.join("\n\n")}` : null;
 	}
