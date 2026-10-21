@@ -1,0 +1,81 @@
+#!/usr/bin/env node
+// Smoke opcional de protocolo: foto manuscrita pública externa, nunca un intento real del usuario.
+import assert from "node:assert/strict";
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync, appendFileSync } from "node:fs";
+import { join, relative, dirname } from "node:path";
+import { createHash } from "node:crypto";
+import { spawnSync } from "node:child_process";
+import { agentDir, importPi, piDir, vaultDir } from "./lib/pi-sdk.mjs";
+import { rutaSegura } from "../extensions/curso/material.ts";
+
+if (process.argv.length > 2) throw new Error("Uso: node .pi/scripts/probar-fotos (consume dos turnos del modelo principal)");
+const hash = bytes => createHash("sha256").update(bytes).digest("hex");
+const url = "https://upload.wikimedia.org/wikipedia/commons/9/99/Financial_Management_Equity_Distribution_Solution_2026.jpg";
+const esperado = "c3e4b5141d0728242dbe020496bc8ec79994b3740fdabfaf63430fd62a9bd0a0";
+const foto = rutaSegura(vaultDir, "_entrada/muestras/externas/fase5/respuesta-externa.jpg");
+if (!existsSync(foto)) {
+  const r = await fetch(url, { signal: AbortSignal.timeout(30000) }); assert.ok(r.ok);
+  const bytes = Buffer.from(await r.arrayBuffer()); assert.equal(hash(bytes), esperado);
+  mkdirSync(dirname(foto), { recursive: true }); writeFileSync(foto, bytes, { flag: "wx" });
+}
+assert.equal(hash(readFileSync(foto)), esperado, "La foto cambió; no se reemplaza ni se envía al modelo.");
+const id = `prueba-${Date.now()}`, salida = rutaSegura(vaultDir, `_procesado/fase5/${id}`);
+const notas = rutaSegura(vaultDir, "informes/fase5"); mkdirSync(salida, { recursive: true }); mkdirSync(notas, { recursive: true });
+const log = join(notas, `${id}.md`), parcial = join(salida, "foto-parcial.png");
+writeFileSync(log, "", { flag: "wx" });
+const recorte = spawnSync(join(piDir, ".venv/bin/python"), ["-c", "from PIL import Image,ImageDraw; import sys; im=Image.open(sys.argv[1]).crop((90,675,1000,1080)); ImageDraw.Draw(im).rectangle((80,145,240,210),fill='white'); im.save(sys.argv[2])", foto, parcial], { timeout: 15000, encoding: "utf8" });
+assert.equal(recorte.status, 0, recorte.stderr);
+const protegidos = ["cursos/redes/progreso.yaml", "cursos/redes/indice.yaml", "cursos/redes/curso.md", ".pi/skills/teach/SKILL.md"];
+const antes = protegidos.map(p => hash(readFileSync(join(vaultDir, p))));
+const sdk = await importPi(), settings = sdk.SettingsManager.create(vaultDir, agentDir, { projectTrusted: true });
+const manager = sdk.SessionManager.create(vaultDir, salida), errores = [];
+let session;
+async function abrir(m) {
+  const loader = new sdk.DefaultResourceLoader({ cwd: vaultDir, agentDir, settingsManager: settings, extensionFactories: [pi => {
+    pi.on("before_agent_start", event => { Object.assign(event.systemPromptOptions.sections, {
+      teach: readFileSync(join(piDir, "skills/teach/SKILL.md"), "utf8"), modo_curso: readFileSync(join(piDir, "modo-curso.md"), "utf8"),
+      curso: `${readFileSync(join(vaultDir, "cursos/redes/curso.md"), "utf8")}\n\n## Alcance del ensayo técnico\nNo es una clase ni un intento del usuario. Revisá sólo el ejercicio 2 de la foto manuscrita externa de finanzas, sin asociarlo al índice ni a ejercicios de Redes. Aplicá sólo la pauta general del contrato de justificar el razonamiento, no la escala de un parcial ajeno. Esta actividad ya está en corrección de un intento: no hay nuevo probe/plan. El primer envío es parcial; el segundo trae la foto completa. Respondé en español.`,
+    }); });
+  }] });
+  await loader.reload(); assert.deepEqual(loader.getExtensions().errors, []);
+  settings.applyOverrides({ retry: { enabled: false }, compaction: { enabled: false } });
+  const p = await sdk.createAgentSession({ cwd: vaultDir, agentDir, settingsManager: settings, resourceLoader: loader, sessionManager: m });
+  await p.session.bindExtensions({ onError: e => errores.push(e) }); p.session.setThinkingLevel("off"); p.session.setActiveToolsByName([]);
+  assert.equal(`${p.session.model.provider}/${p.session.model.id}`, "openai/gpt-6.1-sol");
+  return p.session;
+}
+async function enviar(texto, file, mimeType) {
+  const timer = setTimeout(() => { void session.abort(); }, 120000);
+  try { await session.prompt(texto, { images: [{ type: "image", mimeType, data: readFileSync(file).toString("base64") }] }); }
+  finally { clearTimeout(timer); }
+  assert.equal(session.messages.filter(m => m.role === "assistant").at(-1).stopReason, "stop");
+  return session.getLastAssistantText();
+}
+try {
+  session = await abrir(manager);
+  const contexto = await session.extensionRunner.emitBeforeAgentStart({ messageType: "user", prompt: "ensayo" }, { cwd: vaultDir });
+  assert.equal(contexto.systemPromptOptions.sections.modo_curso, readFileSync(join(piDir, "modo-curso.md"), "utf8"));
+  assert.ok(session.extensionRunner.getRegisteredCommands().some(c => c.name === "md-log"));
+  await session.prompt(`/md-log ${log}`);
+  assert.equal(manager.getBranch().filter(e => e.type === "custom" && e.customType === "md-log").at(-1).data.file, log);
+  appendFileSync(log, "> [!note] Prueba técnica Fase 5\n> Foto pública de finanzas, ajena a Redes. No es respuesta del usuario ni progreso. Primera imagen recortada y con un dato ocultado intencionalmente; segunda imagen original.\n");
+  const t = performance.now();
+  const aclaracion = await enviar("Prueba técnica: revisá lo visible de este intento del ejercicio 2.", parcial, "image/png");
+  assert.match(aclaracion, /\?|mand[aá]|envi[aá]|necesito|confirm[aá]/i); assert.doesNotMatch(aclaracion, /6[.,]4\s*(?:%|\\%)/);
+  const devolucion = await enviar("Esta es la foto completa que aclara el dato y muestra el cálculo manuscrito del ejercicio 2. Continuá la revisión técnica.", foto, "image/jpeg");
+  assert.match(devolucion, /6[.,]4\s*(?:%|\\%)/);
+  const transcripcion = devolucion.search(/transcrip|lo que (?:leo|entend)/i), correccion = devolucion.search(/^\s*(?:#{1,6}\s*|\*\*)?(?:\d+[.)]\s*)?(?:correcci[oó]n|devoluci[oó]n|revisi[oó]n|evaluaci[oó]n)/im);
+  assert.ok(transcripcion >= 0 && correccion > transcripcion, "Cotejá el orden transcripción → devolución antes de aprobar.");
+  const fotos = session.messages.filter(m => m.role === "user").flatMap(m => Array.isArray(m.content) ? m.content.filter(c => c.type === "image") : []);
+  const texto = readFileSync(log, "utf8"), enlaces = [...texto.matchAll(/!\[\[([^\]]+)\]\]/g)].map(m => m[1]);
+  assert.equal(enlaces.length, 2); assert.equal(fotos.length, 2);
+  for (let i = 0; i < 2; i++) assert.equal(hash(readFileSync(rutaSegura(vaultDir, enlaces[i]))), hash(Buffer.from(fotos[i].data, "base64")));
+  const file = manager.getSessionFile(), contenido = readFileSync(log, "utf8");
+  const uso = session.messages.filter(m => m.role === "assistant").map(m => m.usage);
+  await session.extensionRunner.emit({ type: "session_shutdown" }); session.dispose(); session = await abrir(sdk.SessionManager.open(file));
+  assert.equal(readFileSync(log, "utf8"), contenido); assert.equal(readdirSync(join(notas, "adjuntos")).filter(n => enlaces.some(e => e.endsWith(n))).length, 2);
+  assert.deepEqual(protegidos.map(p => hash(readFileSync(join(vaultDir, p)))), antes); assert.deepEqual(errores, []);
+  const r = { modelo: "openai/gpt-6.1-sol", fuente: { url, sha256: esperado, licencia: "CC0", autor: "FlexingCA", limite: "Foto externa de finanzas; no material ni intento de Redes." }, log: relative(vaultDir, log), adjuntos: enlaces, aclaracion, devolucion, duracion_ms: performance.now() - t, uso, reapertura_sin_duplicacion: true, protegidos_intactos: protegidos, limite: "Prueba técnica aislada con pauta general de justificación; sin escala aplicable ni respuesta real del usuario. No prueba Ctrl+V físico ni clic/render en Obsidian." };
+  writeFileSync(join(salida, "resultado.json"), JSON.stringify(r, null, 2) + "\n"); console.log(JSON.stringify(r, null, 2));
+} catch (e) { console.error(`Prueba incompleta: ${e.stack || e}. Artefactos en ${salida}`); process.exitCode = 1; }
+finally { if (session) { await session.abort(); await session.extensionRunner.emit({ type: "session_shutdown" }); session.dispose(); } }

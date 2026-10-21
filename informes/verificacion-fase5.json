@@ -1,0 +1,74 @@
+{
+  "version": 1,
+  "estado": "fase5_implementada_checkpoint_usuario_pendiente",
+  "fase4_commit": "c757542",
+  "fase4_aprobada_por_usuario": true,
+  "modelo": "openai/gpt-6.1-sol",
+  "fuente": {
+    "url": "https://upload.wikimedia.org/wikipedia/commons/9/99/Financial_Management_Equity_Distribution_Solution_2026.jpg",
+    "sha256": "c3e4b5141d0728242dbe020496bc8ec79994b3740fdabfaf63430fd62a9bd0a0",
+    "licencia": "CC0",
+    "autor": "FlexingCA",
+    "limite": "Foto externa de finanzas; no material ni intento de Redes."
+  },
+  "escenarios": {
+    "dato_ocultado_pide_aclaracion_sin_adivinar": true,
+    "foto_completa_transcripcion_antes_de_correccion": true,
+    "aritmetica_cotejada_exactamente": true,
+    "sin_puntaje_al_no_haber_escala_aplicable": true,
+    "bytes_adjuntos_iguales_a_mensajes": true,
+    "reapertura_sin_duplicacion": true,
+    "llamadas_modelo_principal": 2,
+    "respuestas_reales_usuario": 0
+  },
+  "log": "informes/fase5/prueba-1792607375280.md",
+  "adjuntos": [
+    {
+      "ruta": "informes/fase5/adjuntos/1792607378137-1-f6fb98c0b2555d4b5dac12e96ba23ebd6c95a5840799732b0441a801b5e6a530.png",
+      "sha256": "f6fb98c0b2555d4b5dac12e96ba23ebd6c95a5840799732b0441a801b5e6a530",
+      "bytes": 283979
+    },
+    {
+      "ruta": "informes/fase5/adjuntos/1792607478197-1-c3e4b5141d0728242dbe020496bc8ec79994b3740fdabfaf63430fd62a9bd0a0.jpg",
+      "sha256": "c3e4b5141d0728242dbe020496bc8ec79994b3740fdabfaf63430fd62a9bd0a0",
+      "bytes": 158371
+    }
+  ],
+  "uso": {
+    "entrada": 18533,
+    "salida": 634,
+    "tokens_totales": 19167,
+    "costo_catalogo_no_factura": 0.043406
+  },
+  "protegidos_sha256": {
+    "cursos/redes/progreso.yaml": "98e1d8ce367adbffd7f928be907bb8fe8c1a32e39b6b28e2d386d3a0c30a798d",
+    "cursos/redes/indice.yaml": "b4c520c0a739bad39faec562703f136db098aeadd8efb2ad45a4d4e8281ec705",
+    "cursos/redes/curso.md": "f0b04bea210d40687156fcf1bd109483541cc21f5fef4dcc4ee00e35eb84f2df",
+    ".pi/skills/teach/SKILL.md": "180d78f5bd65e2f251dab60c716ac5874727595a28377e58590c1aac526ada80"
+  },
+  "integridad": {
+    "pdf_originales": 18,
+    "pdf_curso": 17,
+    "teach_original": true,
+    "configuracion_locks_researcher_sin_cambios": true,
+    "plan_intacto": true
+  },
+  "pruebas": {
+    "node": 55,
+    "python": 56,
+    "doctor": "Completo correcto dentro de tmux; PNG sintético guardado/embebido con runtime real, Luna texto/imagen y web."
+  },
+  "evidencia_local": "_procesado/fase5/prueba-1792607375280/resultado.json",
+  "incidente_harness": "Exigía ?; respuesta válida Mandame la foto completa. Se corrigió y reanudó el mismo JSONL, sin repetir la primera llamada.",
+  "manual": {
+    "ctrl_v_fisico_tmux": "pendiente",
+    "render_obsidian": "pendiente",
+    "contenido_portapapeles_leido": false,
+    "portapapeles_modificado": false
+  },
+  "limites": [
+    "Prueba técnica aislada con pauta general de justificación; sin escala aplicable ni respuesta real del usuario. No prueba Ctrl+V físico ni clic/render en Obsidian.",
+    "No prueba respuesta manuscrita de Redes, rúbrica detallada ni una clase completa.",
+    "268 páginas referidas pendientes; aprobación global no cambia revision_humana."
+  ]
+}

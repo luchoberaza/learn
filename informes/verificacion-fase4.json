@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "estado": "fase4_checkpoint_tecnico_correcto_aprobacion_pendiente",
+  "estado": "fase4_checkpoint_tecnico_aprobado_por_usuario",
   "fase3_commit": "3616e71",
   "modelo": "openai/gpt-6.1-sol",
   "curso": "redes",

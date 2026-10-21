@@ -28,6 +28,7 @@
 import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
 import * as fs from "node:fs";
 import * as path from "node:path";
+import { createHash } from "node:crypto";
 
 const QA_TOOLS = new Set(["quiz", "ask_user_question"]);
 
@@ -88,8 +89,54 @@ export default function mdLog(pi: ExtensionAPI) {
 		return lines.join("\n");
 	}
 
-	function userBlock(text: string): string {
-		return `> [!quote] VOS\n\n${text}`;
+	function guardarImagen(image: any, timestamp: number, numero: number): string {
+		if (!logFile) throw new Error("No hay nota vinculada.");
+		const mime = String(image.mimeType).split(";")[0].trim().toLowerCase();
+		const formatos: Record<string, string> = { "image/png": "png", "image/jpeg": "jpg", "image/webp": "webp", "image/gif": "gif" };
+		const extension = Object.hasOwn(formatos, mime) ? formatos[mime] : undefined;
+		if (!extension || typeof image.data !== "string") throw new Error("Formato no compatible.");
+		const bytes = Buffer.from(image.data, "base64");
+		if (!bytes.length || bytes.toString("base64") !== image.data) throw new Error("Base64 inválido.");
+		// shortcut: sólo se valida la firma; usar un decodificador si se exige certificar integridad del formato.
+		const firmaValida = mime === "image/png" ? bytes.subarray(0, 8).equals(Buffer.from("89504e470d0a1a0a", "hex"))
+			: mime === "image/jpeg" ? bytes.subarray(0, 3).equals(Buffer.from("ffd8ff", "hex"))
+			: mime === "image/gif" ? ["GIF87a", "GIF89a"].includes(bytes.subarray(0, 6).toString("ascii"))
+			: bytes.subarray(0, 4).toString("ascii") === "RIFF" && bytes.subarray(8, 12).toString("ascii") === "WEBP";
+		if (!firmaValida) throw new Error("La firma no coincide con el formato.");
+		const directorio = path.join(fs.realpathSync(path.dirname(logFile)), "adjuntos");
+		try { fs.mkdirSync(directorio, { mode: 0o700 }); } catch (e: any) { if (e.code !== "EEXIST") throw e; }
+		if (!fs.lstatSync(directorio).isDirectory()) throw new Error("Adjuntos debe ser un directorio, no un enlace.");
+		const hash = createHash("sha256").update(bytes).digest("hex");
+		const nombre = `${timestamp}-${numero}-${hash}.${extension}`;
+		const destino = path.join(directorio, nombre);
+		try { fs.writeFileSync(destino, bytes, { flag: "wx", mode: 0o600 }); }
+		catch (e: any) {
+			if (e.code !== "EEXIST" || !fs.lstatSync(destino).isFile() || !fs.readFileSync(destino).equals(bytes)) {
+				throw new Error("El adjunto existente se preservó o no se pudo escribir.");
+			}
+		}
+		const relativo = path.relative(contexto?.cwd ?? path.dirname(logFile), destino);
+		const enlace = relativo.startsWith(`..${path.sep}`) || path.isAbsolute(relativo) ? `adjuntos/${nombre}` : relativo.split(path.sep).join("/");
+		return `![[${enlace}]]`;
+	}
+
+	// Mismo camino para eventos e historial; el hash reutiliza sólo copias idénticas.
+	function userBlock(msg: any): string | null {
+		const contenido = typeof msg.content === "string" ? [{ type: "text", text: msg.content }] : msg.content;
+		if (!Array.isArray(contenido)) return null;
+		let numero = 0;
+		const timestamp = Number.isFinite(msg.timestamp) && msg.timestamp >= 0 ? Math.trunc(msg.timestamp) : 0;
+		const partes = contenido.map((c: any) => {
+			if (c.type === "text") return stripSkillBlocks(c.text.trim());
+			if (c.type !== "image") return "";
+			numero++;
+			try { return guardarImagen(c, timestamp, numero); }
+			catch {
+				contexto?.ui.notify(`No se pudo guardar la imagen ${numero} en el log; el chat continúa. Revisala en la sesión de pi.`, "warning");
+				return `> [!warning] Imagen ${numero} no guardada\n> Revisá el adjunto original en la sesión de pi; no se reemplazaron archivos existentes.`;
+			}
+		}).filter(Boolean);
+		return partes.length ? `> [!quote] VOS\n\n${partes.join("\n\n")}` : null;
 	}
 
 	// Skill declarations (`<skill name="..." ...> ...whole SKILL.md... </skill>`)
@@ -203,14 +250,7 @@ export default function mdLog(pi: ExtensionAPI) {
 		if (!msg || !("role" in msg)) return;
 
 		if (msg.role === "user") {
-			const text = typeof msg.content === "string"
-				? msg.content
-				: Array.isArray(msg.content)
-					? msg.content.filter((c: any) => c.type === "text").map((c: any) => c.text).join("\n")
-					: "";
-			const trimmed = stripSkillBlocks(text.trim());
-			if (!trimmed) return;
-			await withLock(() => appendToFile(userBlock(trimmed)));
+			await withLock(() => { const block = userBlock(msg); if (block) appendToFile(block); });
 			return;
 		}
 
@@ -371,13 +411,8 @@ export default function mdLog(pi: ExtensionAPI) {
 			count++;
 
 			if (msg.role === "user") {
-				const text = typeof msg.content === "string"
-					? msg.content
-					: Array.isArray(msg.content)
-						? msg.content.filter((c: any) => c.type === "text").map((c: any) => c.text).join("\n")
-						: "";
-				const trimmed = stripSkillBlocks(text.trim());
-				if (trimmed) blocks.push(userBlock(trimmed));
+				const block = userBlock(msg);
+				if (block) blocks.push(block);
 				continue;
 			}
 

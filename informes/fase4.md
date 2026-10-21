@@ -1,6 +1,6 @@
 # Fase 4 — sesión de estudio
 
-**Implementación terminada; checkpoint técnico comprobado, pendiente de aprobación del usuario.** Fase 3 cerrada en `3616e71`, con la propuesta de Redes aprobada y aplicada. No se inicia Fase 5.
+**Fase 4 aprobada por el usuario con «Aprobado; continuá», cerrada en `c757542`.** Fase 3 cerrada en `3616e71`, con la propuesta de Redes aprobada y aplicada. La autorización posterior permite iniciar Fase 5; no convierte el smoke en una clase completa ni en revisión individual de materiales.
 
 ## Qué se agregó
 

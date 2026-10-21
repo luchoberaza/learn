@@ -1,6 +1,6 @@
-# Instalación reproducible — Fases 0 a 4
+# Instalación reproducible — Fases 0 a 5
 
-**Estado:** Fases 0–3 aprobadas y cerradas (`79b1976`, `352c249`, `6409acd`, `3616e71`). Redes: 17 documentos / 987 páginas y 8 temas, con 268 páginas referidas todavía pendientes; aprobación de organización no equivale a revisión individual. Fase 4 implementada con primera pregunta real, compactación y reapertura comprobadas; checkpoint pendiente de aprobación. Historial y límites de las pruebas en `informes/fase1.md` a `informes/fase4.md` y `DECISIONES.md`. No se inicia Fase 5.
+**Estado:** Fases 0–4 aprobadas y cerradas (`79b1976`, `352c249`, `6409acd`, `3616e71`, `c757542`). Redes: 17 documentos / 987 páginas y 8 temas, con 268 páginas referidas todavía pendientes; aprobación de organización no equivale a revisión individual. Fase 5 implementada con manuscrito público y modelo principal reales; checkpoint pendiente, incluido Ctrl+V físico/render Obsidian. Historial y límites en `informes/fase1.md` a `informes/fase5.md` y `DECISIONES.md`. No se inicia Fase 6.
 
 Actualizar entre semestres, no en semana de parciales.
 
@@ -22,6 +22,7 @@ Actualizar entre semestres, no en semana de parciales.
 | Python de ingesta | `3.13.13`, entorno `.pi/.venv` |
 | PyMuPDF / OCRmyPDF / wordfreq | `1.28.2` / `17.13.0` / `3.1.1`; transitivas en `scripts/ingesta/uv.lock` |
 | PyYAML (Fase 2: ítems) | `6.0.3`; transitivas en el mismo `uv.lock` |
+| Pillow (fixture opcional de Fase 5) | `13.0.0`, transitiva ya instalada de OCR, fijada en `uv.lock`; no se usa en el logger |
 | Tesseract utilizado | `5.5.2`, Conda `h1f36d38_0`, con `spa` y `eng` |
 | Ghostscript existente | `10.08.0`, paquete `10.08.0-1.1` |
 
@@ -133,7 +134,7 @@ Abrí `~/Projects/pi-learning` como vault. Las citas futuras usarán `[[ruta/al.
 
 En Wayland, pi usa `wl-paste` (`wl-clipboard`); en X11 necesita `xclip`. Pi admite PNG, JPEG, WebP y GIF, **no HEIC**. Pasá las fotos del celular en JPEG y pegalas directamente en pi con **Ctrl+V**. No hay comando de transferencia de fotos.
 
-El guardado de imágenes en el log se implementa en Fase 5; no está listo en el md-log original.
+Desde Fase 5, el md-log adaptado guarda las imágenes junto a la nota en `adjuntos/` y las embebe para Obsidian. El original de upstream no tenía ese guardado. Se conserva el formato recibido: un PNG no se renombra como JPEG. Ver «Fotos persistentes» abajo.
 
 ## Ingesta base — Fase 1
 
@@ -205,7 +206,7 @@ Primera prueba real: 3/3 páginas transcritas; segunda: 3/3 en caché y ninguna 
 
 Prueba externa: dos imágenes de papel escaneado de *Algebra elemental* (Limric, 1895), procedentes de Internet Archive / colección Library of Congress. El PDF de prueba contiene esos JPEG sin recomprimir y sin capa de texto; no deriva de un PDF digital rasterizado. Se cotejaron seis fracciones y ocho importes; quince ítems, incluido el 9 multipágina. Segunda ejecución con el prompt corregido: dos aciertos de caché y cero llamadas nuevas. Fuente, SHA-256, fallos iniciales y límites en `informes/verificacion-escaneo-fase2.json`; comparación visible en `informes/fase2/escaneo-real.md`.
 
-Un error o cancelación conserva el texto previo. Las transcripciones incompletas se rechazan; `[ilegible]` o LaTeX roto quedan pendientes. El prompt distingue moneda (`\$`) de LaTeX y un salto de página de contenido ilegible. `revision_humana: pendiente` no cambia automáticamente por tener puntaje alto. Las fotos/manuscritos siguen sin verificarse. El usuario aprobó el checkpoint de Fase 2 con sus límites; esa aceptación global no modifica la revisión pendiente de páginas e ítems individuales.
+Un error o cancelación conserva el texto previo. Las transcripciones incompletas se rechazan; `[ilegible]` o LaTeX roto quedan pendientes. El prompt distingue moneda (`\$`) de LaTeX y un salto de página de contenido ilegible. `revision_humana: pendiente` no cambia automáticamente por tener puntaje alto. Al cerrar Fase 2, fotos/manuscritos no estaban verificados; el ensayo público aislado de Fase 5 se describe abajo, sin certificar respuestas reales de Redes. El usuario aprobó el checkpoint de Fase 2 con sus límites; esa aceptación global no modifica la revisión pendiente de páginas e ítems individuales.
 
 ## Crear y ampliar cursos — Fase 3
 
@@ -255,7 +256,27 @@ node .pi/scripts/probar-sesion
 
 Consume LLM para la primera pregunta y compactación; se detiene sin responder por vos. Usa sólo seis tools de lectura/preguntas y crea su propio JSONL bajo `_procesado/fase4/`. Primera prueba completa correcta: quiz a los **20,08 s**, compactación real y reapertura del mismo archivo con curso/tema/log restaurados. Dossier 6296 bytes, lectura 0,45 ms, BM25 4,75 ms y render frío adicional 388,6 ms. No son garantías ni una clase completa. `informes/fase4.md` documenta también dos intentos previos fallidos del harness, sus correcciones y una descarga redundante a la caché global; el harness final conserva el scope de paquetes y no modifica settings personales.
 
-El modo no promete funciones futuras: fotos persistentes en Fase 5, researcher anclado/caché en Fase 6, `/fin`, `/progreso` y `registrar_progreso` en Fase 7. Por ahora, un cierre se resume en chat/log sin editar YAML de progreso. El md-log manual ahora pide confirmación para rellenar una nota no vacía; el vínculo de curso nunca la reemplaza.
+El modo incorpora fotos persistentes desde Fase 5, sin prometer funciones futuras: researcher anclado/caché en Fase 6, `/fin`, `/progreso` y `registrar_progreso` en Fase 7. Por ahora, un cierre se resume en chat/log sin editar YAML de progreso. El md-log manual ahora pide confirmación para rellenar una nota no vacía; el vínculo de curso nunca la reemplaza.
+
+## Fotos persistentes — Fase 5
+
+Mismo `uv sync --locked`, sin dependencias nuevas ni comando propio de transferencia. Después de `/reload`, cualquier imagen del usuario recibida por pi con un log vinculado se copia a `adjuntos/` junto a la nota, incluidos mensajes sin texto. En el curso es `cursos/<curso>/sesiones/adjuntos/`; `/estudiar` ya vincula el log. Se conservan PNG/JPEG/WebP/GIF y su orden, con nombre de timestamp, posición y SHA-256. Los embeds dentro del vault usan su ruta desde el vault.
+
+La misma ruta se usa al recuperar historial; reutiliza sólo copias idénticas y preserva cambios manuales. No sigue symlinks en adjuntos ni reemplaza archivos. Los nuevos archivos tienen permisos `0600` y los directorios nuevos `0700`; no se cambian permisos preexistentes. Un fallo deja aviso en el log/UI, sin perder texto ni las demás fotos. No hay limpieza automática de copias parciales o temporales nativos de pi.
+
+El protocolo transcribe antes de corregir, conserva errores/unidades/tachaduras y espera aclaración de los datos necesarios ilegibles. Corrige con el contrato y sólo da puntaje con escala aplicable. No se escribe progreso todavía.
+
+Prueba opcional, **dos turnos del modelo principal**, sin respuestas reales del alumno:
+
+```bash
+node .pi/scripts/probar-fotos
+```
+
+Usa una foto manuscrita pública de Wikimedia Commons (FlexingCA, CC0), **de finanzas y ajena a Redes**, no una muestra simulada ni material añadido al curso. Si falta, descarga sólo ese JPEG y exige el SHA documentado. Recorta/oculta un dato para el caso negativo con Pillow 13.0.0 (ya instalado por OCR), luego envía el original completo. El modelo pide aclaración y después transcribe/corrige según la pauta general de justificación, sin inventar escala. Reapertura, dos embeds y bytes idénticos a los mensajes comprobados. Evidencia, procedencia e incidente del harness: `informes/fase5.md`. Log visible: `informes/fase5/prueba-1792607375280.md`.
+
+**Manual pendiente:** el ensayo SDK no certifica Ctrl+V físico dentro de tmux ni render en Obsidian. No se cambió el portapapeles personal. Para probar sin hacer una clase, abrí una sesión nueva de pi dentro de tmux, vinculá la nota vacía preparada con `/md-log informes/fase5/prueba-manual.md`, pegá una imagen como imagen con Ctrl+V en el editor normal y enviá «Prueba técnica: transcribí esta foto, sin registrar progreso». En pi 1.3.0 puede aparecer una ruta temporal antes del envío. Abrí esa nota en Obsidian y comprobá la foto; `/md-unlog` al terminar. Si la nota ya tiene contenido, creá otra vacía: no la rellenes otra vez. No uses `prueba-base.md`.
+
+Las imágenes y JSONL quedan locales, fuera del Git de `.pi/`. Pueden contener datos personales y metadatos: evitá información sensible innecesaria. El usuario sigue encargándose del paso celular → PC. No se verificó todavía una respuesta manuscrita real de Redes ni una rúbrica detallada inexistente.
 
 ## Comprobaciones y checkpoint
 
@@ -266,9 +287,9 @@ node --test .pi/tests/*.test.mjs
 .pi/scripts/doctor --sin-red
 ```
 
-El diagnóstico carga las extensiones locales con confianza solo para su propio proceso, sin modificar `trust.json`. No envía un prompt de enseñanza ni lee el portapapeles. Por defecto ejecuta dos pings de hasta 64 tokens (uno con un PNG sintético), una búsqueda y una lectura web. No consulta material privado del curso.
+El diagnóstico carga las extensiones locales con confianza solo para su propio proceso, sin modificar `trust.json`. No envía un prompt de enseñanza ni lee el portapapeles. Por defecto ejecuta dos pings de hasta 64 tokens (uno con un PNG sintético), una búsqueda y una lectura web. No envía material del curso a modelos o proveedores web. Desde Fase 5 prueba además el guardado/embed de un PNG sintético en una carpeta temporal propia, sin LLM y sin leer el portapapeles.
 
-Resultado automático actual, Fase 4: **46 tests Node sin LLM en verde**, incluida una suite de **56 tests Python**, y **`doctor` completamente en verde dentro de tmux**, con pings reales de `gpt-6-luna` y pruebas web. El diagnóstico comprueba la instalación de uso diario; no exige los entornos ML experimentales ni confunde la aprobación humana de calidad con una dependencia rota. El lanzador se comprobó además con un pseudoterminal real ejecutando `pi-learn --version`.
+Resultado automático actual, Fase 5: **55 tests Node sin LLM en verde**, incluida una suite de **56 tests Python**, y **`doctor` completamente en verde dentro de tmux**, con pings reales de `gpt-6-luna` y pruebas web. El diagnóstico comprueba la instalación de uso diario; no exige los entornos ML experimentales ni confunde la aprobación humana de calidad con una dependencia rota. El lanzador se comprobó además con un pseudoterminal real ejecutando `pi-learn --version`.
 
 ### Prueba del researcher real (opcional, con LLM y red)
 
@@ -289,8 +310,8 @@ El usuario aceptó la prueba técnica parcial para cerrar Fase 0. La lista sigui
 3. Ejecutar `/md-log <nombre-de-la-nota-nueva>.md`.
 4. Ejecutar `/skill:teach regla de la cadena` y completar el flujo: quiz, objetivo, researcher, aprobación del plan, explicación y verificaciones.
 5. Comprobar que el researcher abre un panel de tmux, busca y lee fuentes, y entrega un resultado en español al padre.
-6. Copiar una imagen al portapapeles y pegarla con Ctrl+V **dentro de esa sesión**. Comprobar que pi muestra el adjunto y el modelo lo recibe. No se espera todavía que md-log guarde la foto.
+6. Copiar una imagen al portapapeles y pegarla con Ctrl+V **dentro de esa sesión**. Comprobar que pi muestra el adjunto y el modelo lo recibe. Desde Fase 5 se espera además la copia en `adjuntos/` y su embed; esta comprobación física sigue pendiente.
 7. Verificar en Obsidian el log de texto y los quizzes; `/md-unlog` al terminar.
 8. Correr `doctor` desde otra terminal dentro de tmux, o pedir a pi que ejecute `.pi/scripts/doctor`.
 
-La Fase 0 se cierra con la aceptación explícita del smoke técnico, los tests y el doctor en verde, mediante un único commit en `.pi/`. La base de Fase 1 fue aprobada explícitamente y se cierra con un único commit. La Fase 2 fue aprobada explícitamente con «Fase 2 aprobada, continuá», aceptando el checkpoint con problemas escaneados reales externos y sus límites declarados; se cierra con un único commit tras repetir tests y doctor en verde. No se declara probado un parcial manuscrito ni se usó una muestra digital rasterizada como sustituto. Fase 3 aprobada con «Aprobado; continuá», propuesta aplicada y chequeos repetidos para su único commit. La aprobación no modifica la revisión humana pendiente de las transcripciones y no equivale a aprobar Fase 4 por adelantado. Fase 4 tiene checkpoint técnico listo; se espera su OK antes de iniciar Fase 5.
+La Fase 0 se cierra con la aceptación explícita del smoke técnico, los tests y el doctor en verde, mediante un único commit en `.pi/`. La base de Fase 1 fue aprobada explícitamente y se cierra con un único commit. La Fase 2 fue aprobada explícitamente con «Fase 2 aprobada, continuá», aceptando el checkpoint con problemas escaneados reales externos y sus límites declarados; se cierra con un único commit tras repetir tests y doctor en verde. No se declara probado un parcial manuscrito ni se usó una muestra digital rasterizada como sustituto. Fase 3 aprobada con «Aprobado; continuá», propuesta aplicada y chequeos repetidos para su único commit. La aprobación no modifica la revisión humana pendiente de las transcripciones y no equivale a aprobar Fase 4 por adelantado. Fase 4 aprobada explícitamente con «Aprobado; continuá», sin convertir los mensajes repetidos en varias autorizaciones. Fase 5 tiene checkpoint técnico listo con límites y comprobaciones manuales pendientes; se espera su OK antes de Fase 6.

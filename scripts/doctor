@@ -1,13 +1,13 @@
 #!/usr/bin/env node
-import { existsSync, readFileSync, readdirSync } from "node:fs";
-import { homedir } from "node:os";
+import { existsSync, readFileSync, readdirSync, mkdtempSync, writeFileSync, rmSync } from "node:fs";
+import { homedir, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { loadProject, piDir, vaultDir, webConfigPath } from "./lib/pi-sdk.mjs";
 
 const sinRed = process.argv.includes("--sin-red");
 if (process.argv.some(arg => arg === "--help" || arg === "--ayuda")) {
-  console.log("Uso: .pi/scripts/doctor [--sin-red]\nVerifica instalación, ingesta y estructura de los cursos (Fases 0–4). Por defecto hace dos pings breves a modelos y prueba búsqueda y lectura web.\n--sin-red omite esas llamadas y las marca como NO verificadas. No lee el portapapeles.");
+  console.log("Uso: .pi/scripts/doctor [--sin-red]\nVerifica instalación, ingesta, cursos y guardado local de imágenes (Fases 0–5). Por defecto hace dos pings breves a modelos y prueba búsqueda y lectura web.\n--sin-red omite esas llamadas y las marca como NO verificadas. No lee el portapapeles.");
   process.exit(0);
 }
 let fallos = 0;
@@ -69,6 +69,17 @@ try {
   for (const name of ["curso-nuevo", "curso-agregar", "curso-check", "curso-estado", "estudiar", "cursos"]) {
     check(commands.has(name), `Comando /${name}`, commands.has(name) ? "registrado" : "ejecutá /reload y revisá extensions/curso/");
   }
+  const pruebaFotos = mkdtempSync(join(tmpdir(), "pi-learn-fotos-"));
+  try {
+    if (!commands.has("md-log") || !commands.has("md-unlog")) throw new Error("Falta md-log.");
+    const file = join(pruebaFotos, "sesion.md"), png = readFileSync(join(piDir, "tests/fixtures/rojo.png"));
+    writeFileSync(file, "");
+    await session.prompt(`/md-log ${file}`);
+    await session.extensionRunner.emit({ type: "message_end", message: { role: "user", timestamp: Date.now(), content: [{ type: "image", mimeType: "image/png", data: png.toString("base64") }] } });
+    const enlace = readFileSync(file, "utf8").match(/!\[\[(adjuntos\/[a-z0-9.-]+\.png)\]\]/)?.[1];
+    check(Boolean(enlace) && readFileSync(join(pruebaFotos, enlace)).equals(png), "Fotos en md-log", "PNG idéntico y embed comprobados sin modelo; manuscrito/Ctrl+V requieren prueba aparte");
+  } catch { check(false, "Fotos en md-log", "falló el guardado/embed local; ejecutá tests/md-log-fotos.test.mjs"); }
+  finally { if (commands.has("md-unlog")) await session.prompt("/md-unlog"); rmSync(pruebaFotos, { recursive: true, force: true }); }
   check(existsSync(join(piDir, "modo-curso.md")) && existsSync(join(piDir, "scripts/ingesta/sesion.py")), "Contexto de sesión", "modo-curso y lector/render local presentes; no requiere dependencias nuevas");
   const skills = project.loader.getSkills();
   check(["curso-nuevo", "curso-agregar"].every(n => skills.skills.some(s => s.name === n)), "Skills de cursos", "curso-nuevo y curso-agregar; /reload tras cambios");
