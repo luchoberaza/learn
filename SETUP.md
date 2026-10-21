@@ -1,6 +1,6 @@
-# Instalación reproducible — Fases 0 a 2
+# Instalación reproducible — Fases 0 a 3
 
-**Estado:** Fase 0 aceptada por el usuario (opción «1») con el smoke técnico de preguntas, quiz, log e imagen, más la prueba independiente del researcher real. Los 11 tests y el diagnóstico automático se repitieron en verde dentro de tmux para el commit de cierre. La lección quedó en el probe; no se afirma que se haya completado. Ver `informes/verificacion-base.md`. El usuario aprobó después la base de Fase 1 con «aprobado, sigamos», conociendo las limitaciones del informe, y autorizó Fase 2. Fase 1 quedó en `352c249`; Fase 2 tiene implementación, piloto digital y prueba con escaneos reales externos comprobados, y fue aprobada por el usuario con «Fase 2 aprobada, continuá». Se completa su commit de cierre con los chequeos repetidos en verde; no se inició Fase 3. La muestra externa se buscó a pedido del usuario; es papel impreso, no un parcial manuscrito.
+**Estado:** Fase 0 aceptada por el usuario (opción «1») con el smoke técnico de preguntas, quiz, log e imagen, más la prueba independiente del researcher real. Los 11 tests y el diagnóstico automático se repitieron en verde dentro de tmux para el commit de cierre. La lección quedó en el probe; no se afirma que se haya completado. Ver `informes/verificacion-base.md`. El usuario aprobó después la base de Fase 1 con «aprobado, sigamos», conociendo las limitaciones del informe, y autorizó Fase 2. Fase 1 quedó en `352c249`; Fase 2 tiene implementación, piloto digital y prueba con escaneos reales externos comprobados, y fue aprobada por el usuario con «Fase 2 aprobada, continuá». Fase 2 quedó cerrada en `6409acd`. Fase 3 aprobada con «Aprobado; continuá»: se aplicó la tabla de Redes y la incorporación de las tres diapositivas, conservando contrato/progreso/PDFs existentes. El curso final tiene 17 documentos y 8 temas; las revisiones individuales siguen pendientes. Este cierre precede a Fase 4. La muestra externa se buscó a pedido del usuario; es papel impreso, no un parcial manuscrito.
 
 Actualizar entre semestres, no en semana de parciales.
 
@@ -182,7 +182,7 @@ mkdir -p informes/fase1
 cp -n _procesado/fase1/base-simple/informe-ingesta.md informes/fase1/ingesta-base.md
 ```
 
-No hay todavía `/curso-nuevo`, `/curso-estado` ni `/estudiar`: corresponden a fases posteriores. Los ensayos de marker, docling y visión están separados en [`scripts/ingesta/benchmark/`](scripts/ingesta/benchmark/README.md); **no es necesario restaurarlos para usar la ingesta**.
+Están disponibles `/curso-nuevo`, `/curso-agregar`, `/curso-check` y `/curso-estado` (Fase 3). `/estudiar` sigue reservado a Fase 4. Los ensayos de marker, docling y visión están separados en [`scripts/ingesta/benchmark/`](scripts/ingesta/benchmark/README.md); **no es necesario restaurarlos para usar la ingesta**.
 
 ## Visión e ítems — Fase 2
 
@@ -191,7 +191,7 @@ Se restaura con el mismo `uv sync --locked` de arriba; se añade únicamente PyY
 - `transcribir_paginas(curso, doc, paginas)` usa Luna, renderiza las páginas ya preparadas, guarda Markdown, actualiza BM25/informe y devuelve solo un resumen. Más de 50 páginas —límite configurable— exige confirmación interactiva; sin UI se rechaza. La caché evita repetir llamadas vigentes; cambiar modelo, prompt o umbral puede invalidarla y consumir nuevamente.
 - `guardar_items(curso, doc, items)` guarda la segmentación hecha por el agente: `{id, paginas, enunciado, solucion?: {doc, id}}`. Los ids conservan la numeración del documento. Requiere páginas transcritas, valida referencias y no pisa ediciones manuales.
 
-Son tools de preparación, no comandos `/`. Todavía no hay un curso creado: su creación queda para Fase 3. Para comprobar la misma lógica sin inventar un curso, existe un piloto aislado con el práctico digital disponible:
+Son tools de preparación, no comandos `/`. Los pilotos aislados de Fase 2 siguen disponibles; Fase 3 incorpora además el curso real `redes`. Para repetir la prueba digital original sin crear otro curso:
 
 ```bash
 # Opcional, con LLM: puede enviar tres páginas a Luna si no hay caché vigente.
@@ -207,6 +207,30 @@ Prueba externa: dos imágenes de papel escaneado de *Algebra elemental* (Limric,
 
 Un error o cancelación conserva el texto previo. Las transcripciones incompletas se rechazan; `[ilegible]` o LaTeX roto quedan pendientes. El prompt distingue moneda (`\$`) de LaTeX y un salto de página de contenido ilegible. `revision_humana: pendiente` no cambia automáticamente por tener puntaje alto. Las fotos/manuscritos siguen sin verificarse. El usuario aprobó el checkpoint de Fase 2 con sus límites; esa aceptación global no modifica la revisión pendiente de páginas e ítems individuales.
 
+## Crear y ampliar cursos — Fase 3
+
+No agrega dependencias: usa el mismo Python/PyMuPDF/PyYAML fijado en `uv.lock`, con los comandos `uv sync --locked` de arriba. Después de `/reload` o de abrir una sesión nueva:
+
+```text
+/curso-nuevo <slug>
+/curso-agregar <slug> [archivos…]
+/curso-check redes
+/curso-estado redes
+```
+
+Los dos primeros alias invocan las skills nativas `/skill:curso-nuevo` y `/skill:curso-agregar`. El agente selecciona material del curso y redacta una propuesta explícita, no importa toda la bandeja por defecto. `guardar_curso(curso, propuesta)` valida/copia fuentes nuevas y muestra un diff con confirmación interactiva antes de reemplazar curación existente; sin UI rechaza la actualización. No hay bandera de autoaprobación, ni reemplazo de PDFs o progreso existente. La selección de páginas y su ingesta en segundo plano reutilizan la CLI base.
+
+Formatos, seguridad y comandos locales: [`scripts/ingesta/CURSOS.md`](scripts/ingesta/CURSOS.md). El validador es de sólo lectura; `ok` sólo acredita estructura/referencias, y `listo_estudio` exige cero avisos. El doctor comprueba cada curso y señala páginas pendientes sin fingir que su revisión humana es una dependencia faltante. `/curso-estado` actualiza su indicador al consultar, sin servicio de sondeo permanente.
+
+El curso real está en `cursos/redes/`: **17 PDFs / 987 páginas, 8 temas** y 52 páginas preparadas, 23 con Luna. Los 15 ítems ya están asignados. El usuario aprobó la tabla y las tres diapositivas complementarias; la propuesta `_procesado/fase3/propuesta-redes-curada.json` se aplicó verificando sus huellas. Abrí `cursos/redes/revision-inicial.md` e `informe-ingesta.md` en Obsidian. Hay **268 páginas referidas pendientes**, no el curso entero preparado.
+
+```bash
+.pi/.venv/bin/python .pi/scripts/ingesta/cursos.py validar --curso redes
+.pi/.venv/bin/python .pi/scripts/ingesta/cursos.py informe --curso redes
+```
+
+El informe visible se regenera sólo si conserva su huella generada; si se editó manualmente, se preserva y se avisa. Los detalles de fuentes, resultados y límites están en `informes/fase3.md` y `informes/verificacion-fase3.json`. Las fuentes y enunciados reales permanecen fuera de Git. Los datos del curso no se restauran desde el commit del código: conservar el vault o volver a preparar los originales.
+
 ## Comprobaciones y checkpoint
 
 ```bash
@@ -218,7 +242,7 @@ node --test .pi/tests/*.test.mjs
 
 El diagnóstico carga las extensiones locales con confianza solo para su propio proceso, sin modificar `trust.json`. No envía un prompt de enseñanza ni lee el portapapeles. Por defecto ejecuta dos pings de hasta 64 tokens (uno con un PNG sintético), una búsqueda y una lectura web. No consulta material privado del curso.
 
-Resultado automático actual, Fase 2: **28 tests Node sin LLM en verde**, incluida una suite de **34 tests Python**, y **`doctor` completamente en verde dentro de tmux**, con pings reales de `gpt-6-luna` y pruebas web. El diagnóstico comprueba la instalación de uso diario; no exige los entornos ML experimentales ni confunde la aprobación humana de calidad con una dependencia rota. El lanzador se comprobó además con un pseudoterminal real ejecutando `pi-learn --version`.
+Resultado automático actual, Fase 3: **34 tests Node sin LLM en verde**, incluida una suite de **52 tests Python**, y **`doctor` completamente en verde dentro de tmux**, con pings reales de `gpt-6-luna` y pruebas web. El diagnóstico comprueba la instalación de uso diario; no exige los entornos ML experimentales ni confunde la aprobación humana de calidad con una dependencia rota. El lanzador se comprobó además con un pseudoterminal real ejecutando `pi-learn --version`.
 
 ### Prueba del researcher real (opcional, con LLM y red)
 
@@ -243,4 +267,4 @@ El usuario aceptó la prueba técnica parcial para cerrar Fase 0. La lista sigui
 7. Verificar en Obsidian el log de texto y los quizzes; `/md-unlog` al terminar.
 8. Correr `doctor` desde otra terminal dentro de tmux, o pedir a pi que ejecute `.pi/scripts/doctor`.
 
-La Fase 0 se cierra con la aceptación explícita del smoke técnico, los tests y el doctor en verde, mediante un único commit en `.pi/`. La base de Fase 1 fue aprobada explícitamente y se cierra con un único commit. La Fase 2 fue aprobada explícitamente con «Fase 2 aprobada, continuá», aceptando el checkpoint con problemas escaneados reales externos y sus límites declarados; se cierra con un único commit tras repetir tests y doctor en verde. No se declara probado un parcial manuscrito ni se usó una muestra digital rasterizada como sustituto.
+La Fase 0 se cierra con la aceptación explícita del smoke técnico, los tests y el doctor en verde, mediante un único commit en `.pi/`. La base de Fase 1 fue aprobada explícitamente y se cierra con un único commit. La Fase 2 fue aprobada explícitamente con «Fase 2 aprobada, continuá», aceptando el checkpoint con problemas escaneados reales externos y sus límites declarados; se cierra con un único commit tras repetir tests y doctor en verde. No se declara probado un parcial manuscrito ni se usó una muestra digital rasterizada como sustituto. Fase 3 aprobada con «Aprobado; continuá», propuesta aplicada y chequeos repetidos para su único commit. La aprobación no modifica la revisión humana pendiente de las transcripciones y no equivale a aprobar Fase 4 por adelantado.

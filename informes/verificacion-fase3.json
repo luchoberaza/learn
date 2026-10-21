@@ -1,0 +1,314 @@
+{
+  "version": 1,
+  "estado": "fase3_aprobada_propuesta_aplicada",
+  "fase2_commit": "6409acd",
+  "curso": "redes",
+  "fuentes_copiadas": [
+    {
+      "id": "programa-redes",
+      "archivo": "fuentes/programa/Programa de Unidad Curricular Redes de Computadoras - 20191022.pdf",
+      "paginas": 6,
+      "sha256": "84756d3f88e6ae206b8e62b9b9c7861db20a68d2584621b96b60079710d1badc"
+    },
+    {
+      "id": "kurose-7",
+      "archivo": "fuentes/bibliografia/Redes_de_computadoras_Un_enfoque_descend.pdf",
+      "paginas": 699,
+      "sha256": "d3daf1f6b55402d5c4b9a172722fd9a4194cfbe5198e06a90dc8210f26894b93"
+    },
+    {
+      "id": "practico-1",
+      "archivo": "fuentes/ejercicios/practico1.pdf",
+      "paginas": 3,
+      "sha256": "ae1bc82e96c66749f02c4e81646990a7eb25e7b96f02beddf1220eb01886be2d"
+    },
+    {
+      "id": "practico-2",
+      "archivo": "fuentes/ejercicios/practico2.pdf",
+      "paginas": 3,
+      "sha256": "8e81ee3f2d1c6cf28d0930ee32b77a1711bac9933f86392c594c2908074a5a21"
+    },
+    {
+      "id": "practico-3",
+      "archivo": "fuentes/ejercicios/practico3.pdf",
+      "paginas": 5,
+      "sha256": "9a8ea1b4f67db737d6d2c1488e71e6cbfb4b6437ff91b9181ab0b272c7addf55"
+    },
+    {
+      "id": "practico-4",
+      "archivo": "fuentes/ejercicios/practico4.pdf",
+      "paginas": 3,
+      "sha256": "843e94a234d1069fee35b112caecf103a8d2e44bcbe3fb0522e10e3a917bf3a6"
+    },
+    {
+      "id": "practico-5",
+      "archivo": "fuentes/ejercicios/practico5.pdf",
+      "paginas": 4,
+      "sha256": "e0407eca8ad3c5c60caee2101b98be4e2a232733003fbec5e52101ae19b1a252"
+    },
+    {
+      "id": "practico-6",
+      "archivo": "fuentes/ejercicios/practico6.pdf",
+      "paginas": 6,
+      "sha256": "475aa3ba32669b809f8ee7db5ada3e11552a1f4c3a7fee2d81433c88f676a4d7"
+    },
+    {
+      "id": "practico-7",
+      "archivo": "fuentes/ejercicios/practico7.pdf",
+      "paginas": 5,
+      "sha256": "831a1855a8ebecc15108e5df119aea266c0036199e82d76ae201b06d08d6125f"
+    },
+    {
+      "id": "sol-prc20230918",
+      "archivo": "fuentes/evaluaciones/sol_prc20230918.pdf",
+      "paginas": 3,
+      "sha256": "2d5157b1dc46b1d7fdd777d47942ed0307959b1eac600fcbc015f5df53ee9762"
+    },
+    {
+      "id": "sol-prc20240926",
+      "archivo": "fuentes/evaluaciones/sol_prc20240926.pdf",
+      "paginas": 4,
+      "sha256": "8c1f9c588765290b5b7f25bcd62df3b2f8c7fa2c9478402493903bc9d98d46a6"
+    },
+    {
+      "id": "sol-prc2024123",
+      "archivo": "fuentes/evaluaciones/sol_prc2024123.pdf",
+      "paginas": 4,
+      "sha256": "58ac849d487f3bb0f6b3855fac5e507f24e57d419765bfb2f11bd19510805c61"
+    },
+    {
+      "id": "sol-prc20250924",
+      "archivo": "fuentes/evaluaciones/sol_prc20250924.pdf",
+      "paginas": 4,
+      "sha256": "75901428eefdc308b10ce958a79ea486998aa7b195b5fba2120aaae4acd25096"
+    },
+    {
+      "id": "sol-prc20251126",
+      "archivo": "fuentes/evaluaciones/sol_prc20251126.pdf",
+      "paginas": 5,
+      "sha256": "82a8e6bc88bc36ea23a112c6cd9e1e3b23e2cea0b24e8d5c48fb2bfa94e363b3"
+    }
+  ],
+  "originales_intactos": 18,
+  "seleccion_base": {
+    "version": 1,
+    "estado": "completada_con_pendientes",
+    "pid": 29903,
+    "iniciado": "2026-10-21T14:05:11.538441+00:00",
+    "actualizado": "2026-10-21T14:05:23.760176+00:00",
+    "solicitadas": 52,
+    "procesadas": 52,
+    "cache": 52,
+    "pendientes": 5,
+    "documento": "sol-prc20240926",
+    "pagina": 4
+  },
+  "calidad": {
+    "programa-redes": {
+      "procesadas": 6,
+      "pendientes": [
+        1
+      ],
+      "rutas": {
+        "pendiente": 1,
+        "digital": 5
+      }
+    },
+    "kurose-7": {
+      "procesadas": 39,
+      "pendientes": [
+        33,
+        47,
+        50
+      ],
+      "rutas": {
+        "digital": 24,
+        "vision": 12,
+        "pendiente": 3
+      }
+    },
+    "practico-1": {
+      "procesadas": 3,
+      "pendientes": [],
+      "rutas": {
+        "vision": 3
+      }
+    },
+    "sol-prc20240926": {
+      "procesadas": 4,
+      "pendientes": [
+        1
+      ],
+      "rutas": {
+        "pendiente": 1,
+        "vision": 3
+      }
+    }
+  },
+  "vision": {
+    "modelo": "openai/gpt-6-luna",
+    "paginas": 23,
+    "transcritas": 23,
+    "tokens": {
+      "input": 73592,
+      "output": 19304,
+      "totalTokens": 92896
+    },
+    "costo_catalogo_no_factura": 0.0170112,
+    "repeticion_cache": 23
+  },
+  "bancos": {
+    "practico-1": [
+      {
+        "id": "1",
+        "paginas": [
+          1
+        ]
+      },
+      {
+        "id": "2",
+        "paginas": [
+          1
+        ]
+      },
+      {
+        "id": "3",
+        "paginas": [
+          1
+        ]
+      },
+      {
+        "id": "4",
+        "paginas": [
+          2
+        ]
+      },
+      {
+        "id": "5",
+        "paginas": [
+          2
+        ]
+      },
+      {
+        "id": "6",
+        "paginas": [
+          2
+        ]
+      },
+      {
+        "id": "7",
+        "paginas": [
+          2,
+          3
+        ]
+      },
+      {
+        "id": "8",
+        "paginas": [
+          3
+        ]
+      },
+      {
+        "id": "9",
+        "paginas": [
+          3
+        ]
+      },
+      {
+        "id": "10",
+        "paginas": [
+          3
+        ]
+      }
+    ],
+    "sol-prc20240926": [
+      {
+        "id": "1",
+        "paginas": [
+          1
+        ]
+      },
+      {
+        "id": "2",
+        "paginas": [
+          2
+        ]
+      },
+      {
+        "id": "3",
+        "paginas": [
+          2
+        ]
+      },
+      {
+        "id": "4",
+        "paginas": [
+          3
+        ]
+      },
+      {
+        "id": "5",
+        "paginas": [
+          3,
+          4
+        ]
+      }
+    ]
+  },
+  "indice_actual": {
+    "documentos": 14,
+    "temas": 8,
+    "ok": true,
+    "listo_estudio": false,
+    "paginas_pendientes": 261,
+    "items_sin_asignar": 15
+  },
+  "validacion_caliente_ms": 48.4,
+  "revision_humana": "pendiente",
+  "limites": [
+    "Preparación parcial, no todo el curso.",
+    "Programa de 2017; vigencia de evaluación 2026 no verificada.",
+    "Quinta edición básica ausente; séptima complementaria aportada.",
+    "Tabla de solución del parcial PDF 4 no certificada por su puntaje."
+  ],
+  "pruebas": {
+    "node": {
+      "aprobadas": 34,
+      "fallidas": 0
+    },
+    "python": {
+      "aprobadas": 52,
+      "fallidas": 0
+    },
+    "doctor": {
+      "resultado_final": "correcto",
+      "dentro_de_tmux": true,
+      "avisos_curso": 11,
+      "incidente_intermedio": "web_search sin resultados válidos; repetición completa correcta sin cambios de código/configuración."
+    },
+    "plan_sha256": "ba3ab49513e1fee2ec7c4e3ab60638fb28fb2e58460f3c24af785b987277b5fa"
+  },
+  "aprobacion": {
+    "mensaje": "Aprobado; continuá",
+    "alcance": "Tabla tema → material y tres diapositivas complementarias; no certifica transcripciones ni aprueba Fase 4.",
+    "canal": "Confirmación explícita del usuario en el chat; cierre local de la propuesta exacta, sin simular ctx.ui ni cambiar el guard de la tool."
+  },
+  "propuesta_aprobada": {
+    "archivo": "_procesado/fase3/propuesta-redes-curada.json",
+    "documentos": 17,
+    "copias_nuevas": 3,
+    "ok": true,
+    "paginas_pendientes": 268,
+    "items_sin_asignar": 0,
+    "base": "0fa16f8906a468118b221c97f874cc94241f37da848b5b935377f3f988af3707",
+    "huella": "c801e91fa202dc5beb01fc00b55a1c53cbf364b461fb2bdcfee5d1fc8c7bdb6e"
+  },
+  "resultado_aplicacion": {
+    "copiados": 3,
+    "documentos": 17,
+    "temas": 8,
+    "paginas_pendientes": 268,
+    "items_sin_asignar": 0,
+    "contrato_y_progreso_intactos": true
+  }
+}

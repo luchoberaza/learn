@@ -4,6 +4,7 @@ import { existsSync, lstatSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { piDir, vaultDir } from "../../scripts/lib/pi-sdk.mjs";
 import { python, transcribir } from "./ingesta.ts";
+import { guardarCurso, registrarCuracion } from "./curacion.ts";
 
 const slug = Type.String({ pattern: "^[a-z0-9]+(?:-[a-z0-9]+)*$" });
 const paginas = Type.Array(Type.Integer({ minimum: 1 }), { minItems: 1 });
@@ -16,6 +17,15 @@ function salida(curso: string): string {
 }
 
 export default function (pi: ExtensionAPI) {
+  registrarCuracion(pi);
+  pi.registerTool({
+    name: "guardar_curso", label: "Revisar y guardar curso",
+    description: "Preparación: valida una propuesta JSON en _procesado/ y copia PDFs nuevos desde _entrada/. Para un curso existente muestra el diff y exige confirmación humana real, sin autoaprobación desde argumentos. Rechaza ediciones concurrentes y conserva fuentes y progreso existentes.",
+    parameters: Type.Object({ curso: slug, propuesta: Type.String({ minLength: 1 }) }),
+    executionMode: "sequential",
+    execute: (_id, args, signal, onUpdate, ctx) => guardarCurso(pi, args, ctx, signal,
+      texto => onUpdate?.({ content: [{ type: "text", text: texto }], details: undefined })),
+  });
   pi.registerTool({
     name: "transcribir_paginas", label: "Transcribir páginas con visión",
     description: "Solo preparación: transcribe páginas ya ingeridas con el modelo de visión configurado, fuera del contexto principal. Siempre para ejercicios/evaluaciones/soluciones y para páginas dudosas. Guarda Markdown y devuelve solo un resumen. Superar el límite configurado requiere confirmación; no inventa texto ni reintenta automáticamente.",
