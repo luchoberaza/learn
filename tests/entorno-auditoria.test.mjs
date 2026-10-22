@@ -4,9 +4,9 @@ import { mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSyn
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
-import { importPi, piDir, vaultDir } from "../scripts/lib/pi-sdk.mjs";
+import { agentDir, importPi, piDir, vaultDir } from "../scripts/lib/pi-sdk.mjs";
 
-const lanzador = join(piDir, "config/fish/pi-learn.fish");
+const lanzador = join(piDir, "config/fish/pi-learn.fish"), instalacion = process.env.PI_MANAGED_INSTALL_ROOT || join(agentDir, "install");
 process.env.PI_OFFLINE = "1";
 
 // HOME falso: ponytail como paquete global, una skill global que choca con teach y el vault en ~/Projects/pi-learning.
@@ -119,4 +119,13 @@ test("H41: sin los paquetes fijados pi-learn avisa en una línea y arranca pi si
   const completo = piLearn(t, { home });
   assert.equal(completo.stderr, "");
   assert.equal(completo.llamadas[0].at(-2), "OFFLINE=");
+});
+
+test("X01: el doctor marca menos de 2 GB libres y dice cómo ver qué ocupa", t => {
+  const disco = mkdtempSync(join(tmpdir(), "pi-disco-"));
+  t.after(() => rmSync(disco, { recursive: true, force: true }));
+  const r = spawnSync("unshare", ["-rm", "sh", "-c", 'mount -t tmpfs -o size=64m tmpfs "$0" && mkdir "$0/agente" && exec "$@"', disco, process.execPath, join(piDir, "scripts/doctor"), "--sin-red"],
+    { encoding: "utf8", timeout: 60000, env: { ...process.env, PI_CODING_AGENT_DIR: join(disco, "agente"), PI_MANAGED_INSTALL_ROOT: instalacion } });
+  if (r.error || !r.stdout) return t.skip(`sin espacios de nombres de usuario: ${r.stderr}`);
+  assert.match(r.stdout, /^✗ Espacio libre: 0,1 GB.*; liberá al menos 2 GB.*du -xh/m);
 });

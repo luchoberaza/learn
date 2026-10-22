@@ -1,9 +1,9 @@
 #!/usr/bin/env node
-import { existsSync, readFileSync, readdirSync, mkdtempSync, writeFileSync, rmSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, mkdtempSync, writeFileSync, rmSync, statfsSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
-import { loadProject, piDir, vaultDir, webConfigPath } from "./lib/pi-sdk.mjs";
+import { agentDir, loadProject, piDir, vaultDir, webConfigPath } from "./lib/pi-sdk.mjs";
 
 const sinRed = process.argv.includes("--sin-red");
 if (process.argv.some(arg => arg === "--help" || arg === "--ayuda")) {
@@ -40,6 +40,9 @@ check(run(clipboard, [wayland ? "--version" : "-version"]).ok,
 const vault = config.vault.replace(/^~(?=\/|$)/, homedir());
 check(resolve(vault) === vaultDir && ["_entrada", "cursos"].every(name => existsSync(join(vault, name))),
   "Rutas del vault", `${vault}; creá _entrada/ y cursos/ si faltan`);
+// Un ENOSPC en clase corta el turno y deja el JSONL de la sesión con una línea partida.
+const libre = Math.min(...[vaultDir, agentDir].filter(existsSync).map(dir => { const s = statfsSync(dir); return s.bavail * s.bsize; }));
+check(libre >= 2 ** 31, "Espacio libre", `${(libre / 2 ** 30).toFixed(1).replace(".", ",")} GB en el disco del vault y de pi${libre < 2 ** 31 ? "; liberá al menos 2 GB (para ver qué ocupa: du -xh -d 2 ~ | sort -h | tail)" : ""}`);
 let obsidian = false;
 try { obsidian = json(join(vault, ".obsidian/app.json")).userIgnoreFilters?.includes("_procesado") === true; } catch {}
 check(obsidian, "Obsidian", obsidian ? "_procesado excluido" : "con Obsidian cerrado, agregá _procesado a userIgnoreFilters");
