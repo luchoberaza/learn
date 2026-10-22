@@ -56,3 +56,11 @@ test('H30: leer_sesion_anterior devuelve el principio y el final de un log largo
   assert.match(texto,/INICIO DEL LOG/);assert.match(texto,/RESPUESTA FINAL: 42/);assert.ok(Buffer.byteLength(texto)<24500);assert.ok(!texto.includes('�'));
   assert.equal(texto.match(/SHA-256: ([a-f0-9]{64})/)[1],createHash('sha256').update(readFileSync(join(e.raiz,log))).digest('hex'));
 });
+test('H26: /fin con el agente ocupado corta el turno, espera y sigue con el cierre una sola vez',async t=>{
+  const e=await entorno(t),orden=[];let ocupado=true;
+  Object.assign(e.ctx,{isIdle:()=>!ocupado,abort:()=>orden.push('abort'),waitForIdle:async()=>{orden.push('espera');ocupado=false;}});
+  const append=e.entradas.push.bind(e.entradas);e.entradas.push=x=>{if(x.customType==='curso-cierre')orden.push('cierre');return append(x);};
+  await e.comandos.get('fin').handler('',e.ctx);
+  assert.deepEqual(orden,['abort','espera','cierre']);assert.equal(e.mensajes.length,2);assert.match(e.mensajes.at(-1),/registrar_progreso con cierre:true/);
+  assert.ok(!e.avisos.some(a=>/Esperá/.test(a)));
+});

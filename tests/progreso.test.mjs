@@ -35,7 +35,7 @@ test('/fin pide registro y cierra sólo después del mensaje final y guardado',a
   await e.eventos.get('session_start')({},e.ctx);assert.equal(e.sesion.actual(),undefined);
 });
 test('cierre natural usa el mismo camino; errores y busy dejan el log activo',async t=>{
-  const e=await entorno(t);e.ctx.isIdle=()=>false;await e.comandos.get('fin').handler('',e.ctx);assert.equal(e.entradas.filter(x=>x.customType==='curso-cierre').length,0);
+  const e=await entorno(t);e.ctx.isIdle=()=>false;e.ctx.abort=()=>{};e.ctx.waitForIdle=async()=>{};await e.comandos.get('fin').handler('',e.ctx);assert.equal(e.entradas.filter(x=>x.customType==='curso-cierre').length,1);
   await assert.rejects(()=>e.guardar({estado:'inventado'}));assert.ok(e.sesion.actual());
   await e.guardar({cierre:true});e.final();await e.eventos.get('agent_settled')({},e.ctx);assert.equal(e.sesion.actual(),undefined);
 });
