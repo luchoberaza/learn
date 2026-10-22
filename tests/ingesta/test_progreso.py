@@ -9,7 +9,7 @@ import unittest
 from unittest.mock import patch
 import yaml
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'scripts/ingesta'))
-from almacen import Conflicto, atomico, bloquear
+from almacen import Conflicto, atomico, esperar
 from progreso import registrar, leer
 
 
@@ -137,7 +137,7 @@ class ProgresoTest(unittest.TestCase):
         with patch('progreso.atomico', side_effect=editar):
             with self.assertRaises(Conflicto): self.guardar()
         self.assertEqual(self.archivo.read_text(), 'EDICION CONCURRENTE')
-        with bloquear(self.raiz / '_procesado', self.vault):
+        with patch('almacen.ESPERA', 0.2), esperar(self.raiz / '.progreso.lock'):
             with self.assertRaises(Conflicto): self.guardar()
 
     def test_reconstruccion_exige_huella_y_no_modifica_log(self):

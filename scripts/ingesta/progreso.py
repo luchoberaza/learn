@@ -11,7 +11,7 @@ import re
 import sys
 
 import yaml
-from almacen import Conflicto, atomico, bloquear, ruta_segura
+from almacen import Conflicto, atomico, esperar, ruta_segura
 from cursos import SLUG, carpeta, cargar_yaml, texto, validar_progreso
 
 
@@ -43,8 +43,13 @@ def crudo(raiz, nombre):
     return f.read_bytes()
 
 
+def bloqueo(raiz):
+    # Propio del progreso: la ingesta retiene el de _procesado/ durante toda la corrida.
+    return esperar(ruta_segura(raiz, ".progreso.lock"))
+
+
 def cargar(raiz, ctx):
-    """Se llama bajo el bloqueo compartido del curso. Preserva el inválido antes de restaurar."""
+    """Restaurar escribe: se llama bajo bloqueo(raiz). Preserva el inválido antes de restaurar."""
     try:
         raw = crudo(raiz, "progreso.yaml")
         return comprobar(cargar_yaml(raw.decode("utf-8")), ctx), raw, []
@@ -71,13 +76,17 @@ def leer(vault: Path, curso: str):
     raiz = carpeta(vault, curso)
     if not raiz.is_dir():
         raise ValueError("El curso no existe; no se creó automáticamente.")
-    with bloquear(raiz / "_procesado", vault):
-        ctx = contexto(raiz)
+    ctx = contexto(raiz)
+    try:
         try:
-            p, _, avisos = cargar(raiz, ctx)
-            return {"progreso": p, "avisos": avisos, "disponible": True}
-        except ValueError as e:
-            return {"progreso": {"version": 1, "temas": {}, "historial": []}, "avisos": [str(e)], "disponible": False}
+            # progreso.yaml se publica atómico: leerlo no necesita bloqueo.
+            return {"progreso": comprobar(cargar_yaml(crudo(raiz, "progreso.yaml").decode("utf-8")), ctx), "avisos": [], "disponible": True}
+        except (OSError, ValueError, TypeError, KeyError):
+            with bloqueo(raiz):
+                p, _, avisos = cargar(raiz, ctx)
+        return {"progreso": p, "avisos": avisos, "disponible": True}
+    except ValueError as e:
+        return {"progreso": {"version": 1, "temas": {}, "historial": []}, "avisos": [str(e)], "disponible": False}
 
 
 def unicos(valores):
@@ -155,7 +164,7 @@ def registrar(vault: Path, curso: str, tema: str, log: str, datos: dict, cierre=
     archivo_log = ruta_segura(raiz, log)
     if not archivo_log.is_file():
         raise ValueError("El log de evidencia no existe.")
-    with bloquear(raiz / "_procesado", vault):
+    with bloqueo(raiz):
         ctx = contexto(raiz)
         nuevo = validar_datos(datos, tema, ctx)
         if reconstruido and (not isinstance(huella_log, str) or hashlib.sha256(archivo_log.read_bytes()).hexdigest() != huella_log):

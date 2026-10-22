@@ -8,6 +8,9 @@ import json
 import os
 from pathlib import Path
 import tempfile
+import time
+
+ESPERA = 5
 
 
 class Conflicto(RuntimeError):
@@ -92,5 +95,24 @@ def bloquear(salida: Path, vault: Path):
         elif marca != {"generador": "pi-learning-ingesta", "version": 1}:
             raise Conflicto("La salida pertenece a otra herramienta o versión.")
         yield salida
+    finally:
+        os.close(fd)
+
+
+@contextmanager
+def esperar(archivo: Path):
+    """Exclusión breve entre procesos: reintenta cada 100 ms hasta ESPERA segundos."""
+    fd = os.open(archivo, os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600)
+    try:
+        limite = time.monotonic() + ESPERA
+        while True:
+            try:
+                fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                break
+            except BlockingIOError:
+                if time.monotonic() >= limite:
+                    raise Conflicto("Otro proceso está guardando; reintentá.") from None
+                time.sleep(0.1)
+        yield
     finally:
         os.close(fd)

@@ -10,7 +10,7 @@ import sys
 
 import pymupdf
 
-from almacen import Conflicto, atomico, bloquear, guardar_json, leer_json, ruta_segura, sha256
+from almacen import Conflicto, atomico, bloquear, esperar, guardar_json, leer_json, ruta_segura, salida_segura, sha256
 from cursos import carpeta, cargar_yaml, texto, validar
 from progreso import leer as leer_progreso
 
@@ -81,14 +81,19 @@ def renderizar(vault: Path, curso: str, doc: str, numero: int):
     if Path(d["archivo"]).parts[:2] != ("fuentes", d["tipo"]):
         raise ValueError("Fuente fuera de fuentes/<tipo>/.")
     huella = sha256(fuente)
-    with bloquear(raiz / "_procesado", vault) as salida:
-        nombre = f"{doc}/render/{numero:04}.png"
-        imagen = ruta_segura(salida, nombre)
-        registro = leer_json(salida, f"{doc}/render/{numero:04}.json")
-        if imagen.exists() and registro:
-            if registro.get("sha256_fuente") != huella or registro.get("sha256_imagen") != sha256(imagen):
-                raise Conflicto("El PDF o su render cambió; se preservó. Revisá la preparación.")
-            return {"cache": True}
+    salida = salida_segura(raiz / "_procesado", vault)
+    nombre = f"{doc}/render/{numero:04}.png"
+    imagen = ruta_segura(salida, nombre)
+    registro = leer_json(salida, f"{doc}/render/{numero:04}.json")
+    if imagen.exists() and registro:
+        if registro.get("sha256_fuente") != huella or registro.get("sha256_imagen") != sha256(imagen):
+            raise Conflicto("El PDF o su render cambió; se preservó. Revisá la preparación.")
+        return {"cache": True}
+    if not ruta_segura(salida, "control.json").exists():
+        with bloquear(salida, vault):  # marca la salida como de la ingesta, igual que antes
+            pass
+    imagen.parent.mkdir(parents=True, exist_ok=True)
+    with esperar(ruta_segura(salida, f"{doc}/render/.render.lock")):
         with pymupdf.open(fuente) as pdf:
             p = pdf[numero - 1]
             png = p.get_pixmap(matrix=pymupdf.Matrix(1800 / max(p.rect.width, p.rect.height), 1800 / max(p.rect.width, p.rect.height)), alpha=False).tobytes("png")
