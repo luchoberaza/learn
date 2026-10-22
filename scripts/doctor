@@ -22,7 +22,8 @@ function run(program, args = []) {
 function json(file) { return JSON.parse(readFileSync(file, "utf8")); }
 const config = json(join(piDir, "curso.config.json"));
 const version = run("pi", ["--version"]);
-check(version.ok && version.text === "1.4.0", "pi", `${version.text || "no encontrado"}; se requiere 1.4.0 (ver SETUP.md)`);
+if (version.ok && version.text !== "1.4.0") console.log(`! pi: ${version.text}, distinta de la fijada 1.4.0; verificá APIs antes de usar (SETUP.md).`);
+else check(version.ok, "pi", `${version.text || "no encontrado"}; se requiere 1.4.0 (ver SETUP.md)`);
 check(process.version === "v26.1.0", "Node.js", `${process.version}; versión verificada: v26.1.0`);
 const fish = run("fish", ["--version"]);
 check(fish.ok && fish.text === "fish, version 4.9.3", "fish", `${fish.text || "ausente"}; versión verificada: 4.9.3`);
@@ -85,12 +86,26 @@ try {
   } catch { check(false, "Fotos en md-log", "falló el guardado/embed local; ejecutá tests/md-log-fotos.test.mjs"); }
   finally { if (commands.has("md-unlog")) await session.prompt("/md-unlog"); rmSync(pruebaFotos, { recursive: true, force: true }); }
   check(existsSync(join(piDir, "modo-curso.md")) && existsSync(join(piDir, "scripts/ingesta/sesion.py")), "Contexto de sesión", "modo-curso y lector/render local presentes; no requiere dependencias nuevas");
-  const skills = project.loader.getSkills();
-  check(["curso-nuevo", "curso-agregar"].every(n => skills.skills.some(s => s.name === n)), "Skills de cursos", "curso-nuevo y curso-agregar; /reload tras cambios");
+  const { systemPromptOptions: prompt } = await session.extensionRunner.emitBeforeAgentStart({ messageType: "user", prompt: "" }, { cwd: vaultDir });
+  const ajenas = Object.keys(prompt.sections).filter(s => !["teach", "modo_curso", "curso"].includes(s));
+  if (prompt.forceSystemPrompt !== undefined) ajenas.push("prompt completo reemplazado");
+  check(!ajenas.length, "Prompt del tutor", ajenas.length ? `secciones ajenas: ${ajenas.join(", ")}; filtrá su paquete en .pi/settings.json (SETUP.md)` : "sin secciones ajenas");
+  // Mismas opciones de skills que config/fish/pi-learn.fish.
+  const lanzamiento = new project.sdk.DefaultResourceLoader({ cwd: vaultDir, agentDir, settingsManager: session.settingsManager, noExtensions: true, noSkills: true, additionalSkillPaths: [join(piDir, "skills")] });
+  await lanzamiento.reload();
+  const skills = lanzamiento.getSkills(), colisiones = skills.diagnostics.filter(d => d.type === "collision").map(d => d.collision?.name);
+  check(!colisiones.length && ["teach", "curso-nuevo", "curso-agregar"].every(n => skills.skills.some(s => s.name === n)), "Skills de cursos",
+    colisiones.length ? `nombres repetidos: ${colisiones.join(", ")}; renombrá una en .pi/skills` : "teach, curso-nuevo y curso-agregar, sin colisiones; /reload tras cambios");
+  const oculto = session.settingsManager.getHideThinkingBlock();
+  check(oculto, "Thinking oculto", oculto ? "hideThinkingBlock activo" : "agregá \"hideThinkingBlock\": true a .pi/settings.json");
   const safeBash = join(piDir, "git/github.com/amosblomqvist/pi-interactive-subagents/pi-extension/subagents/tools/safe-bash.ts");
   check(existsSync(safeBash) && Boolean(globalThis.__pi_interactive_subagents?.registerToolExtension),
     "safe_bash / puente web", "safe_bash incluido; puente de herramientas para hijos registrado");
-  const registry = session.modelRuntime;
+  const registry = session.modelRuntime, principal = `${session.settingsManager.getDefaultProvider()}/${session.settingsManager.getDefaultModel()}`;
+  for (const [rol, id] of [["principal", principal], ["researcher", config.modelo_researcher], ["visión", config.modelo_vision]]) {
+    const slash = id.indexOf("/"), model = registry.getModel(id.slice(0, slash), id.slice(slash + 1)), auth = Boolean(model) && registry.hasConfiguredAuth(model.provider);
+    check(auth, `Credenciales ${rol}`, `${id}: ${!model ? "no está en el catálogo; revisá /model" : auth ? "configuradas (sin llamar al modelo)" : "sin credenciales; ejecutá /login en pi"}`);
+  }
   for (const [rol, id] of [["researcher", config.modelo_researcher], ["visión", config.modelo_vision]]) {
     const slash = id.indexOf("/");
     const model = registry.getModel(id.slice(0, slash), id.slice(slash + 1));

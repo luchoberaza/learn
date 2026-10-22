@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { cpSync, mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -128,4 +128,31 @@ test("X01: el doctor marca menos de 2 GB libres y dice cómo ver qué ocupa", t 
     { encoding: "utf8", timeout: 60000, env: { ...process.env, PI_CODING_AGENT_DIR: join(disco, "agente"), PI_MANAGED_INSTALL_ROOT: instalacion } });
   if (r.error || !r.stdout) return t.skip(`sin espacios de nombres de usuario: ${r.stderr}`);
   assert.match(r.stdout, /^✗ Espacio libre: 0,1 GB.*; liberá al menos 2 GB.*du -xh/m);
+});
+
+test("H80/H14/H09: el doctor del proyecto ve el prompt, las skills y el thinking como los usa pi-learn", () => {
+  const r = spawnSync(process.execPath, [join(piDir, "scripts/doctor"), "--sin-red"], { cwd: vaultDir, encoding: "utf8", timeout: 60000 });
+  assert.match(r.stdout, /^✓ Prompt del tutor: sin secciones ajenas/m);
+  assert.match(r.stdout, /^✓ Skills de cursos: teach, curso-nuevo y curso-agregar, sin colisiones/m);
+  assert.match(r.stdout, /^✓ Thinking oculto/m);
+  assert.match(r.stdout, /^[✓✗] Credenciales principal: openai-codex\/gpt-6\.1-sol: /m);
+});
+
+test("H80/H14/H09: el doctor marca credenciales, secciones, colisiones y thinking, y avisa por otra versión de pi", t => {
+  const h = hogar(t), v = mkdtempSync(join(tmpdir(), "pi-doctor-")), copia = join(v, ".pi");
+  t.after(() => rmSync(v, { recursive: true, force: true }));
+  cpSync(piDir, copia, { recursive: true, filter: f => !/\/\.(git|venv)$/.test(f) });
+  for (const d of ["cursos", "_entrada", ".pi/skills/otra-teach", "bin"]) mkdirSync(join(v, d), { recursive: true });
+  const settings = JSON.parse(readFileSync(join(copia, "settings.json"), "utf8"));
+  writeFileSync(join(copia, "settings.json"), JSON.stringify({ ...settings, hideThinkingBlock: undefined, packages: settings.packages.filter(p => typeof p === "string") }));
+  writeFileSync(join(copia, "skills/otra-teach/SKILL.md"), "---\nname: teach\ndescription: Duplicada.\n---\nDuplicada.\n");
+  writeFileSync(join(v, "bin/pi"), "#!/bin/sh\necho 1.5.0\n", { mode: 0o755 });
+  const r = spawnSync(process.execPath, [join(copia, "scripts/doctor"), "--sin-red"], { cwd: v, encoding: "utf8", timeout: 60000,
+    env: { ...process.env, HOME: h.home, PI_CODING_AGENT_DIR: h.agente, PI_MANAGED_INSTALL_ROOT: instalacion, PATH: `${join(v, "bin")}:${process.env.PATH}` } });
+  assert.match(r.stdout, /^! pi: 1\.5\.0, distinta de la fijada 1\.4\.0; verificá APIs antes de usar/m);
+  assert.doesNotMatch(r.stdout, /^✗ pi:/m);
+  assert.match(r.stdout, /^✗ Prompt del tutor: secciones ajenas: ponytail;/m);
+  assert.match(r.stdout, /^✗ Skills de cursos: nombres repetidos: teach;/m);
+  assert.match(r.stdout, /^✗ Thinking oculto:/m);
+  for (const rol of ["principal", "researcher", "visión"]) assert.match(r.stdout, new RegExp(`^✗ Credenciales ${rol}: openai-codex/`, "m"));
 });
