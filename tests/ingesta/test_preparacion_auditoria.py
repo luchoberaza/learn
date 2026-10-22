@@ -118,6 +118,13 @@ class ValidarPedidosTest(CursoPreparacion):
         asignaciones.write_text("{roto")
         self.assertIn("asignaciones.json ilegible", "\n".join(self.guardar_indice(self.indice)["avisos"]))
 
+    def test_un_documento_de_soluciones_no_promete_prepararse_solo(self):
+        destino = self.raiz / "fuentes/soluciones/soluciones.pdf"
+        destino.parent.mkdir(parents=True)
+        destino.write_bytes(self.fuente.read_bytes())
+        self.indice["documentos"].append({"id": "soluciones", "titulo": "Soluciones", "tipo": "soluciones", "archivo": "fuentes/soluciones/soluciones.pdf", "paginas": 3})
+        self.assertIn("Documento soluciones (soluciones) sin segmentar: transcribilo y segmentalo con /curso-agregar.", self.guardar_indice(self.indice)["avisos"])
+
     def test_edicion_cita_adoptar_e_informe_cuenta_la_ruta_manual(self):
         pagina = self.raiz / "_procesado/libro/paginas/0003.md"
         pagina.write_text(pagina.read_text() + "\nCorrección a mano.\n")

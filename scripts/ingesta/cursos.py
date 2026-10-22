@@ -265,7 +265,9 @@ def validar(raiz: Path, slug: str, *, indice=None, contrato=None, origenes=None,
         resultado["items_sin_asignar"] = sin_asignar
         for d in documentos.values():
             if d["tipo"] in {"ejercicios", "evaluaciones", "soluciones"} and d["id"] not in items:
-                avisos.append(f"Documento {d['id']} ({d['tipo']}) sin segmentar: se transcribe y segmenta solo la primera vez que se estudia un tema del curso.")
+                # La preparación por tema segmenta parciales y prácticos; un documento de soluciones se vincula a mano.
+                avisos.append(f"Documento {d['id']} ({d['tipo']}) sin segmentar: " + ("transcribilo y segmentalo con /curso-agregar." if d["tipo"] == "soluciones"
+                              else "se transcribe y segmenta solo la primera vez que se estudia un tema del curso."))
         resultado.update(documentos=len(documentos), temas=len(temas))
     except (OSError, ValueError, KeyError, TypeError, RecursionError, RuntimeError) as e:
         errores.append(f"No se pudo validar: {e}")
