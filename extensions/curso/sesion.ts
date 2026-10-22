@@ -91,18 +91,24 @@ export function registrarSesion(pi: ExtensionAPI, vault = vaultDir, recursos = p
     }
     Object.assign(event.systemPromptOptions.sections, { teach, modo_curso: modo, curso: resumen });
   });
-  const cacheCompletar = new Map<string, { mtime: number; datos: DatosCurso }>();
+  const cacheCompletar = new Map<string, { mtime: number; temas: Tema[] }>();
   pi.registerCommand("estudiar", {
     description: "Estudiar un tema del curso con sus fuentes, contexto persistente y log en Obsidian",
     async getArgumentCompletions(prefijo) {
       try {
-        const espacio = prefijo.indexOf(" ");
-        if (espacio < 0) return cursos().filter(c => normalizar(c).includes(normalizar(prefijo))).map(c => ({ value: `${c} `, label: c }));
-        const curso = prefijo.slice(0, espacio), q = normalizar(prefijo.slice(espacio + 1).trim());
-        const mtime = statSync(rutaSegura(raiz(curso), "indice.yaml")).mtimeMs;
+        // Un texto exacto no se sugiere: en pi-tui, Enter con la lista abierta aplica la sugerencia en vez de enviar.
+        const espacio = prefijo.indexOf(" "), lista = cursos();
+        if (espacio < 0) return lista.includes(normalizar(prefijo)) ? null : lista.filter(c => normalizar(c).includes(normalizar(prefijo))).map(c => ({ value: `${c} `, label: c }));
+        const curso = lista.find(c => normalizar(c) === normalizar(prefijo.slice(0, espacio))), q = normalizar(prefijo.slice(espacio + 1).trim());
+        if (!curso) return null;
+        // Sin Python ni espera (salvo la primera vez): una lista vieja abierta deformaba el comando al tipear rápido.
+        const copia = rutaSegura(raiz(curso), ".sesion-cargada.json");
+        if (!statSync(copia, { throwIfNoEntry: false })) await cargar(curso);
+        const mtime = statSync(copia).mtimeMs;
         let cached = cacheCompletar.get(curso);
-        if (!cached || cached.mtime !== mtime) { cached = { mtime, datos: await cargar(curso) }; cacheCompletar.set(curso, cached); }
-        return cached.datos.temas.filter(t => [t.id, t.nombre, ...(t.alias || [])].some(s => normalizar(s).includes(q))).map(t => ({ value: `${curso} ${t.id}`, label: t.nombre }));
+        if (cached?.mtime !== mtime) { cached = { mtime, temas: (JSON.parse(readFileSync(copia, "utf8")) as DatosCurso).temas }; cacheCompletar.set(curso, cached); }
+        if (cached.temas.some(t => [t.id, t.nombre, ...(t.alias || [])].some(s => normalizar(s) === q))) return null;
+        return cached.temas.filter(t => [t.id, t.nombre, ...(t.alias || [])].some(s => normalizar(s).includes(q))).map(t => ({ value: `${curso} ${t.id}`, label: t.nombre }));
       } catch { return null; }
     },
     async handler(args, ctx) {
@@ -117,7 +123,6 @@ export function registrarSesion(pi: ExtensionAPI, vault = vaultDir, recursos = p
         const consulta = palabras.join(" ");
         const d = await cargar(curso, true);
         for (const aviso of d.avisos.filter(a => a.startsWith("Progreso") || a === COPIA)) ctx.ui.notify(aviso, "warning");
-        cacheCompletar.delete(curso);
         let candidatos = consulta ? resolverTemas(d.temas, consulta) : ordenarTemas(d), resultados: ReturnType<typeof buscarMaterial> = [];
         if (consulta && !candidatos.length) {
           try { resultados = buscarMaterial(raiz(curso), d, consulta, "bibliografia"); } catch { /* La falta de BM25 no impide un probe ad hoc. */ }

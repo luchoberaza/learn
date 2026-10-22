@@ -100,7 +100,7 @@ test("activar y restaurar avisan explícitamente si se recuperó el progreso", a
 test("autocompleta ambos argumentos completos y respeta cancelación/busy", async t => {
   const e = entorno(t), c = e.comandos.get("estudiar");
   writeFileSync(join(e.raiz, "indice.yaml"), "Índice de la prueba de completado");
-  const opciones = await c.getArgumentCompletions("calculo derivación");
+  const opciones = await c.getArgumentCompletions("calculo deriv");
   assert.equal(opciones[0].value, "calculo derivacion");
   e.ctx.isIdle = () => false; await c.handler("calculo derivacion", e.ctx);
   e.ctx.isIdle = () => true; e.ctx.ui.select = async () => undefined;

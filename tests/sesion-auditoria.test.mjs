@@ -165,3 +165,14 @@ test("H03: /curso-check y /curso-estado no muestran JSON roto y /curso-estado in
   assert.equal(estados["curso-ingesta"], "calculo: interrumpida · 3/9 · pendientes: 2 · editadas: 2");
   assert.match(avisos.at(-1)[1], /terminó al arrancar: sin memoria\nEl proceso ya no mantiene el bloqueo/);
 });
+test("H17: el autocompletado no se ofrece sobre un texto exacto y no vuelve a llamar a Python", async t => {
+  const e = entorno(t), completar = e.comandos.get("estudiar").getArgumentCompletions;
+  let llamadas = 0; const exec = e.pi.exec; e.pi.exec = (...a) => (llamadas++, exec(...a));
+  assert.deepEqual((await completar("calculo deriv")).map(o => o.value), ["calculo derivacion"]);
+  assert.equal(llamadas, 1);
+  for (const texto of ["calculo", "calculo derivacion", "calculo Derivación", "calculo derivada"]) assert.equal(await completar(texto), null, texto);
+  assert.deepEqual((await completar("calc")).map(o => o.value), ["calculo "]);
+  await e.estudiar("calculo derivacion");
+  assert.deepEqual((await completar("calculo d")).map(o => o.value), ["calculo derivacion"]);
+  assert.equal(llamadas, 2);
+});
