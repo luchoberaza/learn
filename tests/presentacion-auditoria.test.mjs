@@ -1,9 +1,11 @@
 import { after, before, test } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
-import { agentDir, loadProject, vaultDir } from "../scripts/lib/pi-sdk.mjs";
+import { spawnSync } from "node:child_process";
+import { agentDir, loadProject, piDir, vaultDir } from "../scripts/lib/pi-sdk.mjs";
 
 let p;
 before(async () => { p = await loadProject(); p.sdk.initTheme("dark"); });
@@ -150,4 +152,19 @@ test("H62: si el resumen en español falla, pi sigue con el suyo y la sesión no
   const { ai, faux, session } = await conFaux(t, charla);
   faux.setResponses([ai.fauxAssistantMessage("", { stopReason: "error", errorMessage: "sin red" }), ai.fauxAssistantMessage("resumen de pi"), ai.fauxAssistantMessage("resumen de pi")]);
   assert.match((await session.compact()).summary, /resumen de pi/);
+});
+
+test("H80: el doctor revisa timeout, la web del researcher y el renombre a web_fetch en vez de safe_bash", t => {
+  const agente = mkdtempSync(join(tmpdir(), "pi-doctor-web-")), vacio = mkdtempSync(join(tmpdir(), "pi-doctor-path-"));
+  t.after(() => { rmSync(agente, { recursive: true, force: true }); rmSync(vacio, { recursive: true, force: true }); });
+  const { toolNames, ...sinRenombre } = JSON.parse(readFileSync(join(piDir, "config/web-search.json"), "utf8"));
+  writeFileSync(join(agente, "web-search.json"), JSON.stringify(sinRenombre));
+  const doctor = env => spawnSync(process.execPath, [join(piDir, "scripts/doctor"), "--sin-red"], { cwd: vaultDir, encoding: "utf8", timeout: 120000,
+    env: { ...process.env, PI_CODING_AGENT_DIR: agente, PI_MANAGED_INSTALL_ROOT: process.env.PI_MANAGED_INSTALL_ROOT || join(agentDir, "install"), ...env } }).stdout;
+  const salida = doctor({});
+  assert.match(salida, new RegExp(`^✗ web_fetch del researcher: ${join(agente, "web-search.json")}: toolNames\\.fetchContent = null; debe ser "web_fetch"`, "m"));
+  assert.match(salida, /^✓ timeout \(coreutils\)/m);
+  assert.match(salida, /^✓ Web del researcher: \.pi\/npm\/node_modules\/pi-web-access\/dist\/index\.js/m);
+  assert.doesNotMatch(salida, /safe_bash|puente web/);
+  assert.match(doctor({ PATH: vacio }), /^✗ timeout \(coreutils\): .*instalá coreutils$/m);
 });

@@ -55,6 +55,14 @@ check(webVersion === "0.42.0", "Extensión web fijada", `${webVersion || "ausent
 const webConfig = webConfigPath();
 check(existsSync(webConfig) && readFileSync(webConfig, "utf8") === readFileSync(join(piDir, "config/web-search.json"), "utf8"),
   "Configuración web", `${webConfig}; instalación reproducible en SETUP.md (sin cookies; uso actual sin claves de búsqueda)`);
+// El researcher es un pi -p propio: timeout lo corta, pi-web-access le da la web y el renombre deja pasar web_fetch por --tools.
+check(run("timeout", ["--version"]).ok, "timeout (coreutils)", "el researcher lo usa para cortar al hijo; si falta, instalá coreutils");
+check(existsSync(join(piDir, "npm/node_modules/pi-web-access/dist/index.js")), "Web del researcher",
+  ".pi/npm/node_modules/pi-web-access/dist/index.js; si falta, el researcher investiga sin web: ejecutá npm ci --ignore-scripts --prefix .pi/npm");
+let fetchContent;
+try { fetchContent = json(webConfig).toolNames?.fetchContent; } catch {}
+check(fetchContent === "web_fetch", "web_fetch del researcher",
+  `${webConfig}: toolNames.fetchContent = ${JSON.stringify(fetchContent ?? null)}; debe ser "web_fetch" o el researcher queda sin leer páginas (copiá .pi/config/web-search.json, SETUP.md)`);
 const researcher = readFileSync(join(piDir, "agents/researcher.md"), "utf8");
 check(researcher.match(/^model: (.+)$/m)?.[1] === config.modelo_researcher, "Modelo del researcher", "agents/researcher.md debe coincidir con curso.config.json");
 check(run("git", ["-C", piDir, "diff", "--exit-code", "7cfd8942f82ab9476e63572387e1fe9bcea5082c", "--", "skills/teach/SKILL.md"]).ok,
@@ -98,9 +106,6 @@ try {
     colisiones.length ? `nombres repetidos: ${colisiones.join(", ")}; renombrá una en .pi/skills` : "teach, curso-nuevo y curso-agregar, sin colisiones; /reload tras cambios");
   const oculto = session.settingsManager.getHideThinkingBlock();
   check(oculto, "Thinking oculto", oculto ? "hideThinkingBlock activo" : "agregá \"hideThinkingBlock\": true a .pi/settings.json");
-  const safeBash = join(piDir, "git/github.com/amosblomqvist/pi-interactive-subagents/pi-extension/subagents/tools/safe-bash.ts");
-  check(existsSync(safeBash) && Boolean(globalThis.__pi_interactive_subagents?.registerToolExtension),
-    "safe_bash / puente web", "safe_bash incluido; puente de herramientas para hijos registrado");
   const registry = session.modelRuntime, principal = `${session.settingsManager.getDefaultProvider()}/${session.settingsManager.getDefaultModel()}`;
   for (const [rol, id] of [["principal", principal], ["researcher", config.modelo_researcher], ["visión", config.modelo_vision]]) {
     const slash = id.indexOf("/"), model = registry.getModel(id.slice(0, slash), id.slice(slash + 1)), auth = Boolean(model) && registry.hasConfiguredAuth(model.provider);
