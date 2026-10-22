@@ -108,6 +108,12 @@ test("leer_paginas: cada pregunta del documento necesita su marca de solución; 
   assert.match(texto, /Uno\.[^]*Dos\./); assert.doesNotMatch(texto, /SECRETO/);
 });
 
+test("leer_paginas rechaza sin invitar a pedir el texto completo antes del intento", t => {
+  const { raiz, d } = curso(t);
+  rmSync(join(raiz, "_procesado/parcial/paginas/0003.md"));
+  assert.throws(() => leerPaginas(raiz, d, "parcial", 1, 1), e => /leer_items/.test(e.message) && /sólo después del intento del estudiante/.test(e.message));
+});
+
 test("un práctico con ítems solucion_de se reserva como un parcial", async t => {
   const d = datos();
   d.documentos.push({ id: "practico", titulo: "Práctico", tipo: "ejercicios", archivo: "fuentes/ejercicios/practico.pdf", paginas: 1 });

@@ -103,7 +103,7 @@ function sinSoluciones(raiz: string, d: Documento, noSeparable: Error): string[]
 export function leerPaginas(raiz: string, datos: DatosCurso, doc: string, desde: number, hasta: number, despuesDelIntento = false): string {
   const d = documento(datos, doc);
   if (![desde, hasta].every(Number.isInteger) || desde < 1 || hasta < desde || hasta > d.paginas) throw new Error("Rango PDF inválido (base 1, extremos incluidos).");
-  const reservadas = !despuesDelIntento && conSolucion(datos, d) ? sinSoluciones(raiz, d, new Error(`No se puede separar el enunciado de la solución en ${doc}: leé el enunciado con leer_items; el texto completo va con despues_del_intento:true.`)) : undefined;
+  const reservadas = !despuesDelIntento && conSolucion(datos, d) ? sinSoluciones(raiz, d, new Error(`No se puede separar el enunciado de la solución en ${doc}: leé el enunciado con leer_items; el texto completo, sólo después del intento del estudiante (despues_del_intento:true).`)) : undefined;
   let salida = "";
   for (let p = desde; p <= hasta && Buffer.byteLength(salida) < 30000; p++) {
     try { salida += reservadas ? `\n${reservadas[p - 1]}\n${sinEnlace([p])}\n` : `\n${leer(raiz, `_procesado/${doc}/paginas/${String(p).padStart(4, "0")}.md`, 200_000)}\n${cita(datos, doc, p)}\n`; }
