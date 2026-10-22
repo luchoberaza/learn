@@ -59,23 +59,23 @@ export default function (pi: ExtensionAPI) {
     executionMode: "sequential", reachesTools: () => ["subagent"], execute: investigar,
   });
   pi.registerTool({
-    name: "leer_paginas", label: "Leer páginas", description: "Leer transcripciones del curso activo por páginas PDF (base 1). Devuelve citas y texto acotado; si falta o es dudoso, consultá ver_pagina.",
-    parameters: Type.Object({ doc: slug, desde: Type.Integer({ minimum: 1 }), hasta: Type.Integer({ minimum: 1 }) }), executionMode: "sequential",
+    name: "leer_paginas", label: "Leer páginas", description: "Leer transcripciones del curso activo por páginas PDF (base 1). Devuelve citas y texto acotado; si falta o es dudoso, consultá ver_pagina. En evaluaciones omite las soluciones y los enlaces, y rechaza documentos de soluciones; despues_del_intento:true sólo cuando el estudiante ya entregó su intento.",
+    parameters: Type.Object({ doc: slug, desde: Type.Integer({ minimum: 1 }), hasta: Type.Integer({ minimum: 1 }), despues_del_intento: Type.Optional(Type.Boolean()) }), executionMode: "sequential",
     async execute(_id, args) { return { content: [{ type: "text", text: sesion.leer_paginas(args) }], details: undefined }; },
   });
   pi.registerTool({
-    name: "buscar_material", label: "Buscar material", description: "Buscar material del curso activo mediante BM25 sin tildes. Devuelve ubicaciones y fragmentos, sin OCR.",
+    name: "buscar_material", label: "Buscar material", description: "Buscar material del curso activo mediante BM25 sin tildes. Devuelve ubicaciones y fragmentos, sin OCR. De evaluaciones y soluciones devuelve sólo la ubicación: leé esos enunciados con leer_items.",
     parameters: Type.Object({ consulta: Type.String({ minLength: 1, maxLength: 500 }), tipo: Type.Optional(Type.Union([Type.Literal("bibliografia"), Type.Literal("ejercicios"), Type.Literal("evaluaciones"), Type.Literal("soluciones"), Type.Literal("programa"), Type.Literal("otros")])) }), executionMode: "sequential",
     async execute(_id, args) { return { content: [{ type: "text", text: sesion.buscar_material(args) }], details: undefined }; },
   });
   pi.registerTool({
-    name: "leer_items", label: "Leer ítems", description: "Leer ítems del curso activo. Por defecto sólo enunciados; incluir_solucion se usa después del intento del estudiante y sólo devuelve soluciones explícitamente vinculadas.",
+    name: "leer_items", label: "Leer ítems", description: "Leer ítems del curso activo. Por defecto sólo enunciados, y en evaluaciones cita «PDF p. N» sin enlace porque la página trae la solución; incluir_solucion se usa después del intento del estudiante y sólo devuelve soluciones explícitamente vinculadas, con sus enlaces.",
     parameters: Type.Object({ doc: slug, ids: Type.Array(Type.String({ minLength: 1, maxLength: 80 }), { minItems: 1, maxItems: 100 }), incluir_solucion: Type.Optional(Type.Boolean()) }), executionMode: "sequential",
     async execute(_id, args) { return { content: [{ type: "text", text: sesion.leer_items(args) }], details: undefined }; },
   });
   pi.registerTool({
-    name: "ver_pagina", label: "Ver página original", description: "Mostrar la imagen original de una página PDF del curso activo, con render local y caché. No ejecuta OCR ni llama al modelo de visión.",
-    parameters: Type.Object({ doc: slug, pagina: Type.Integer({ minimum: 1 }) }), executionMode: "sequential",
+    name: "ver_pagina", label: "Ver página original", description: "Mostrar la imagen original de una página PDF del curso activo, con render local y caché. No ejecuta OCR ni llama al modelo de visión. En evaluaciones y soluciones la imagen trae la solución: exige despues_del_intento:true, sólo cuando el estudiante ya entregó su intento.",
+    parameters: Type.Object({ doc: slug, pagina: Type.Integer({ minimum: 1 }), despues_del_intento: Type.Optional(Type.Boolean()) }), executionMode: "sequential",
     async execute(_id, args, signal) {
       const r = await sesion.ver_pagina(args, signal);
       return { content: [{ type: "text", text: r.cita }, { type: "image", data: r.imagen, mimeType: "image/png" }], details: undefined };

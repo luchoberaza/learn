@@ -172,12 +172,13 @@ export function registrarSesion(pi: ExtensionAPI, vault = vaultDir, recursos = p
       ctx.ui.setStatus("curso", undefined);
     },
     refrescar: () => { if (activo && datos) preparar(activo, datos); return resumen; },
-    leer_paginas({ doc, desde, hasta }: { doc: string; desde: number; hasta: number }) { const { d, r } = actual(); return leerPaginas(r, d, doc, desde, hasta); },
+    leer_paginas({ doc, desde, hasta, despues_del_intento = false }: { doc: string; desde: number; hasta: number; despues_del_intento?: boolean }) { const { d, r } = actual(); return leerPaginas(r, d, doc, desde, hasta, despues_del_intento); },
     buscar_material({ consulta, tipo }: { consulta: string; tipo?: string }) { const { d, r } = actual(); return JSON.stringify(buscarMaterial(r, d, consulta, tipo)); },
     leer_items({ doc, ids, incluir_solucion = false }: { doc: string; ids: string[]; incluir_solucion?: boolean }) { return leerItems(actual().d, doc, ids, incluir_solucion); },
-    async ver_pagina({ doc, pagina }: { doc: string; pagina: number }, signal?: AbortSignal) {
+    async ver_pagina({ doc, pagina, despues_del_intento = false }: { doc: string; pagina: number; despues_del_intento?: boolean }, signal?: AbortSignal) {
       const { a, d, r } = actual(), fuente = documento(d, doc);
       if (!Number.isInteger(pagina) || pagina < 1 || pagina > fuente.paginas) throw new Error("Página PDF fuera de rango.");
+      if (!despues_del_intento && ["evaluaciones", "soluciones"].includes(fuente.tipo)) throw new Error("La imagen de esta página trae la solución: leé el enunciado con leer_items y mostrala recién después del intento (despues_del_intento:true).");
       const resultado = await pi.exec(join(recursos, ".venv/bin/python"), [join(recursos, "scripts/ingesta/sesion.py"), "renderizar", "--vault", vault, "--curso", a.curso, "--doc", doc, "--pagina", String(pagina)], { timeout: 10000, signal });
       if (resultado.code !== 0) throw new Error(resultado.stderr.trim() || "No se pudo renderizar la página.");
       return { imagen: readFileSync(rutaSegura(r, `_procesado/${doc}/render/${String(pagina).padStart(4, "0")}.png`)).toString("base64"), cita: cita(d, doc, pagina) };
