@@ -7,7 +7,7 @@ import sys
 
 from pipeline import MOTORES
 
-RECETA = "recrealo desde el vault: UV_PROJECT_ENVIRONMENT=.pi/.venv uv sync --project .pi/scripts/ingesta --python 3.13.13 --python-preference only-managed --locked"
+RECETA = "recrealo desde el vault: UV_PROJECT_ENVIRONMENT=$PWD/.pi/.venv uv sync --project .pi/scripts/ingesta --python 3.13.13 --python-preference only-managed --locked"
 chequeos = []
 
 

@@ -155,7 +155,7 @@ test("H80/H14/H09: el doctor marca credenciales, secciones, colisiones y thinkin
   assert.match(r.stdout, /^✗ Skills de cursos: nombres repetidos: teach;/m);
   assert.match(r.stdout, /^✗ Thinking oculto:/m);
   for (const rol of ["principal", "researcher", "visión"]) assert.match(r.stdout, new RegExp(`^✗ Credenciales ${rol}: openai-codex/`, "m"));
-  assert.match(r.stdout, /^✗ Entorno de ingesta: falta \.pi\/\.venv; recrealo desde el vault: UV_PROJECT_ENVIRONMENT=\.pi\/\.venv uv sync --project \.pi\/scripts\/ingesta --python 3\.13\.13 --python-preference only-managed --locked$/m);
+  assert.match(r.stdout, /^✗ Entorno de ingesta: falta \.pi\/\.venv; recrealo desde el vault: UV_PROJECT_ENVIRONMENT=\$PWD\/\.pi\/\.venv uv sync --project \.pi\/scripts\/ingesta --python 3\.13\.13 --python-preference only-managed --locked$/m);
 });
 
 test("comprobar: respeta ruta_tesseract y dice cómo recrear el venv con Python de uv", t => {
@@ -176,7 +176,7 @@ test("comprobar: respeta ruta_tesseract y dice cómo recrear el venv con Python 
   assert.equal(propio["Tesseract"].ok, true);
   assert.equal(propio["Idiomas OCR"].ok, false);
   assert.match(correr(`import sys; sys.version_info = (3, 12, 0, 'final', 0); ${lanzar}`)["Python de ingesta"].detalle,
-    /UV_PROJECT_ENVIRONMENT=\.pi\/\.venv uv sync --project \.pi\/scripts\/ingesta --python 3\.13\.13 --python-preference only-managed --locked/);
+    /UV_PROJECT_ENVIRONMENT=\$PWD\/\.pi\/\.venv uv sync --project \.pi\/scripts\/ingesta --python 3\.13\.13 --python-preference only-managed --locked/);
 });
 
 test("H14: los argumentos de pi-learn van primero y no tapan los subcomandos de pi", t => {

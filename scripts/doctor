@@ -7,7 +7,7 @@ import { agentDir, loadProject, piDir, vaultDir, webConfigPath } from "./lib/pi-
 
 const sinRed = process.argv.includes("--sin-red");
 if (process.argv.some(arg => arg === "--help" || arg === "--ayuda")) {
-  console.log("Uso: .pi/scripts/doctor [--sin-red]\nVerifica instalación, ingesta, cursos y guardado local de imágenes (Fases 0–6). Por defecto hace dos pings breves a modelos y prueba búsqueda y lectura web.\n--sin-red omite esas llamadas y las marca como NO verificadas. No lee el portapapeles.");
+  console.log("Uso: .pi/scripts/doctor [--sin-red]\nVerifica instalación, ingesta, cursos y guardado local de imágenes. Por defecto hace dos pings breves a modelos y prueba búsqueda y lectura web.\n--sin-red omite esas llamadas y las marca como NO verificadas. No lee el portapapeles.");
   process.exit(0);
 }
 let fallos = 0;
@@ -141,7 +141,7 @@ try {
   check(false, "Carga de pi", "falló el SDK o una extensión; ejecutá pi --verbose (SETUP.md)");
 } finally { if (project) await project.close(); }
 const pythonIngesta = join(piDir, ".venv/bin/python");
-const recetaVenv = "recrealo desde el vault: UV_PROJECT_ENVIRONMENT=.pi/.venv uv sync --project .pi/scripts/ingesta --python 3.13.13 --python-preference only-managed --locked";
+const recetaVenv = "recrealo desde el vault: UV_PROJECT_ENVIRONMENT=$PWD/.pi/.venv uv sync --project .pi/scripts/ingesta --python 3.13.13 --python-preference only-managed --locked";
 if (!existsSync(pythonIngesta)) {
   check(false, "Entorno de ingesta", `falta .pi/.venv; ${recetaVenv}`);
 } else {

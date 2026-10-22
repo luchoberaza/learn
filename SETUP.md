@@ -64,7 +64,7 @@ UV_PROJECT_ENVIRONMENT="$PWD/.pi/.venv" uv sync --project .pi/scripts/ingesta --
 .pi/.venv/bin/python .pi/scripts/ingesta/comprobar.py
 ```
 
-La ruta tiene que ser absoluta: con `UV_PROJECT_ENVIRONMENT=.pi/.venv`, uv la resuelve desde `--project` y crea el entorno en `.pi/scripts/ingesta/.pi/.venv`. La receta que imprimen hoy el doctor y `comprobar.py` usa esa ruta relativa: no la copies tal cual.
+La ruta tiene que ser absoluta: con `UV_PROJECT_ENVIRONMENT=.pi/.venv`, uv la resuelve desde `--project` y crea el entorno en `.pi/scripts/ingesta/.pi/.venv`. El doctor y `comprobar.py` imprimen la misma receta con `$PWD`; copiala desde la raíz del vault.
 
 **Tesseract.** La clave opcional `ruta_tesseract` de `curso.config.json` fija el ejecutable (acepta `~`). Su carpeta se antepone al `PATH` de OCRmyPDF y de la comprobación de idiomas. Hoy vale `~/miniconda3/bin/tesseract` (5.5.2, con `spa` y `eng`); el `/usr/bin/tesseract` del sistema (5.5.3) sólo trae `eng` y `osd`. Comprobar:
 
