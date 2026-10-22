@@ -1,10 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { prepararInvestigacion, verificacionPrevia } from '../extensions/curso/researcher.ts';
+import { prepararInvestigacion, registrarResearcher, verificacionPrevia } from '../extensions/curso/researcher.ts';
 
 const agente = (modelo, cuerpo = 'PROMPT ESPAÑOL') => `---\nname: researcher\ntools: web_search, web_fetch, read\nmodel: ${modelo}\nthinking: medium\n---\n\n${cuerpo}\n`;
 function entorno(t) {
@@ -53,4 +53,58 @@ test('H32: una caché previa del tema se inyecta marcada «previa» y no bloquea
   cache(e, `derivadas-${e.huella()}.md`, e.huella(), '## Resumen\nMAPA NUEVO');
   const vigente = verificacionPrevia(e.vault, e.recursos, e.d, e.tema);
   assert.match(vigente, /vigente/); assert.match(vigente, /MAPA NUEVO/);
+});
+
+// researcher simulado: guarda sus argumentos y responde con un informe válido que cita la primera ancla.
+function falso(e, cuerpo) {
+  const f = join(e.vault, 'falso.mjs'); writeFileSync(f, `import { readFileSync, writeFileSync } from 'node:fs';\nwriteFileSync(${JSON.stringify(join(e.vault, 'argv.json'))}, JSON.stringify(process.argv.slice(2)));\n${cuerpo}`);
+  return [process.execPath, f];
+}
+const informe = `const cita = readFileSync(0, 'utf8').match(/\\[\\[cursos\\/[^\\]]+#page=\\d+\\]\\]/)[0];
+console.log('## Resumen\\nMapa.\\n## Contra el material del curso\\nconcuerda ' + cita + '\\n## Extensiones útiles\\nNinguna.\\n## Fuentes\\nhttps://example.org/');`;
+function runtime(e, comando, ...extra) {
+  const entradas = [], eventos = new Map(), avisos = [], mensajes = [];
+  let activo = { a: { curso: 'calculo', tema: 'derivadas' }, d: e.d, r: e.raiz };
+  const pi = { on: (n, h) => eventos.set(n, h), appendEntry: (customType, data) => entradas.push({ type: 'custom', customType, data }), events: { emit: () => {} }, sendMessage: (m, o) => mensajes.push([m, o]) };
+  const ctx = { sessionManager: { getBranch: () => entradas }, ui: { notify: (m, tipo) => avisos.push([m, tipo]) }, executeTool: assert.fail };
+  const r = { entradas, avisos, mensajes, ctx, set activo(v) { activo = v; },
+    construir: () => registrarResearcher(pi, () => activo, () => verificacionPrevia(e.vault, e.recursos, e.d, e.tema), e.vault, e.recursos, comando, ...extra),
+    alcance: (afirmaciones = ['La derivada de x² es 2x.']) => r.investigar('1', { modo: 'alcance', afirmaciones }, undefined, undefined, ctx),
+    async turno() { const ev = { type: 'before_agent_start', messageType: 'user', prompt: 'Sigo', systemPromptOptions: { sections: {} } }; await eventos.get('before_agent_start')(ev, ctx); return ev; } };
+  r.investigar = r.construir();
+  return r;
+}
+const carpeta = (e, nombre) => join(e.raiz, 'notas/verificaciones/.trabajos', nombre);
+async function esperar(cond, ms = 10_000) {
+  for (const fin = Date.now() + ms; !cond(); await new Promise(r => setTimeout(r, 20))) if (Date.now() > fin) throw new Error('Tiempo de espera agotado.');
+}
+
+test('H07: investigar_tema lanza un pi propio sin tmux ni subagent, vuelve enseguida y entrega sin turnos', async t => {
+  const e = entorno(t), r = runtime(e, falso(e, informe));
+  const inicio = performance.now(), res = await r.alcance(), ms = performance.now() - inicio;
+  assert.ok(ms < 500, `${ms} ms`); assert.equal(res.isError, undefined);
+  assert.ok(res.content[0].text.length <= 80); assert.doesNotMatch(res.content[0].text, /subagent|researcher|[A-Z][a-z]+ [a-z]+ in /);
+  const dir = carpeta(e, res.details.nombre);
+  await esperar(() => existsSync(join(dir, 'codigo')));
+  const argv = JSON.parse(readFileSync(join(e.vault, 'argv.json'), 'utf8')), valor = f => argv[argv.indexOf(f) + 1];
+  for (const f of ['-p', '--no-session', '--no-approve', '--no-extensions', '--no-skills', '--no-context-files']) assert.ok(argv.includes(f), f);
+  assert.equal(valor('--model'), 'openai/gpt-6-luna'); assert.equal(valor('--thinking'), 'medium'); assert.equal(valor('--tools'), 'web_search,web_fetch,read');
+  assert.equal(readFileSync(valor('--append-system-prompt'), 'utf8'), 'PROMPT ESPAÑOL');
+  const ev = await r.turno();
+  assert.deepEqual(r.avisos, [['Verificación del material lista.', 'info']]);
+  assert.match(ev.systemPromptOptions.sections.curso, /vigente/);
+  assert.equal(r.mensajes.length, 1); const [mensaje, opciones] = r.mensajes[0];
+  assert.equal(mensaje.display, false); assert.equal(opciones.triggerTurn, undefined); assert.equal(opciones.deliverAs, 'nextTurn'); assert.match(mensaje.content, /## Resumen/);
+  assert.ok(!existsSync(dir));
+  await r.turno(); assert.equal(r.avisos.length, 1); assert.equal(r.mensajes.length, 1);
+});
+
+test('H07: tras /fin el informe se guarda en silencio, sin avisos ni mensajes', async t => {
+  const e = entorno(t), r = runtime(e, falso(e, informe));
+  const res = await r.alcance(); r.activo = undefined;
+  await esperar(() => existsSync(join(carpeta(e, res.details.nombre), 'codigo')));
+  await r.turno();
+  assert.deepEqual(r.avisos, []); assert.deepEqual(r.mensajes, []);
+  assert.equal(r.entradas.at(-1).data.estado, 'guardada');
+  assert.match(verificacionPrevia(e.vault, e.recursos, e.d, e.tema), /vigente/);
 });
