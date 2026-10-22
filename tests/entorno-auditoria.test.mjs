@@ -76,3 +76,9 @@ test("H09: el thinking del tutor queda oculto como setting de proyecto", async t
   writeFileSync(join(agente, "settings.json"), JSON.stringify({ hideThinkingBlock: false }));
   assert.equal(sdk.SettingsManager.create(vaultDir, agente, { projectTrusted: true }).getHideThinkingBlock(), true);
 });
+
+test("X06: el hijo del researcher recibe su orden a los 300 ms y se respeta un valor propio", t => {
+  const { home } = hogar(t);
+  assert.equal(piLearn(t, { home }).llamadas[0].at(-1), "DELAY=300");
+  assert.equal(piLearn(t, { home, env: { PI_SUBAGENT_SHELL_READY_DELAY_MS: "900" } }).llamadas[0].at(-1), "DELAY=900");
+});

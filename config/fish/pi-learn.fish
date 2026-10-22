@@ -4,9 +4,9 @@ function pi-learn --description 'Abre pi en la carpeta actual, dentro de tmux'
         return 127
     end
     set -l recursos "$HOME/Projects/pi-learning/.pi"
-    # Fish carga conda y otras inicializaciones antes de aceptar órdenes.
+    # Fish con conda ejecuta la orden tipeada aunque llegue a los 0 ms; 300 es margen.
     if not set -q PI_SUBAGENT_SHELL_READY_DELAY_MS
-        set -fx PI_SUBAGENT_SHELL_READY_DELAY_MS 2500
+        set -fx PI_SUBAGENT_SHELL_READY_DELAY_MS 300
     end
     # Sólo las skills del proyecto: las globales no son del tutor y una choca con teach.
     set -l opciones -ns --skill "$recursos/skills" $argv
