@@ -34,6 +34,16 @@ class VisionPedidosTest(unittest.TestCase):
         self.assertIn("corregida a mano", (self.raiz / "practico/paginas/0001.md").read_text())
         self.assertEqual(self.items([{"id": "1", "paginas": [1], "enunciado": "Ejercicio 1."}])["ids"], ["1"])
 
+    def test_texto_de_vision_limpio_no_queda_pendiente_por_un_falso_positivo_de_matematica(self):
+        calidades = json.loads((self.raiz / "practico/calidad.json").read_text())
+        calidades["paginas"]["1"]["clasificacion"]["posible_matematica"] = True
+        (self.raiz / "practico/calidad.json").write_text(json.dumps(calidades))
+        (self.raiz / "practico/cache/0001.json").unlink(missing_ok=True)
+        limpio = "Ejercicio 1. Un host envía paquetes por un enlace y el router los reenvía. " * 3
+        salida = self.guardar(texto=limpio)
+        self.assertEqual((salida["ruta"], salida["pendiente"]), ("vision", False))
+        self.assertEqual(self.guardar(texto=limpio + " $x = ")["ruta"], "pendiente")
+
 
 if __name__ == "__main__":
     unittest.main()

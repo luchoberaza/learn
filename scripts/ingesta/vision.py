@@ -134,8 +134,9 @@ def guardar(raiz: Path, vault: Path, datos: dict, *, fallo: bool = False) -> dic
         texto = datos.get("texto")
         if not isinstance(texto, str) or not texto.strip() or len(texto) > 100000 or datos.get("completa") is not True:
             raise ValueError("La respuesta está vacía, incompleta o es demasiado grande; se conserva el texto anterior.")
-        # La imagen mixta ya se envió al modelo; no repetir el aviso de extracción solo textual.
-        q.update(calidad(texto, {**q["clasificacion"], "clase": "digital"}, datos["umbral"]))
+        # La imagen mixta ya se envió al modelo; no repetir el aviso de extracción solo textual. Visión escribe
+        # la matemática en LaTeX: sin '$' no hay fórmula rota, sólo un falso positivo del detector (H22/H23).
+        q.update(calidad(texto, {**q["clasificacion"], "clase": "digital", "posible_matematica": False}, datos["umbral"]))
         if re.search(r"\[ilegible\]", texto, re.I):
             q.update(puntaje=min(q["puntaje"], 0.4), pendiente=True)
             q["avisos"].append("Visión dejó contenido ilegible; requiere revisión del original.")

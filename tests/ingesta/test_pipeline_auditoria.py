@@ -97,7 +97,7 @@ class MatematicaDigitalTest(Base):
             self.ejecutar(self.doc("libro"))
         texto = "Transcripción de visión: " + PROSA.strip()
         self.transcribir("libro", texto)
-        self.assertEqual(self.q("libro")["ruta"], "pendiente")  # el tope de matemática sin LaTeX la dejaba trabada
+        self.assertEqual(self.q("libro")["ruta"], "vision")  # visión ya no aplica el tope de matemática sin LaTeX
         with patch("extraccion.VERSION_ALGORITMO", 99):
             self.ejecutar(self.doc("libro"))
         q = self.q("libro")
