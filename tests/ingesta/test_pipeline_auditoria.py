@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+import shutil
 import sys
 import tempfile
 import unittest
@@ -14,7 +15,7 @@ import pymupdf
 from almacen import bloquear
 import extraccion
 from extraccion import clasificar
-from pipeline import ejecutar
+from pipeline import construir_busqueda, ejecutar
 import vision
 
 CURSO = Path(__file__).resolve().parents[3] / "cursos/redes"
@@ -146,6 +147,42 @@ class FalloVisionTest(Base):
         q = self.q("libro")
         self.assertEqual((q["ruta"], q["pendiente"]), ("digital", False))
         self.assertNotIn("error_vision", q)
+
+
+class SolucionesFueraDelIndiceTest(Base):
+    def indexado(self, doc: str) -> str:
+        return " ".join(f["texto"] for f in json.loads((self.salida / "busqueda.json").read_text())["fragmentos"] if f["doc"] == doc)
+
+    def test_evaluaciones_indexan_solo_enunciados_y_soluciones_nada(self):
+        self.pdf("parcial.pdf", ["Pregunta 1 (10 puntos)\nCalcule enunciadouno.\nSolución\nsecretouno",
+                                 "secretodos sigue la solución.\n**_Pregunta 2 (8 puntos)_**\nExplique enunciadodos.\nSolución: secretotres",
+                                 "secretocuatro\nEjercicio 3 Considere enunciadotres.\n**Respuesta** secretocinco\nPregunta 4\nenunciadocuatro\nRespuesta: secretoseis"])
+        self.pdf("resueltos.pdf", ["Ejercicio 1\nsecretosiete"])
+        self.ejecutar(self.doc("parcial", "evaluaciones"), self.doc("resueltos", "soluciones"))
+        texto = self.indexado("parcial")
+        for palabra in ["enunciadouno", "enunciadodos", "enunciadotres", "enunciadocuatro"]:
+            self.assertIn(palabra, texto)
+        self.assertNotIn("secreto", texto)
+        self.assertEqual(self.indexado("resueltos"), "")
+        indice = json.loads((self.salida / "busqueda.json").read_text())
+        self.assertEqual({f["tipo"] for f in indice["fragmentos"]}, {"evaluaciones"})
+
+    def test_pagina_faltante_no_deja_pasar_una_solucion_que_continua(self):
+        self.pdf("parcial.pdf", ["Pregunta 1 (10 puntos)\nenunciadouno", "Solución\nsecretouno", "secretodos continúa.\nPregunta 2\nenunciadodos"])
+        self.ejecutar(self.doc("parcial", "evaluaciones", [1, 3]))
+        texto = self.indexado("parcial")
+        self.assertIn("enunciadodos", texto)
+        self.assertNotIn("secreto", texto)
+
+    @unittest.skipUnless((CURSO / "_procesado/sol-prc20240926/meta.json").exists(), "falta el parcial procesado de cursos/redes")
+    def test_parcial_real_con_solucion_integrada(self):
+        shutil.copytree(CURSO / "_procesado/sol-prc20240926", self.salida / "sol-prc20240926", ignore=shutil.ignore_patterns("render", "cache"))
+        construir_busqueda(self.salida)
+        texto = self.indexado("sol-prc20240926")
+        for enunciado in ["Deseo comprar cables", "GET condicional", "RDT 2.2", "Go-Back-N"]:
+            self.assertIn(enunciado, texto)
+        for solucion in ["registro MX", "RCPT TO", "Content-type", "ventaja concreta", "temporizadores", "Son 16 paquetes"]:
+            self.assertNotIn(solucion, texto)
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

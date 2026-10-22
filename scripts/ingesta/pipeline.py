@@ -18,6 +18,8 @@ from extraccion import calidad, clasificar, encabezados, etiqueta_impresa, extra
 
 TIPOS = {"programa", "bibliografia", "ejercicios", "evaluaciones", "soluciones", "otros"}
 MOTORES = {"digital": "pymupdf", "escaneada": "ocrmypdf", "mixta": "pymupdf"}
+PREGUNTA = re.compile(r"[\s#>*_]*(?:pregunta|ejercicio|problema)\s+\d", re.I)
+SOLUCION = re.compile(r"[\s#>*_]*(?:soluci[oó]n|resoluci[oó]n)|[\s#>]*(?:[*_]+\s*respuesta|respuesta\s*(?::|$))", re.I)
 
 
 def ahora() -> str:
@@ -120,6 +122,19 @@ def recuperar_registro(raiz: Path, doc: str, numero: int, previo: dict) -> dict:
     return entrada
 
 
+def enunciados(texto: str, en_solucion: bool) -> tuple[str, bool]:
+    """Sin el texto desde cada marcador de solución hasta la próxima pregunta; el estado sigue en la página siguiente."""
+    lineas = []
+    for linea in texto.splitlines():
+        if PREGUNTA.match(linea):
+            en_solucion = False
+        elif SOLUCION.match(linea):
+            en_solucion = True
+        if not en_solucion:
+            lineas.append(linea)
+    return "\n".join(lineas), en_solucion
+
+
 def construir_busqueda(raiz: Path) -> dict:
     fragmentos = []
     for carpeta in sorted(raiz.iterdir()):
@@ -127,13 +142,21 @@ def construir_busqueda(raiz: Path) -> dict:
             continue
         doc = carpeta.name
         meta = leer_json(raiz, f"{doc}/meta.json")
+        # Las soluciones no se buscan: llegan con leer_items después del intento.
+        if meta["tipo"] == "soluciones":
+            continue
         calidades = leer_json(raiz, f"{doc}/calidad.json", {"paginas": {}})["paginas"]
         secciones = leer_json(raiz, f"{doc}/estructura.json", {"secciones": []})["secciones"]
+        en_solucion, siguiente = False, 1
         for p, cal in sorted(calidades.items(), key=lambda par: int(par[0])):
             markdown = pagina_verificada(raiz, doc, int(p), cal)
             if markdown is None:
                 continue
             texto = contenido_pagina(markdown)
+            if meta["tipo"] == "evaluaciones":
+                # Tras una página faltante puede seguir una solución: no se indexa hasta la próxima pregunta.
+                texto, en_solucion = enunciados(texto, en_solucion or int(p) != siguiente)
+                siguiente = int(p) + 1
             if not texto.strip():
                 continue
             posibles = [s for s in secciones if s["paginas"][0] <= int(p) <= s["paginas"][1]]
