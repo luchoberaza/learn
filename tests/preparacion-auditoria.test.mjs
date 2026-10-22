@@ -312,5 +312,5 @@ test("skills y CURSOS.md describen la preparación automática por tema", () => 
     assert.doesNotMatch(texto, /Usá `transcribir_paginas` en todo ejercicio/, skill);
   }
   const cursos = readFileSync(join(piDir, "scripts/ingesta/CURSOS.md"), "utf8");
-  for (const clave of ["## Preparación por tema", "preparacion.json", ".preparacion.lock", "150 páginas", "asignado automáticamente"]) assert.ok(cursos.includes(clave), clave);
+  for (const clave of ["## Preparación por tema", "preparacion.json", ".preparacion.lock", "150 páginas", "asignado automáticamente", "sin ingesta base espera", "editado a mano", "marcador de solución"]) assert.ok(cursos.includes(clave), clave);
 });
