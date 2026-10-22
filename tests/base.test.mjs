@@ -103,7 +103,8 @@ for (const inside of [false, true]) {
     const result = spawnSync("fish", ["--no-config", "-c", 'source "$argv[1]"; cd "$argv[2]"; pi-learn $argv[3..-1]', "--", join(piDir, "config/fish/pi-learn.fish"), cwd, ...args], { env, encoding: "utf8" });
     assert.equal(result.status, 0, result.stderr);
     const actual = readFileSync(record, "utf8").split("\0").slice(0, -1);
-    const expected = inside ? ["pi", ...args] : ["tmux", "-L", "pi-learn", "-f", join(process.env.HOME, "Projects/pi-learning/.pi/config/tmux.conf"), "new-session", "-c", cwd, "--", "pi", ...args];
+    const pi = ["pi", "-ns", "--skill", join(process.env.HOME, "Projects/pi-learning/.pi/skills"), ...args];
+    const expected = inside ? pi : ["tmux", "-L", "pi-learn", "-f", join(process.env.HOME, "Projects/pi-learning/.pi/config/tmux.conf"), "new-session", "-c", cwd, "--", ...pi];
     assert.deepEqual(actual, expected);
   });
 }
