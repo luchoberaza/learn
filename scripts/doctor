@@ -98,10 +98,8 @@ try {
   const ajenas = Object.keys(prompt.sections).filter(s => !["teach", "modo_curso", "curso"].includes(s));
   if (prompt.forceSystemPrompt !== undefined) ajenas.push("prompt completo reemplazado");
   check(!ajenas.length, "Prompt del tutor", ajenas.length ? `secciones ajenas: ${ajenas.join(", ")}; filtrá su paquete en .pi/settings.json (SETUP.md)` : "sin secciones ajenas");
-  // Mismas opciones de skills que config/fish/pi-learn.fish.
-  const lanzamiento = new project.sdk.DefaultResourceLoader({ cwd: vaultDir, agentDir, settingsManager: session.settingsManager, noExtensions: true, noSkills: true, additionalSkillPaths: [join(piDir, "skills")] });
-  await lanzamiento.reload();
-  const skills = lanzamiento.getSkills(), colisiones = skills.diagnostics.filter(d => d.type === "collision").map(d => d.collision?.name);
+  // loadProject usa las mismas opciones de skills que config/fish/pi-learn.fish.
+  const skills = project.loader.getSkills(), colisiones = skills.diagnostics.filter(d => d.type === "collision").map(d => d.collision?.name);
   check(!colisiones.length && ["teach", "curso-nuevo", "curso-agregar"].every(n => skills.skills.some(s => s.name === n)), "Skills de cursos",
     colisiones.length ? `nombres repetidos: ${colisiones.join(", ")}; renombrá una en .pi/skills` : "teach, curso-nuevo y curso-agregar, sin colisiones; /reload tras cambios");
   const oculto = session.settingsManager.getHideThinkingBlock();

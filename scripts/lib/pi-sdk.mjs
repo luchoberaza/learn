@@ -31,7 +31,8 @@ export async function importPi() {
 export async function loadProject() {
   const sdk = await importPi();
   const settingsManager = sdk.SettingsManager.create(vaultDir, agentDir, { projectTrusted: true });
-  const loader = new sdk.DefaultResourceLoader({ cwd: vaultDir, agentDir, settingsManager });
+  // Mismas skills que pi-learn (-ns --skill .pi/skills): las globales no son del tutor y una choca con teach.
+  const loader = new sdk.DefaultResourceLoader({ cwd: vaultDir, agentDir, settingsManager, noSkills: true, additionalSkillPaths: [join(piDir, "skills")] });
   await loader.reload();
   const result = loader.getExtensions();
   if (result.errors.length) throw new Error(result.errors.map(e => `${e.path}: ${e.error}`).join("; "));

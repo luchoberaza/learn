@@ -1,6 +1,6 @@
 import { after, before, test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -167,4 +167,24 @@ test("H80: el doctor revisa timeout, la web del researcher y el renombre a web_f
   assert.match(salida, /^✓ Web del researcher: \.pi\/npm\/node_modules\/pi-web-access\/dist\/index\.js/m);
   assert.doesNotMatch(salida, /safe_bash|puente web/);
   assert.match(doctor({ PATH: vacio }), /^✗ timeout \(coreutils\): .*instalá coreutils$/m);
+});
+
+test("loadProject carga las skills como pi-learn (-ns --skill .pi/skills): sin globales ni choque con teach", t => {
+  const home = mkdtempSync(join(tmpdir(), "pi-sdk-skills-")), agente = join(home, ".pi/agent");
+  t.after(() => rmSync(home, { recursive: true, force: true }));
+  for (const [nombre, ruta] of [["teach", join(home, ".agents/skills/teach")], ["ajena", join(agente, "skills/ajena")]]) {
+    mkdirSync(ruta, { recursive: true });
+    writeFileSync(join(ruta, "SKILL.md"), `---\nname: ${nombre}\ndescription: Global ajena al tutor.\n---\nAjena.\n`);
+  }
+  const codigo = `const { loadProject } = await import(${JSON.stringify(pathToFileURL(join(piDir, "scripts/lib/pi-sdk.mjs")).href)});
+const p = await loadProject(), s = p.loader.getSkills();
+console.log(JSON.stringify({ nombres: s.skills.map(x => x.name), choques: s.diagnostics.filter(d => d.type === "collision").length, teach: s.skills.find(x => x.name === "teach")?.filePath }));
+await p.close(); process.exit(0);`;
+  const r = spawnSync(process.execPath, ["--input-type=module", "-e", codigo], { encoding: "utf8", timeout: 60000,
+    env: { ...process.env, HOME: home, PI_CODING_AGENT_DIR: agente, PI_MANAGED_INSTALL_ROOT: process.env.PI_MANAGED_INSTALL_ROOT || join(agentDir, "install"), PI_OFFLINE: "1" } });
+  const { nombres, choques, teach } = JSON.parse(r.stdout.trim().split("\n").at(-1));
+  assert.equal(choques, 0);
+  assert.ok(!nombres.includes("ajena"));
+  for (const n of ["teach", "curso-nuevo", "curso-agregar"]) assert.ok(nombres.includes(n), n);
+  assert.equal(teach, join(piDir, "skills/teach/SKILL.md"));
 });
