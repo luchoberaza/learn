@@ -11,6 +11,7 @@ import pymupdf
 import yaml
 
 from almacen import Conflicto, atomico, bloquear, guardar_json, leer_json, ruta_segura, sha256
+from cursos import puntos_validos
 from extraccion import calidad
 from pipeline import ahora, cita, construir_busqueda, firma, informe, pagina_verificada, recuperar_registro
 
@@ -160,7 +161,7 @@ def guardar_items(raiz: Path, vault: Path, datos: dict) -> dict:
         raise ValueError("Se necesita al menos un ítem segmentado por el agente.")
     ids, hashes = set(), {}
     for item in items:
-        if not isinstance(item, dict) or set(item) - {"id", "paginas", "enunciado", "solucion", "solucion_de"}:
+        if not isinstance(item, dict) or set(item) - {"id", "paginas", "enunciado", "solucion", "solucion_de", "puntos"}:
             raise ValueError("Formato de ítem inválido.")
         identificador, paginas = item.get("id"), item.get("paginas")
         if not isinstance(identificador, str) or not identificador.strip() or len(identificador) > 80 or re.search(r"[\x00-\x1f\x7f]", identificador) or identificador in ids:
@@ -168,6 +169,8 @@ def guardar_items(raiz: Path, vault: Path, datos: dict) -> dict:
         ids.add(identificador)
         if not isinstance(item.get("enunciado"), str) or not item["enunciado"].strip() or len(item["enunciado"]) > 50000:
             raise ValueError("Cada ítem necesita un enunciado no vacío y acotado.")
+        if "puntos" in item and not puntos_validos(item["puntos"]):
+            raise ValueError("puntos debe ser un número ≥ 0 o un texto de hasta 40 caracteres.")
         if not isinstance(paginas, list) or not paginas or any(type(p) is not int for p in paginas) or len(paginas) != len(set(paginas)):
             raise ValueError("Cada ítem necesita páginas PDF únicas.")
         for n in paginas:

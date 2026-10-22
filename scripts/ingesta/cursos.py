@@ -8,7 +8,7 @@ from datetime import date
 import difflib
 import hashlib
 import json
-from math import ceil
+from math import ceil, isfinite
 import os
 from pathlib import Path
 import re
@@ -47,6 +47,10 @@ def cargar_yaml(texto: str):
         return yaml.load(texto, Loader=YAMLUnico)
     except yaml.YAMLError:
         raise ValueError("YAML inválido; se preservó el archivo.") from None
+
+
+def puntos_validos(p) -> bool:
+    return (type(p) in (int, float) and p >= 0 and isfinite(p)) or (isinstance(p, str) and bool(p.strip()) and len(p) <= 40)
 
 
 def carpeta(vault: Path, slug: str) -> Path:
@@ -120,6 +124,8 @@ def validar(raiz: Path, slug: str, *, indice=None, contrato=None, origenes=None,
                         raise ValueError(f"Ítems duplicados o inválidos: {d['id']}.")
                     if not isinstance(item.get("enunciado"), str) or not item["enunciado"].strip() or not isinstance(item.get("paginas"), list) or not item["paginas"] or any(type(p) is not int or not 1 <= p <= d["paginas"] for p in item["paginas"]):
                         raise ValueError(f"Enunciado o páginas inválidos en {d['id']}/{item['id']}.")
+                    if "puntos" in item and not puntos_validos(item["puntos"]):
+                        errores.append(f"Puntaje inválido en {d['id']}/{item['id']}: usá un número ≥ 0 o un texto de hasta 40 caracteres.")
                     items[d["id"]][item["id"]] = item
                 for item in items[d["id"]].values():
                     enunciado = items[d["id"]].get(item["solucion_de"]) if isinstance(item.get("solucion_de"), str) else None

@@ -112,6 +112,13 @@ class CursosAuditoriaTest(unittest.TestCase):
             with self.subTest(items=malos):
                 self.assertIn("Solución integrada inválida", " ".join(self.evaluacion(malos, ["5"])["errores"]))
 
+    def test_h72_validar_acepta_puntos_oficiales_y_rechaza_invalidos(self):
+        item = {"id": "5", "paginas": [1], "enunciado": "¿Cuántos paquetes transmite A?", "puntos": 12}
+        self.assertEqual(self.evaluacion([item], ["5"])["errores"], [])
+        for puntos in [-1, True, "", "x" * 41, [12]]:
+            with self.subTest(puntos=puntos):
+                self.assertIn("Puntaje inválido", " ".join(self.evaluacion([{**item, "puntos": puntos}], ["5"])["errores"]))
+
 
 class VisionAuditoriaTest(unittest.TestCase):
     setUp, tearDown = test_vision.VisionTest.setUp, test_vision.VisionTest.tearDown
@@ -127,6 +134,17 @@ class VisionAuditoriaTest(unittest.TestCase):
                       [{**enunciado, "solucion_de": "5-solucion"}, solucion], [enunciado, {**solucion, "solucion_de": ["5"]}]]:
             with self.subTest(items=malos), self.assertRaisesRegex(ValueError, "solucion_de"):
                 self.items(malos)
+
+    def test_h72_guardar_items_conserva_puntos_validos(self):
+        self.guardar()
+        items = [{"id": "1", "paginas": [1], "enunciado": TEXTO, "puntos": 12},
+                 {"id": "2", "paginas": [1], "enunciado": TEXTO, "puntos": 7.5},
+                 {"id": "3", "paginas": [1], "enunciado": TEXTO, "puntos": "10 (a: 4, b: 6)"}]
+        self.items(items)
+        self.assertEqual([i["puntos"] for i in yaml.safe_load((self.raiz / "practico/items.yaml").read_text())["items"]], [12, 7.5, "10 (a: 4, b: 6)"])
+        for puntos in [-1, True, "", "x" * 41, [12], float("inf")]:
+            with self.subTest(puntos=puntos), self.assertRaisesRegex(ValueError, "puntos"):
+                self.items([{**items[0], "puntos": puntos}])
 
 
 if __name__ == "__main__":
