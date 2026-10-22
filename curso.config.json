@@ -6,5 +6,6 @@
   "max_paginas_vision_sin_confirmar": 50,
   "max_tokens_dossier": 3000,
   "max_tokens_curso_md": 1500,
-  "idioma_ocr": ["spa", "eng"]
+  "idioma_ocr": ["spa", "eng"],
+  "ruta_tesseract": "~/miniconda3/bin/tesseract"
 }

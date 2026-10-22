@@ -217,7 +217,7 @@ class IngestaTest(unittest.TestCase):
                                manifiesto=manifiesto, limite_paginas=None)
         def lanzar(*_, **__):
             with bloquear(self.salida, self.vault):
-                return SimpleNamespace(pid=1234)
+                return SimpleNamespace(pid=1234, poll=lambda: 0, returncode=0)
         with patch("ingestar.argumentos", return_value=args), patch("ingestar.subprocess.Popen", side_effect=lanzar):
             with redirect_stdout(io.StringIO()):
                 self.assertEqual(ingestar.main(), 0)

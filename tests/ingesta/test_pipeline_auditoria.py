@@ -1,13 +1,16 @@
 """Regresiones de la auditoría sobre la ingesta, sin LLM. Las pruebas con PDFs reales se omiten si falta el curso."""
 from __future__ import annotations
 
-from contextlib import redirect_stdout
+from contextlib import redirect_stderr, redirect_stdout
 import io
 import json
+import os
 from pathlib import Path
 import shutil
+import subprocess
 import sys
 import tempfile
+import threading
 import unittest
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -229,6 +232,82 @@ class EdicionManualTest(Base):
         self.assertEqual((estado["estado"], estado["editadas"]), ("completada", []))
         self.assertEqual(self.editada.read_text(encoding="utf-8"), "Mi resumen corregido sobre enrutamiento")
         self.assertEqual(self.q("a")["ruta"], "manual")
+
+
+class ArranqueTest(Base):
+    def setUp(self):
+        super().setUp()
+        self.pdf("libro.pdf", [PROSA])
+        self.manifiesto = self.vault / "manifiesto.json"
+        self.manifiesto.write_text(json.dumps({"version": 1, "motores": {c: "pymupdf" for c in ["digital", "escaneada", "mixta"]},
+                                               "documentos": [self.doc("libro")]}))
+        self.config = {k: v for k, v in json.loads(ingestar.CONFIG.read_text()).items() if k != "ruta_tesseract"}
+        # Como /usr/bin/tesseract: sin 'spa'.
+        binarios = self.vault / "bin"
+        binarios.mkdir()
+        falso = binarios / "tesseract"
+        falso.write_text("#!/bin/sh\nif [ \"$1\" = --list-langs ]; then printf 'List of available languages (2):\\neng\\nosd\\n'; else echo 'tesseract 5.5.3'; fi\n")
+        falso.chmod(0o755)
+        for parche in [patch("ingestar.CONFIG", self.vault / "curso.config.json"),
+                       patch.dict(os.environ, {"PATH": f"{binarios}{os.pathsep}{os.environ['PATH']}"})]:
+            parche.start()
+            self.addCleanup(parche.stop)
+        (self.vault / "curso.config.json").write_text(json.dumps(self.config))
+
+    def cli(self, comando: str) -> tuple[int, str, str]:
+        args = SimpleNamespace(comando=comando, vault=self.vault, salida=self.salida, manifiesto=self.manifiesto, limite_paginas=None, doc=None, pagina=None)
+        salida, error = io.StringIO(), io.StringIO()
+        with patch("ingestar.argumentos", return_value=args), redirect_stdout(salida), redirect_stderr(error):
+            return ingestar.main(), salida.getvalue(), error.getvalue()
+
+    def test_pdf_digital_no_exige_tesseract_con_spa(self):
+        estado = ejecutar({"version": 1, "documentos": [self.doc("libro")]}, self.vault, self.salida)
+        self.assertEqual(estado["estado"], "completada")
+
+    def test_iniciar_informa_si_el_hijo_muere_y_estado_no_muestra_la_corrida_anterior(self):
+        self.assertEqual(self.cli("procesar")[0], 0)
+        real = subprocess.Popen
+        muere = [sys.executable, "-c", "import sys; print('No se completó la ingesta: Faltan idiomas OCR', file=sys.stderr); sys.exit(1)"]
+        with patch("ingestar.subprocess.Popen", side_effect=lambda comando, **kw: real(muere, **kw)):
+            codigo, _, error = self.cli("iniciar")
+        self.assertEqual((codigo, error.strip()), (1, "No se completó la ingesta: Faltan idiomas OCR"))
+        estado = json.loads(self.cli("estado")[1])
+        self.assertEqual(estado["estado"], "error")
+        self.assertIn("Faltan idiomas OCR", estado["error"])
+
+    def test_estado_durante_el_arranque_no_es_la_corrida_anterior(self):
+        self.assertEqual(self.cli("procesar")[0], 0)
+        real, hijos, vistos = subprocess.Popen, [], []
+        def lanzar(comando, **kw):
+            hijos.append(real([sys.executable, "-c", "import time; time.sleep(60)"], **kw))
+            return hijos[-1]
+        def consultar():
+            # Popen está parcheado en todo el módulo subprocess: la consulta usa el real.
+            consulta = real([sys.executable, ingestar.__file__, "estado", "--salida", str(self.salida)], stdout=subprocess.PIPE, text=True)
+            vistos.append(json.loads(consulta.communicate()[0])["estado"])
+            hijos[0].kill()
+        temporizador = threading.Timer(0.5, consultar)
+        with patch("ingestar.subprocess.Popen", side_effect=lanzar):
+            temporizador.start()
+            self.cli("iniciar")
+        temporizador.join()
+        self.assertEqual(vistos, ["iniciando"])
+
+    def test_estado_con_el_proceso_muerto_muestra_la_ultima_linea_del_log(self):
+        self.assertEqual(self.cli("procesar")[0], 0)
+        estado = json.loads((self.salida / "estado-ingesta.json").read_text())
+        (self.salida / "estado-ingesta.json").write_text(json.dumps({**estado, "estado": "en_curso"}))
+        (self.salida / "proceso.log").write_text("Traceback (most recent call last):\nMemoryError\n")
+        estado = json.loads(self.cli("estado")[1])
+        self.assertEqual(estado["estado"], "interrumpida")
+        self.assertIn("MemoryError", estado["aviso"])
+
+    def test_ruta_tesseract_va_primero_en_el_path(self):
+        (self.vault / "curso.config.json").write_text(json.dumps({**self.config, "ruta_tesseract": str(self.vault / "otro/tesseract")}))
+        caminos = []
+        with patch("ingestar.ejecutar", side_effect=lambda *a, **k: caminos.append(os.environ["PATH"]) or {}):
+            self.cli("procesar")
+        self.assertTrue(caminos[0].startswith(str(self.vault / "otro") + os.pathsep))
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

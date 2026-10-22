@@ -117,11 +117,14 @@ def identidad_motor(motor: str, idiomas: list[str]) -> dict:
     identidad = {"motor": motor, "version": version(motor), "algoritmo": VERSION_ALGORITMO,
                  "idiomas": idiomas, "wordfreq": version("wordfreq"), "pymupdf": version("pymupdf")}
     if motor == "ocrmypdf":
-        resultado = subprocess.run(["tesseract", "--version"], capture_output=True, text=True, timeout=10, check=True)
+        try:
+            resultado = subprocess.run(["tesseract", "--version"], capture_output=True, text=True, timeout=10, check=True)
+            lenguas = subprocess.run(["tesseract", "--list-langs"], capture_output=True, text=True, timeout=10, check=True)
+        except (OSError, subprocess.SubprocessError):
+            raise ValueError("No se encontró tesseract; instalalo según SETUP.md o fijá ruta_tesseract en curso.config.json.") from None
         identidad["tesseract"] = resultado.stdout.splitlines()[0]
-        lenguas = subprocess.run(["tesseract", "--list-langs"], capture_output=True, text=True, timeout=10, check=True)
         if not set(idiomas).issubset(set(lenguas.stdout.splitlines())):
-            raise ValueError("Faltan idiomas OCR; instalá spa y eng según SETUP.md.")
+            raise ValueError("Faltan idiomas OCR en tesseract; instalá spa y eng según SETUP.md o fijá ruta_tesseract en curso.config.json.")
     return identidad
 
 

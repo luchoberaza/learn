@@ -261,7 +261,13 @@ def ejecutar(manifiesto: dict, vault: Path, salida: Path, *, limite_paginas: int
     if limite_paginas is not None and limite_paginas < 1:
         raise ValueError("El límite de páginas debe ser positivo.")
     motores = manifiesto.get("motores", MOTORES)
-    identidades = {m: identidad_motor(m, idiomas) for m in set(motores.values())}
+    identidades = {"pymupdf": identidad_motor("pymupdf", idiomas)}
+
+    def identidad(motor: str) -> dict:
+        # La de ocrmypdf exige tesseract con los idiomas: sólo se calcula si hay páginas escaneadas.
+        if motor not in identidades:
+            identidades[motor] = identidad_motor(motor, idiomas)
+        return identidades[motor]
     estado = {"version": 1, "estado": "en_curso", "pid": os.getpid(), "iniciado": ahora(), "actualizado": ahora(),
               "solicitadas": sum(len(d["paginas"]) for d in documentos), "procesadas": 0, "cache": 0, "pendientes": 0,
               "documento": None, "pagina": None}
@@ -308,7 +314,11 @@ def ejecutar(manifiesto: dict, vault: Path, salida: Path, *, limite_paginas: int
                         almacenado = pagina_verificada(raiz, identificador, numero, previo)
                         clase_previa = previo.get("clasificacion", {}).get("clase")
                         motor = motores.get(clase_previa)
-                        clave = firma({"sha256": huella, "pagina": numero, "motor": identidades.get(motor), "umbral": umbral,
+                        try:
+                            vigente = identidad(motor) if motor else None
+                        except (OSError, ValueError, subprocess.SubprocessError):
+                            vigente = previo.get("identidad_motor")  # sin tesseract no se descarta lo ya extraído
+                        clave = firma({"sha256": huella, "pagina": numero, "motor": vigente, "umbral": umbral,
                                        "archivo": doc["archivo"], "tipo": doc["tipo"]})
                         # Visión y ediciones humanas no se regeneran desde el PDF mientras no cambien el archivo ni el tipo.
                         ajena = (almacenado is not None and previo.get("motor") in {"vision", "manual"} and anterior is not None
@@ -335,7 +345,7 @@ def ejecutar(manifiesto: dict, vault: Path, salida: Path, *, limite_paginas: int
                             pagina = pdf[numero - 1]
                             clase = clasificar(pagina)
                             motor = motores[clase["clase"]]
-                            clave = firma({"sha256": huella, "pagina": numero, "motor": identidades[motor], "umbral": umbral,
+                            clave = firma({"sha256": huella, "pagina": numero, "motor": identidad(motor), "umbral": umbral,
                                            "archivo": doc["archivo"], "tipo": doc["tipo"]})
                             if ajena:
                                 # Sólo se actualiza la clasificación; la calidad de visión se recalcula como en vision.guardar.
@@ -351,7 +361,7 @@ def ejecutar(manifiesto: dict, vault: Path, salida: Path, *, limite_paginas: int
                             else:
                                 impresa, metodo_etiqueta = etiqueta_impresa(pagina)
                                 titulos[numero] = encabezados(pagina)
-                                resultado.update(clave=clave, clasificacion=clase, motor=motor, identidad_motor=identidades[motor],
+                                resultado.update(clave=clave, clasificacion=clase, motor=motor, identidad_motor=identidad(motor),
                                                  impresa=impresa, metodo_etiqueta=metodo_etiqueta, encabezados=titulos[numero])
                                 texto = extractor(pdf, numero, motor, idiomas)
                                 if motor == "ocrmypdf":
@@ -372,7 +382,7 @@ def ejecutar(manifiesto: dict, vault: Path, salida: Path, *, limite_paginas: int
                             if isinstance(error, Conflicto):
                                 raise
                             resultado.update(puntaje=0, pendiente=True, ruta="pendiente", error=type(error).__name__,
-                                             avisos=[f"Falló la extracción ({type(error).__name__}); se continúa con las otras páginas."])
+                                             avisos=[f"Falló la extracción ({type(error).__name__}: {error}); se continúa con las otras páginas."])
                             # Conservar un resultado previo como provisional si falló un reprocesamiento.
                             markdown = almacenado
                             if almacenado is not None:
@@ -400,8 +410,8 @@ def ejecutar(manifiesto: dict, vault: Path, salida: Path, *, limite_paginas: int
         except (KeyboardInterrupt, SystemExit):
             estado["estado"] = "interrumpida"
             raise
-        except Exception:
-            estado["estado"] = "error"
+        except Exception as error:
+            estado.update(estado="error", error=str(error))
             raise
         finally:
             progreso()
