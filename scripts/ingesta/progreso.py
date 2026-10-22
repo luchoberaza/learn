@@ -100,9 +100,9 @@ def unicos(valores):
 
 
 def fusionar(anterior, nuevo):
-    if anterior.get("estado", "sin_empezar") != "sin_empezar" and nuevo["estado"] == "sin_empezar":
+    if anterior.get("estado", "sin_empezar") != "sin_empezar" and nuevo.get("estado") == "sin_empezar":
         raise ValueError("Ya hay evidencia del tema: conservá su estado previo o usá repasar, no sin_empezar.")
-    r = {**deepcopy(anterior), **deepcopy(nuevo)}
+    r = {"estado": "en_curso", **deepcopy(anterior), **deepcopy(nuevo)}
     for k in ["conceptos_firmes", "ejercicios", "discrepancias"]:
         r[k] = unicos(anterior.get(k, []) + nuevo[k])
     r["borde"] = {
@@ -111,7 +111,8 @@ def fusionar(anterior, nuevo):
     }
     errores = {e["descripcion"]: deepcopy(e) for e in anterior.get("errores_de_concepto", [])}
     for e in nuevo["errores_de_concepto"]:
-        errores[e["descripcion"]] = {**e, "detectado": errores.get(e["descripcion"], e)["detectado"]}
+        previo = errores.get(e["descripcion"], {"resuelto": False})
+        errores[e["descripcion"]] = {**previo, **e, "detectado": previo.get("detectado", e["detectado"])}
     r["errores_de_concepto"] = list(errores.values())
     return r
 
@@ -138,17 +139,22 @@ def rango(ids):
     return ", ".join(ids[:30]) + (" …" if len(ids) > 30 else "")
 
 
-def validar_datos(datos, tema, ctx):
-    campos = {"estado", "borde", "conceptos_firmes", "errores_de_concepto", "ejercicios", "discrepancias", "proximo_paso", "resumen"}
-    if not isinstance(datos, dict) or set(datos) != campos:
-        raise ValueError("Registro incompleto o con campos ajenos al esquema de progreso.")
+def validar_datos(datos, ctx):
+    # Delta: sólo resumen es obligatorio; lo omitido se conserva al fusionar.
+    listas = ["conceptos_firmes", "errores_de_concepto", "ejercicios", "discrepancias"]
+    if not isinstance(datos, dict) or set(datos) - {"estado", "borde", "proximo_paso", "resumen", *listas} or "resumen" not in datos:
+        raise ValueError("Registro sin resumen o con campos ajenos al esquema de progreso.")
     def cadena(s, maximo=2000):
         if not isinstance(s, str) or not s.strip() or len(s) > maximo:
             raise ValueError("El progreso necesita textos no vacíos y acotados.")
     for k in ["resumen", "proximo_paso"]:
-        cadena(datos[k])
-    if not isinstance(datos["borde"], dict) or set(datos["borde"]) != {"domina", "falla"}:
-        raise ValueError("El borde necesita domina y falla.")
+        if k in datos:
+            cadena(datos[k])
+    if datos.get("estado", "en_curso") not in {"sin_empezar", "en_curso", "dominado", "repasar"}:
+        raise ValueError("Estado de progreso inválido.")
+    if not isinstance(datos.get("borde", {}), dict) or set(datos.get("borde", {})) - {"domina", "falla"}:
+        raise ValueError("El borde admite sólo domina y falla.")
+    datos = {**{k: [] for k in listas}, **datos, "borde": {"domina": [], "falla": [], **datos.get("borde", {})}}
     for valores in [datos["borde"]["domina"], datos["borde"]["falla"], *[datos[k] for k in ["conceptos_firmes", "discrepancias", "errores_de_concepto", "ejercicios"]]]:
         if not isinstance(valores, list) or len(valores) > 100:
             raise ValueError("Las listas de progreso admiten hasta 100 entradas por registro.")
@@ -159,7 +165,7 @@ def validar_datos(datos, tema, ctx):
         raise ValueError("Un mismo concepto no puede dominarse y fallar en el mismo registro.")
     hoy = datetime.now().date()
     for e in datos["errores_de_concepto"]:
-        if not isinstance(e, dict) or set(e) - {"descripcion", "detectado", "resuelto"} or not {"descripcion", "resuelto"} <= set(e):
+        if not isinstance(e, dict) or set(e) - {"descripcion", "detectado", "resuelto"} or "descripcion" not in e:
             raise ValueError("Error de concepto fuera del esquema.")
         cadena(e["descripcion"])
     ejercicios, avisos = [], []
@@ -188,7 +194,6 @@ def validar_datos(datos, tema, ctx):
         f = e.setdefault(campo, hoy.isoformat())
         if not isinstance(f, str) or not re.fullmatch(r"\d{4}-\d{2}-\d{2}", f) or date.fromisoformat(f) > hoy:
             raise ValueError("Fecha de evidencia inválida o futura.")
-    comprobar({"version": 1, "temas": {tema: t}, "historial": []}, ctx)
     return t, avisos
 
 
@@ -204,7 +209,7 @@ def registrar(vault: Path, curso: str, tema: str, log: str, datos: dict, cierre=
         raise ValueError("El log de evidencia no existe.")
     with bloqueo(raiz):
         ctx = contexto(raiz)
-        nuevo, observaciones = validar_datos(datos, tema, ctx)
+        nuevo, observaciones = validar_datos(datos, ctx)
         if reconstruido and (not isinstance(huella_log, str) or hashlib.sha256(archivo_log.read_bytes()).hexdigest() != huella_log):
             raise Conflicto("El log cambió desde su lectura; releelo antes de reconstruir.")
         indice = texto(raiz, "indice.yaml")

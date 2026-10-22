@@ -137,6 +137,24 @@ class ProgresoAuditoriaTest(unittest.TestCase):
         self.assertEqual(str(t['errores_de_concepto'][-1]['detectado']), '2026-10-22')
         self.assertEqual(str(t['ejercicios'][-1]['fecha']), '2026-10-22')
 
+    def test_h10_delta_con_solo_lo_nuevo_conserva_lo_previo(self):
+        self.guardar()
+        antes = self.tema()
+        self.guardar({'resumen': 'Delta', 'borde': {'domina': ['regla de la cadena']}})
+        t = self.tema()
+        self.assertEqual(t['borde'], {'domina': ['derivar un polinomio', 'regla de la cadena'], 'falla': ['composición']})
+        for k in ['estado', 'proximo_paso', 'conceptos_firmes', 'errores_de_concepto', 'ejercicios', 'discrepancias']:
+            self.assertEqual(t[k], antes[k], k)
+        self.guardar({'resumen': 'Delta 2', 'errores_de_concepto': [{'descripcion': 'confunde la función interna', 'resuelto': True}]})
+        self.assertEqual(self.tema()['errores_de_concepto'], [{**antes['errores_de_concepto'][0], 'resuelto': True}])
+        log = f'sesiones/{self.b.hoy}-limites.md'
+        (self.raiz / log).write_text('x')
+        registrar(self.vault, 'ejemplo', 'limites', log, {'resumen': 'Sólo resumen', 'errores_de_concepto': [{'descripcion': 'nuevo error'}]})
+        t = yaml.safe_load((self.raiz / 'progreso.yaml').read_text())['temas']['limites']
+        self.assertEqual((t['estado'], t['errores_de_concepto'][0]['resuelto']), ('en_curso', False))
+        with self.assertRaises(ValueError):
+            self.guardar({'borde': {'domina': ['sin resumen']}})
+
 
 class SesionAuditoriaTest(unittest.TestCase):
     def setUp(self):

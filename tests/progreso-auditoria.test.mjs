@@ -32,3 +32,10 @@ test("H13: /fin con el ítem '2(g)' guarda, avisa al modelo por '99' y cierra",a
   assert.match(r.content[0].text,/item '99' no existe en practico; ids válidos: 1–10/);assert.ok(!e.avisos.some(a=>/99/.test(a)),'El aviso del ítem es para el modelo, no para el alumno');
   e.final();await e.eventos.get('agent_settled')({},e.ctx);assert.equal(e.sesion.actual(),undefined);
 });
+test('H10: un delta con sólo resumen y borde se fusiona sin borrar lo previo',async t=>{
+  const e=await entorno(t);await e.guardar();
+  await e.progreso.registrar('delta',{resumen:'Delta',borde:{domina:['Regla de la cadena']}},undefined,undefined,e.ctx);
+  const p=e.sesion.actual().d.progreso.temas.derivacion;
+  assert.deepEqual(p.borde.domina,['Derivar un polinomio','Regla de la cadena']);assert.equal(p.proximo_paso,'Composición');assert.equal(p.estado,'en_curso');
+  await e.comandos.get('fin').handler('',e.ctx);assert.match(e.mensajes.at(-1),/desde el último guardado/);
+});

@@ -33,15 +33,15 @@ export default function (pi: ExtensionAPI) {
   });
   pi.registerTool({
     name: "registrar_progreso", label: "Guardar progreso del curso",
-    description: "Fusiona evidencia observada del tema activo, valida y guarda atómicamente con .bak. No inventes resultados ni puntajes. cierre:true al terminar; el log se cierra tras el mensaje final. Para reconstruir leé leer_sesion_anterior y usá su log/SHA; requiere confirmación humana. Ad hoc no crea temas persistentes.",
+    description: "Fusiona evidencia observada del tema activo, valida y guarda atómicamente con .bak. Mandá sólo lo nuevo desde el último guardado: lo omitido se conserva; sólo resumen es obligatorio y estado/proximo_paso van cuando cambian. No inventes resultados ni puntajes. cierre:true al terminar; el log se cierra tras el mensaje final. Para reconstruir leé leer_sesion_anterior y usá su log/SHA; requiere confirmación humana. Ad hoc no crea temas persistentes.",
     parameters: Type.Object({
-      estado: Type.Union([Type.Literal("sin_empezar"), Type.Literal("en_curso"), Type.Literal("dominado"), Type.Literal("repasar")]),
-      borde: Type.Object({ domina: listaProgreso, falla: listaProgreso }), conceptos_firmes: listaProgreso,
-      errores_de_concepto: Type.Array(Type.Object({ descripcion: textoProgreso, detectado: Type.Optional(fecha), resuelto: Type.Boolean() }), { maxItems: 100 }),
-      ejercicios: Type.Array(Type.Object({ doc: slug, item: Type.String({ minLength: 1, maxLength: 2000, description: "id tal como lo muestra leer_items; el inciso va en notas" }), fecha: Type.Optional(fecha),
+      estado: Type.Optional(Type.Union([Type.Literal("sin_empezar"), Type.Literal("en_curso"), Type.Literal("dominado"), Type.Literal("repasar")])),
+      borde: Type.Optional(Type.Object({ domina: Type.Optional(listaProgreso), falla: Type.Optional(listaProgreso) })), conceptos_firmes: Type.Optional(listaProgreso),
+      errores_de_concepto: Type.Optional(Type.Array(Type.Object({ descripcion: textoProgreso, detectado: Type.Optional(fecha), resuelto: Type.Optional(Type.Boolean()) }), { maxItems: 100 })),
+      ejercicios: Type.Optional(Type.Array(Type.Object({ doc: slug, item: Type.String({ minLength: 1, maxLength: 2000, description: "id tal como lo muestra leer_items; el inciso va en notas" }), fecha: Type.Optional(fecha),
         resultado: Type.Union([Type.Literal("correcto"), Type.Literal("parcial"), Type.Literal("incorrecto")]),
-        puntaje: Type.Optional(Type.String({ maxLength: 200 })), notas: Type.Optional(Type.String({ maxLength: 2000 })) }), { maxItems: 100 }),
-      discrepancias: listaProgreso, proximo_paso: textoProgreso, resumen: textoProgreso, cierre: Type.Optional(Type.Boolean()),
+        puntaje: Type.Optional(Type.String({ maxLength: 200 })), notas: Type.Optional(Type.String({ maxLength: 2000 })) }), { maxItems: 100 })),
+      discrepancias: Type.Optional(listaProgreso), proximo_paso: Type.Optional(textoProgreso), resumen: textoProgreso, cierre: Type.Optional(Type.Boolean()),
       reconstruir_log: Type.Optional(Type.String()), huella_log: Type.Optional(Type.String({ pattern: "^[a-f0-9]{64}$" })),
     }), executionMode: "sequential",
     execute: (...args) => {

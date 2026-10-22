@@ -58,7 +58,7 @@ export function registrarProgreso(pi: ExtensionAPI, sesion: ReturnType<typeof re
       if (!e) { ctx.ui.notify("No hay una sesión de curso activa.", "info"); return; }
       if (!ctx.isIdle()) { ctx.ui.notify("Esperá a que termine el turno antes de /fin; el log sigue abierto.", "warning"); return; }
       pi.appendEntry("curso-cierre", { log: e.a.log, adHoc: !!e.a.adHoc });
-      pi.sendUserMessage(e.a.adHoc ? "Terminemos esta sesión ad hoc. Resumí lo observado y ofrecé curar el tema con /curso-agregar, sin escribir progreso de un tema inexistente ni hacer más preguntas." : "Terminemos la sesión. Llamá registrar_progreso con cierre:true y sólo la evidencia observada; si no hubo respuestas nuevas, conservá estado y borde previos; sólo sin evidencia previa usá sin_empezar y listas vacías. Después mostrá un resumen breve y el próximo paso. El log se cerrará automáticamente al terminar tu mensaje, sólo si el guardado tuvo éxito. No hagas más preguntas.", { deliverAs: "followUp" });
+      pi.sendUserMessage(e.a.adHoc ? "Terminemos esta sesión ad hoc. Resumí lo observado y ofrecé curar el tema con /curso-agregar, sin escribir progreso de un tema inexistente ni hacer más preguntas." : "Terminemos la sesión. Llamá registrar_progreso con cierre:true, resumen y sólo la evidencia observada desde el último guardado; lo omitido se conserva, así que sin respuestas nuevas alcanza con resumen y cierre. Después mostrá un resumen breve y el próximo paso. El log se cerrará automáticamente al terminar tu mensaje, sólo si el guardado tuvo éxito. No hagas más preguntas.", { deliverAs: "followUp" });
     },
   });
   pi.on("agent_settled", async (event, ctx) => {
