@@ -231,6 +231,14 @@ class EdicionManualTest(Base):
         self.assertEqual(estado["estado"], "completada_con_pendientes")
         self.assertEqual(self.editada.read_text(encoding="utf-8"), "Mi resumen corregido sobre enrutamiento")
 
+    def test_una_solucion_editada_tambien_se_avisa(self):
+        self.pdf("resueltos.pdf", ["Ejercicio 1\nLa solución completa del ejercicio."])
+        self.ejecutar(self.doc("resueltos", "soluciones"))
+        (self.salida / "resueltos/paginas/0001.md").write_text("Mi corrección de la solución", encoding="utf-8")
+        estado = self.ejecutar(self.doc("b"))
+        self.assertTrue(any("--doc resueltos --pagina 1" in aviso for aviso in estado["editadas"]))
+        self.assertNotIn("resueltos", {f["doc"] for f in self.busqueda()["fragmentos"]})
+
     def test_adoptar_registra_la_edicion_y_la_ingesta_la_conserva(self):
         self.assertEqual(self.adoptar(), 0)
         q = self.q("a")

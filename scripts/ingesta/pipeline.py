@@ -168,9 +168,6 @@ def construir_busqueda(raiz: Path) -> dict:
             continue
         doc = carpeta.name
         meta = leer_json(raiz, f"{doc}/meta.json")
-        # Las soluciones no se buscan: llegan con leer_items después del intento.
-        if meta["tipo"] == "soluciones":
-            continue
         calidades = leer_json(raiz, f"{doc}/calidad.json", {"paginas": {}})["paginas"]
         secciones = leer_json(raiz, f"{doc}/estructura.json", {"secciones": []})["secciones"]
         en_solucion, siguiente = False, 1
@@ -180,7 +177,8 @@ def construir_busqueda(raiz: Path) -> dict:
             except Conflicto as error:
                 editadas.append(str(error))
                 continue
-            if markdown is None:
+            # Las soluciones no se buscan: llegan con leer_items después del intento.
+            if markdown is None or meta["tipo"] == "soluciones":
                 continue
             texto = contenido_pagina(markdown)
             if meta["tipo"] in {"evaluaciones", "ejercicios"}:
