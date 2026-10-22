@@ -66,10 +66,11 @@ def preparar(raiz: Path, vault: Path, datos: dict) -> dict:
     meta, fuente, calidades = cargar(raiz, vault, doc)
     q, _ = pagina(raiz, doc, n, meta, calidades)
     clave = clave_vision(meta, datos["modelo"])
+    # Una página adoptada a mano es la transcripción definitiva: nunca va al modelo ni se pisa.
     resultado = {"pagina": n, "sha256_fuente": meta["sha256"], "sha256_anterior": q.get("sha256_markdown"),
                  "clave_vision": clave, "cita": cita(meta["archivo"], n),
-                 "cache": q.get("vision", {}).get("clave") == clave and not q.get("error_vision")
-                 and q.get("vision", {}).get("umbral", 0.6) == datos["umbral"]}
+                 "cache": q.get("motor") == "manual" or (q.get("vision", {}).get("clave") == clave and not q.get("error_vision")
+                 and q.get("vision", {}).get("umbral", 0.6) == datos["umbral"])}
     if resultado["cache"]:
         actualizar(raiz)
         return resultado
@@ -116,6 +117,8 @@ def guardar(raiz: Path, vault: Path, datos: dict, *, fallo: bool = False) -> dic
     doc, n = datos["doc"], datos["pagina"]
     meta, _, calidades = cargar(raiz, vault, doc)
     previo, markdown = pagina(raiz, doc, n, meta, calidades)
+    if previo.get("motor") == "manual":
+        raise Conflicto("La página fue adoptada a mano; se preservó sin transcribir.")
     clave = clave_vision(meta, datos["modelo"])
     if (datos["sha256_fuente"] != meta["sha256"] or datos["sha256_anterior"] != previo.get("sha256_markdown")
             or datos["clave_vision"] != clave):
@@ -178,7 +181,7 @@ def guardar_items(raiz: Path, vault: Path, datos: dict) -> dict:
             raise ValueError("Cada ítem necesita páginas PDF únicas.")
         for n in paginas:
             q, _ = pagina(raiz, doc, n, meta, calidades)
-            if not q.get("vision") or q.get("error_vision"):
+            if not (q.get("vision") or q.get("motor") == "manual") or q.get("error_vision"):
                 raise ValueError("Primero transcribí con visión todas las páginas del ítem.")
             hashes[str(n)] = q["sha256_markdown"]
         solucion = item.get("solucion")
