@@ -104,7 +104,7 @@ for (const inside of [false, true]) {
     assert.equal(result.status, 0, result.stderr);
     const actual = readFileSync(record, "utf8").split("\0").slice(0, -1);
     const pi = ["pi", "-ns", "--skill", join(process.env.HOME, "Projects/pi-learning/.pi/skills"), ...args];
-    const expected = inside ? pi : ["tmux", "-L", "pi-learn", "-f", join(process.env.HOME, "Projects/pi-learning/.pi/config/tmux.conf"), "new-session", "-c", cwd, "--", ...pi];
+    const expected = inside ? pi : ["tmux", "-L", "pi-learn", "-f", join(process.env.HOME, "Projects/pi-learning/.pi/config/tmux.conf"), "new-session", "-A", "-s", actual[8], "-c", cwd, "--", ...pi];
     assert.deepEqual(actual, expected);
   });
 }

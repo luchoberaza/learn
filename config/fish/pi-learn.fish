@@ -24,6 +24,10 @@ function pi-learn --description 'Abre pi en la carpeta actual, dentro de tmux'
         printf 'Falta la configuración de tmux: %s\n' "$configuracion" >&2
         return 1
     end
-    # Una sesión nueva por invocación: no reutilizar otra carpeta ni perder argumentos.
-    command tmux -L pi-learn -f "$configuracion" new-session -c "$PWD" -- pi $opciones
+    # Una sesión por carpeta: si pi ya está abierto acá, volver a él en vez de abrir otro sobre la misma sesión.
+    set -l sesion pi-learn-(printf '%s' "$PWD" | md5sum | string sub -l 8)
+    if set -q argv[1]; and command tmux -L pi-learn has-session -t "=$sesion" 2>/dev/null
+        printf 'Ya hay un pi abierto en esta carpeta: vuelvo a ese y no uso «%s»; para usarlo, cerralo antes.\n' "$argv" >&2
+    end
+    command tmux -L pi-learn -f "$configuracion" new-session -A -s "$sesion" -c "$PWD" -- pi $opciones
 end

@@ -82,3 +82,25 @@ test("X06: el hijo del researcher recibe su orden a los 300 ms y se respeta un v
   assert.equal(piLearn(t, { home }).llamadas[0].at(-1), "DELAY=300");
   assert.equal(piLearn(t, { home, env: { PI_SUBAGENT_SHELL_READY_DELAY_MS: "900" } }).llamadas[0].at(-1), "DELAY=900");
 });
+
+test("X03: en el servidor de pi-learn una sesión sin cliente no sobrevive", t => {
+  const socket = `pi-entorno-${process.pid}`, tmux = (...a) => spawnSync("tmux", ["-L", socket, ...a], { encoding: "utf8" });
+  t.after(() => tmux("kill-server"));
+  assert.equal(tmux("-f", join(piDir, "config/tmux.conf"), "new-session", "-d", "-s", "alumno", "--", "sleep", "30").status, 0);
+  assert.notEqual(tmux("has-session", "-t", "=alumno").status, 0);
+});
+
+test("X03: pi-learn reutiliza la sesión de tmux de la carpeta y avisa si no puede usar los argumentos", t => {
+  const { home } = hogar(t), otra = mkdtempSync(join(tmpdir(), "pi-otra-"));
+  t.after(() => rmSync(otra, { recursive: true, force: true }));
+  const nueva = l => l.slice(l.indexOf("new-session"), l.indexOf("--"));
+  const [a, b, c] = [vaultDir, vaultDir, otra].map(cwd => nueva(piLearn(t, { home, cwd, dentro: false }).llamadas.at(-1)));
+  assert.deepEqual(a, b);
+  assert.match(a[3], /^pi-learn-[0-9a-f]{8}$/);
+  assert.deepEqual(a.slice(0, 3), ["new-session", "-A", "-s"]);
+  assert.notEqual(c[3], a[3]);
+  const viva = piLearn(t, { home, dentro: false, args: ["--resume"], env: { HAY: "0" } });
+  assert.match(viva.stderr, /^Ya hay un pi abierto en esta carpeta.*--resume.*\n$/);
+  assert.equal(piLearn(t, { home, dentro: false, args: ["--resume"] }).stderr, "");
+  assert.ok(!piLearn(t, { home, dentro: false }).llamadas.some(l => l.includes("has-session")));
+});
