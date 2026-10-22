@@ -1,8 +1,8 @@
 # Instalación reproducible — Fases 0 a 8 (piloto en curso)
 
-**Estado:** Fases 0–4 aprobadas y cerradas (`79b1976`, `352c249`, `6409acd`, `3616e71`, `c757542`). Redes: 17 documentos / 987 páginas y 8 temas, con 268 páginas referidas todavía pendientes; aprobación de organización no equivale a revisión individual. Fase 5 aprobada con «Confirmado, avanzá», tras verificar la foto recuperada en Obsidian (`98f642a`, corrección `53a7476`). Fase 6 aprobada con «Aprobado, continuá» (`f9aeea7`). Fase 7 aprobada con «Aprobado, continuá» (`29cdb0c`): progreso persistente, cierre y reconstrucción confirmada. Fase 8 en preparación, sin sesiones reales del piloto registradas todavía; seguimiento en `../fricciones.md`. Historial y límites en `informes/fase1.md` a `informes/fase7.md` y `DECISIONES.md`.
+**Estado:** Fases 0–4 aprobadas y cerradas (`79b1976`, `352c249`, `6409acd`, `3616e71`, `c757542`). Fase 5 aprobada con «Confirmado, avanzá», tras verificar la foto recuperada en Obsidian (`98f642a`, corrección `53a7476`). Fase 6 aprobada con «Aprobado, continuá» (`f9aeea7`). Fase 7 aprobada con «Aprobado, continuá» (`29cdb0c`): progreso persistente, cierre y reconstrucción confirmada. Fase 8 (piloto humano) en curso; seguimiento en `../fricciones.md`. El 2026-10-22 se auditó el sistema (`../AUDITORIA.md`) y se integraron en la rama `cursos` dos etapas de arreglos: entorno, ingesta, cursos, progreso, quiz, researcher, sesión, presentación y preparación por tema. La etapa de pedagogía de esa auditoría todavía no está integrada. Historial y límites en `informes/fase1.md` a `informes/fase7.md` y `DECISIONES.md`.
 
-**Base actual: pi 1.4.0.** La instalación administrada ya se había actualizado al probar Fase 5. En Fase 6 se verificaron docs/declaraciones/ejemplos instalados, tests y runtime real, y se adoptó esa versión exacta en doctor y esta guía. No se reinstaló ni degradó pi, ni se cambió la configuración personal. La base original fue 1.3.0; los informes de esas fases conservan su versión histórica. Doctor detectará futuras divergencias de versión.
+**Base actual: pi 1.4.0.** La instalación administrada ya se había actualizado al probar Fase 5. En Fase 6 se verificaron docs/declaraciones/ejemplos instalados, tests y runtime real, y se adoptó esa versión exacta en doctor y esta guía. No se reinstaló ni degradó pi, ni se cambió la configuración personal. La base original fue 1.3.0; los informes de esas fases conservan su versión histórica. Doctor avisa si pi no es 1.4.0.
 
 Actualizar entre semestres, no en semana de parciales.
 
@@ -15,20 +15,22 @@ Actualizar entre semestres, no en semana de parciales.
 | learn (fork) | `7cfd8942f82ab9476e63572387e1fe9bcea5082c` |
 | pi-interactive-subagents | `3.7.2`, commit `c3e8b53c0754ae5ccc19fdab5a7481ec039bc2f7` |
 | pi-web-access | `0.42.0`; árbol transitivo en `npm/package-lock.json` |
-| tmux | `3.8` (paquete existente `3.8-1.1`) |
-| fish | `4.9.3` (paquete existente `4.9.3-1`) |
-| wl-clipboard | `2.3.0` (paquete existente `1:2.3.0-1.1`) |
-| Poppler | `26.08.0` (paquete existente `26.08.0-1.1`); inventario preliminar de muestras |
-| Git | `2.56.0`, existente |
-| uv | `0.13.1`, existente |
-| Python de ingesta | `3.13.13`, entorno `.pi/.venv` |
+| tmux | `3.8` (paquete `3.8-1.1`) |
+| fish | `4.9.3` (paquete `4.9.3-1`) |
+| wl-clipboard | `2.3.0` (paquete `1:2.3.0-1.1`) |
+| coreutils (`timeout`) | `9.12` (paquete `9.12-2.1`) |
+| ImageMagick (opcional) | `7.1.2-34`, con libheif `1.23.6` |
+| Poppler | `26.10.0` (paquete `26.10.0-1.1`); sólo para inventarios manuales, el código no lo usa |
+| Git | `2.56.0` |
+| uv | `0.13.5` (paquete `0.13.5-1.1`) |
+| Python de ingesta | `3.13.13` gestionado por uv, entorno `.pi/.venv` |
 | PyMuPDF / OCRmyPDF / wordfreq | `1.28.2` / `17.13.0` / `3.1.1`; transitivas en `scripts/ingesta/uv.lock` |
 | PyYAML (Fase 2: ítems) | `6.0.3`; transitivas en el mismo `uv.lock` |
-| Pillow (fixture opcional de Fase 5) | `13.0.0`, transitiva ya instalada de OCR, fijada en `uv.lock`; no se usa en el logger |
-| Tesseract utilizado | `5.5.2`, Conda `h1f36d38_0`, con `spa` y `eng` |
-| Ghostscript existente | `10.08.0`, paquete `10.08.0-1.1` |
+| Pillow (fixture opcional de Fase 5) | `13.0.0`, transitiva de OCR, fijada en `uv.lock`; no se usa en el logger |
+| Tesseract utilizado | `5.5.2`, Conda `h1f36d38_0`, con `spa` y `eng`, fijado con `ruta_tesseract` |
+| Ghostscript | `10.08.0`, paquete `10.08.0-1.1` |
 
-No se instalaron paquetes del sistema. Las dependencias Python de Fase 1 están aisladas; los ensayos ML no son dependencias de uso diario. Las herramientas de visualización originales no se modificaron: los mapas Mermaid del skill se renderizan directamente en Obsidian. No se instalaron todavía las dependencias opcionales para generar PNG de Mermaid.
+Las dependencias Python están aisladas en `.pi/.venv`; los ensayos ML no son dependencias de uso diario. Las herramientas de visualización originales no se modificaron: los mapas Mermaid del skill se renderizan directamente en Obsidian. No se instalaron todavía las dependencias opcionales para generar PNG de Mermaid.
 
 Si hace falta una instalación nueva de pi, el comando npm con versión exacta es:
 
@@ -38,6 +40,50 @@ pi --version
 ```
 
 No lo ejecutes sobre esta instalación administrada sin planificar la migración. Para instalaciones npm, `doctor` puede necesitar `PI_LEARN_PI_MODULE` apuntando a la ruta absoluta de `@earendil-works/pi-coding-agent/dist/index.js`. En esta máquina lo localiza automáticamente leyendo `~/.pi/agent/install/current-version`.
+
+## Dependencias globales
+
+Viven fuera de `.pi/` y el proyecto no las instala. El doctor comprueba todas salvo ImageMagick; de uv, sólo el Python del venv.
+
+| Dependencia | Para qué | Si falta |
+|---|---|---|
+| pi `1.4.0` en `~/.pi/agent` | todo | doctor falla; con otra versión avisa con «!» y no lo cuenta como falla |
+| Node.js `26.1.0` | doctor, tests y ensayos | no corren |
+| fish | `pi-learn` y el shell de tmux (`config/tmux.conf`) | no hay lanzador |
+| tmux | `pi-learn` (una sesión por carpeta) y los paneles de los subagentes de `visualize` | `pi-learn` dice «Falta tmux. Instalalo antes de usar pi-learn.» |
+| `wl-paste` (Wayland) o `xclip` (X11) | pegar fotos con Ctrl+V | Ctrl+V no pega la foto: guardala y escribí su ruta en el mensaje |
+| `timeout` de coreutils | cortar al researcher a los 180 s | el researcher no corre |
+| uv y su Python `3.13.13` | `.pi/.venv` | ingesta, sesión y progreso fallan; receta abajo |
+| Tesseract con `spa` y `eng` | OCR de páginas escaneadas | sólo esas páginas fallan y quedan pendientes |
+| ImageMagick (`magick`, con libheif) | fotos HEIC y BMP en la nota | la nota avisa en una línea: mandá la foto en JPEG o PNG |
+
+**El venv.** `.pi/.venv` usa el Python `3.13.13` que gestiona uv (`~/.local/share/uv/python/cpython-3.13.13-linux-x86_64-gnu`), no el de Conda; el entorno anterior, ligado a Conda, quedó en `.pi/.venv.conda-bak`. Para recrearlo, desde la raíz del vault (bash o fish):
+
+```bash
+UV_PROJECT_ENVIRONMENT="$PWD/.pi/.venv" uv sync --project .pi/scripts/ingesta --python 3.13.13 --python-preference only-managed --locked
+.pi/.venv/bin/python .pi/scripts/ingesta/comprobar.py
+```
+
+La ruta tiene que ser absoluta: con `UV_PROJECT_ENVIRONMENT=.pi/.venv`, uv la resuelve desde `--project` y crea el entorno en `.pi/scripts/ingesta/.pi/.venv`. La receta que imprimen hoy el doctor y `comprobar.py` usa esa ruta relativa: no la copies tal cual.
+
+**Tesseract.** La clave opcional `ruta_tesseract` de `curso.config.json` fija el ejecutable (acepta `~`). Su carpeta se antepone al `PATH` de OCRmyPDF y de la comprobación de idiomas. Hoy vale `~/miniconda3/bin/tesseract` (5.5.2, con `spa` y `eng`); el `/usr/bin/tesseract` del sistema (5.5.3) sólo trae `eng` y `osd`. Comprobar:
+
+```bash
+~/miniconda3/bin/tesseract --version
+~/miniconda3/bin/tesseract --list-langs
+```
+
+Sólo si falta, puede restaurarse en un entorno separado, sin modificar Conda base, y apuntar `ruta_tesseract` a `~/.cache/pi-learning/ocr/bin/tesseract`:
+
+```bash
+conda create --prefix "$HOME/.cache/pi-learning/ocr" --channel conda-forge 'tesseract=5.5.2=h1f36d38_0'
+```
+
+Paquete oficial observado: `https://conda.anaconda.org/conda-forge/linux-64/tesseract-5.5.2-h1f36d38_0.conda`, SHA-256 `67125e3aa53a069c1cd5b17ff2b9cb66019b8bc8615a45c456dbd9093721ebd6`. La restauración alternativa no se ejecutó: ya estaba instalado.
+
+**Paquetes y skills personales.** `~/.pi/agent/settings.json` carga el paquete `ponytail`, ajeno al tutor. `.pi/settings.json` lo neutraliza sólo en este proyecto, sin tocar `~/.pi` (ver «Settings del proyecto»). Si algún día lo quitás de `~/.pi/agent/settings.json`, borrá también su entrada de `.pi/settings.json`: sin la entrada personal, pi la toma como paquete del proyecto e intenta clonarlo en `.pi/git` al arrancar, lo que necesita red. Las skills globales se evitan sólo abriendo con `pi-learn` (`-ns`); `pi` a secas las carga.
+
+**Red en el primer arranque.** Los paquetes fijados (`.pi/git/…` y `.pi/npm/node_modules`) no se versionan. Si faltan, pi intenta instalarlos al arrancar. `pi-learn` lo detecta, avisa y abre pi con `PI_OFFLINE=1`, sin subagentes ni web; reinstalalos con los comandos de «Paquetes pi».
 
 ## Base Git
 
@@ -69,7 +115,19 @@ El `npm ci` restaura el árbol exacto del lockfile versionado. Pi genera inicial
 
 `--approve` autoriza la carga para ese proceso, no guarda una decisión global. En el primer inicio interactivo, **pi pedirá confiar en el proyecto**. Revisá y aceptá para cargar `.pi/`; `/trust` permite guardar la decisión.
 
-`instalar-config` es idempotente. Crea archivos ausentes y rechaza cualquier archivo existente con contenido distinto: no reemplaza configuraciones personales.
+`instalar-config` es idempotente: instala `config/fish/pi-learn.fish` en `~/.config/fish/functions/` y `config/web-search.json` donde lo lee pi-web-access. Crea archivos ausentes y rechaza cualquier archivo existente con contenido distinto: no reemplaza configuraciones personales.
+
+### Settings del proyecto
+
+`.pi/settings.json` fija el modelo principal (`openai-codex/gpt-6.1-sol`), `hideThinkingBlock: true` y los paquetes: los dos de arriba y esta entrada, que apaga ponytail sólo acá:
+
+```json
+{ "source": "git:github.com/DietrichGebert/ponytail", "autoload": false, "extensions": ["!**"], "skills": ["!**"] }
+```
+
+Con `autoload: false`, pi toma la entrada del proyecto como filtro sobre la personal: ponytail no aporta extensiones ni skills. El doctor lo comprueba en «Prompt del tutor» (sin secciones ajenas) y «Skills de cursos» (`teach`, `curso-nuevo` y `curso-agregar`, sin nombres repetidos). Todo `.pi/settings.json` rige sólo con el proyecto confiado: sin confianza, pi no lo lee.
+
+El tutor razona con thinking `medium`, el valor por defecto de pi 1.4.0: ni `.pi/settings.json` ni `~/.pi/agent/settings.json` lo cambian. El bloque de thinking queda oculto y la etiqueta dice «Pensando…».
 
 ## Búsqueda y lectura web
 
@@ -77,124 +135,111 @@ Se eligió `pi-web-access@0.42.0`, con:
 
 - Exa MCP sin clave como primera opción; Parallel MCP y DuckDuckGo como respaldo.
 - Lectura HTTP directa; el nombre público `fetch_content` se configura como `web_fetch`.
-- Herramientas activas desde el inicio, también en hijos restringidos; puente en `extensions/web-subagentes.ts`.
+- Herramientas activas desde el inicio. Los subagentes de pi-interactive-subagents las reciben por el puente `extensions/web-subagentes.ts`; el researcher del curso carga pi-web-access directamente (ver Fase 6).
 - Sin cookies del navegador, navegador automático, resúmenes LLM, clonación GitHub, procesamiento PDF ni lectura de videos.
 - Sin servicios de extracción HTTP alojados por terceros.
 
-La configuración reproducible está en `config/web-search.json`. En esta sesión, `XDG_CONFIG_HOME=~/.config`, así que se instaló en `~/.config/pi/web-search.json`. Con `PI_CODING_AGENT_DIR`, se usa ese directorio; sin XDG, se usa `~/.pi/agent`. El instalador respeta también la precedencia de archivos heredados documentada por el paquete.
+La configuración reproducible está en `config/web-search.json`. En esta sesión, `XDG_CONFIG_HOME=~/.config`, así que se instaló en `~/.config/pi/web-search.json`. Con `PI_CODING_AGENT_DIR`, se usa ese directorio; sin XDG, se usa `~/.pi/agent`. El instalador respeta también la precedencia de archivos heredados documentada por el paquete. El renombre `toolNames.fetchContent: "web_fetch"` es imprescindible: sin él la tool se llama `fetch_content` y el researcher, que filtra sus tools por nombre, queda sin leer páginas y sin aviso. El doctor lo comprueba («web_fetch del researcher»).
 
 No fue necesario crear cuentas ni guardar claves. Las consultas salen hacia el proveedor que atienda la búsqueda; los respaldos también reciben la consulta si se utilizan. Los endpoints sin clave tienen límites de uso y no ofrecen una garantía de disponibilidad permanente. Si en el futuro se agregan `EXA_API_KEY` o `PARALLEL_API_KEY`, esos proveedores pueden pasar a consumir cuotas/créditos de esas cuentas: revisar antes la configuración.
 
-`safe_bash` viene con los subagentes, no con pi ni con learn. Su filtro de órdenes no es un sandbox de seguridad del sistema operativo.
+`safe_bash` viene con los subagentes, no con pi ni con learn, y el researcher ya no lo usa (`agents/researcher.md` lista `web_search, web_fetch, read`). Su filtro de órdenes no es un sandbox de seguridad del sistema operativo.
 
 ## Modelos configurados y verificados
 
 Por elección explícita del usuario:
 
-- researcher: `openai-codex/gpt-6-luna`;
-- visión: `openai-codex/gpt-6-luna`.
+- principal (tutor): `openai-codex/gpt-6.1-sol`, en `.pi/settings.json`;
+- researcher: `openai-codex/gpt-6-luna`, thinking `medium` (frontmatter de `agents/researcher.md`);
+- visión, segmentación y clasificación de ítems: `openai-codex/gpt-6-luna` (`modelo_vision` de `curso.config.json`).
 
-El frontmatter de `agents/researcher.md` coincide con `curso.config.json`. En Fase 7 el usuario autorizó «Usar openai-codex» al comprobar que `openai` ya no tenía credenciales configuradas. Antes de cambiar el proyecto respondieron Sol por texto y Luna por texto/PNG; doctor repitió los dos pings de Luna correctamente. Sólo cambiaron archivos del proyecto, sin claves nuevas, login ni preferencias personales. Los informes anteriores conservan el proveedor histórico `openai`.
+El frontmatter de `agents/researcher.md` coincide con `curso.config.json`; el doctor lo comprueba. En Fase 7 el usuario autorizó «Usar openai-codex» al comprobar que `openai` ya no tenía credenciales configuradas. Antes de cambiar el proyecto respondieron Sol por texto y Luna por texto/PNG; doctor repitió los dos pings de Luna correctamente. Sólo cambiaron archivos del proyecto, sin claves nuevas, login ni preferencias personales. Los informes anteriores conservan el proveedor histórico `openai`.
 
 Esto confirma disponibilidad y aceptación de imágenes, **no** la fidelidad del OCR matemático. En Fase 1 se transcribieron tres páginas con Luna solo como referencia del benchmark; todavía requieren revisión. Ver `informes/fase1.md`.
 
 La primera propuesta (`gpt-5.4-mini` / `gpt-5.5`) había fallado con HTTP 400 porque esta cuenta ChatGPT/Codex no admite esos ids, pese a figurar en el catálogo. Se conserva el antecedente en `DECISIONES.md`: aparecer en `/model` no prueba el acceso real.
 
-El modelo principal del proyecto es `openai-codex/gpt-6.1-sol`, verificado en el ensayo de dos sesiones de Fase 7; no se modificaron las preferencias globales. Las claves, si se necesitan en el futuro, se ingresan mediante `/login`, nunca en el chat ni en archivos versionados.
+No hay proveedor de respaldo. Si un turno de una clase termina en error del proveedor, pi muestra su error en inglés y el curso agrega una línea en español con la causa probable (disco lleno, cuota o límite de uso, credenciales, red u otro error) y sugiere escribir «seguí» para reintentar o /fin para guardar. Las claves, si se necesitan, se ingresan mediante `/login`, nunca en el chat ni en archivos versionados.
 
 ## Lanzador fish: `pi-learn`
 
-Ya instalado en:
-
-```text
-~/.config/fish/functions/pi-learn.fish
-```
-
-Copia versionada: `config/fish/pi-learn.fish`. No se cambió `config.fish` ni la configuración personal de tmux.
+Instalado en `~/.config/fish/functions/pi-learn.fish`; copia versionada en `config/fish/pi-learn.fish` (el doctor exige que sean iguales). No se cambió `config.fish` ni la configuración personal de tmux.
 
 ```fish
 cd ~/Projects/pi-learning
 pi-learn
 # También admite los argumentos nativos de pi:
 pi-learn --resume
+pi-learn -c
 ```
 
-- Conserva **la carpeta actual**, sin cambiarla al vault automáticamente.
-- Fuera de tmux crea una sesión nueva en el servidor separado `pi-learn`, con `config/tmux.conf`.
+- Conserva **la carpeta actual**, sin cambiarla al vault.
+- Abre `pi <argumentos> -ns --skill ~/Projects/pi-learning/.pi/skills`: el tutor ve sólo las skills del proyecto. Los subcomandos de pi (`install`, `remove`, `uninstall`, `update`, `list`, `config`, `mcp`, `auth`) pasan sin agregados.
+- Fuera de tmux usa el servidor separado `pi-learn` con `config/tmux.conf` y una sesión por carpeta, `pi-learn-<hash>`. Si ya hay un pi abierto en esa carpeta, se adjunta a él en vez de abrir otro; si le pasaste argumentos, avisa que no los usa (el aviso se lee al salir de tmux).
+- Cerrar la ventana termina pi, igual que un kill (`destroy-unattached`). También lo termina cualquier cosa que deje la sesión sin cliente: prefijo+d, crear otra sesión o cambiar de sesión con los atajos de `~/.config/tmux/tmux.conf`, que `config/tmux.conf` carga. Para retomar, `pi-learn -c`.
 - Dentro de tmux ejecuta pi directamente: no anida tmux ni altera sus opciones globales.
-- La configuración exclusiva importa las preferencias personales existentes y habilita passthrough, portapapeles y teclas extendidas; conserva el entorno Wayland para `wl-paste`.
-- Da 2500 ms al shell fish de cada hijo antes de enviarle la orden de inicio; respeta `PI_SUBAGENT_SHELL_READY_DELAY_MS` si ya está definido.
-- Cada invocación externa crea una sesión distinta: no reutiliza otra carpeta ni pierde argumentos. Si se separa una sesión con el prefijo de tmux y `d`, se puede volver con `tmux -L pi-learn attach`.
+- `config/tmux.conf` importa las preferencias personales y habilita passthrough, portapapeles y teclas extendidas; conserva el entorno Wayland para `wl-paste`.
+- Da 300 ms al shell de cada subagente de pi-interactive-subagents antes de enviarle la orden (`PI_SUBAGENT_SHELL_READY_DELAY_MS`, que respeta si ya está definido). No afecta al researcher del curso.
+- Si faltan los paquetes fijados, avisa y abre pi con `PI_OFFLINE=1`, sin investigador ni web.
 
-Fish carga la función automáticamente. Si esa shell ya conocía otra definición, abrir una shell nueva o ejecutar `source ~/.config/fish/functions/pi-learn.fish`.
+Para tomar una versión nueva del lanzador: copiá `config/fish/pi-learn.fish` a `~/.config/fish/functions/` (`instalar-config` no pisa una copia distinta) y, sin clase en curso, cerrá el servidor viejo con `tmux -L pi-learn kill-server`. Si esa shell ya conocía otra definición, abrí una shell nueva o ejecutá `source ~/.config/fish/functions/pi-learn.fish`.
 
 ## Obsidian e imágenes
 
 Se creó `.obsidian/app.json` con `userIgnoreFilters: ["_procesado"]` cuando Obsidian no estaba abierto y el archivo no existía. No se reemplazó configuración existente. En futuras modificaciones, cerrar Obsidian primero para que no reescriba el archivo al salir.
 
-Abrí `~/Projects/pi-learning` como vault. Las citas futuras usarán `[[ruta/al.pdf#page=N]]`.
+Abrí `~/Projects/pi-learning` como vault. Las citas usan `[[ruta/al.pdf#page=N]]`.
 
-En Wayland, pi usa `wl-paste` (`wl-clipboard`); en X11 necesita `xclip`. Pi admite PNG, JPEG, WebP y GIF, **no HEIC**. Pasá las fotos del celular en JPEG y pegalas directamente en pi con **Ctrl+V**. No hay comando de transferencia de fotos.
+En Wayland, pi usa `wl-paste` (`wl-clipboard`); en X11 necesita `xclip`. Pegá las fotos con **Ctrl+V** dentro de pi; si el portapapeles no funciona, guardá la foto y escribí su ruta (absoluta, `./`, `../` o `~/`) sola en una línea del mensaje. No hay comando de transferencia de fotos. Durante una clase el tutor sólo abre PNG, JPEG, WebP y GIF fuera de `cursos/`: una foto HEIC llega a la nota, pero el tutor no la puede leer; mandala en JPEG.
 
-Desde Fase 5, el md-log adaptado guarda las imágenes junto a la nota en `adjuntos/` y las embebe para Obsidian. El original de upstream no tenía ese guardado. Se conserva el formato recibido: un PNG no se renombra como JPEG. Ver «Fotos persistentes» abajo.
+Desde Fase 5, el md-log adaptado guarda las imágenes junto a la nota en `adjuntos/` y las embebe para Obsidian. El original de upstream no tenía ese guardado. Ver «Fotos persistentes» abajo.
 
 ## Ingesta base — Fase 1
 
-Desde la raíz del vault:
+Desde la raíz del vault, con el venv de «Dependencias globales»:
 
 ```bash
-UV_PROJECT_ENVIRONMENT="$PWD/.pi/.venv" uv sync --project .pi/scripts/ingesta --python 3.13.13 --locked
 .pi/.venv/bin/python .pi/scripts/ingesta/comprobar.py
 ```
 
-Se usan **PyMuPDF para digital/mixta** y **OCRmyPDF + Tesseract para escaneada**, sin GPU, Torch ni servidores. El manifiesto solo necesita documentos y páginas; `config/muestras-fase1.json` es un ejemplo con 9 páginas, no una orden de procesar los 18 PDFs completos. Los overrides de motor se conservan para el benchmark.
+Se usan **PyMuPDF para digital/mixta** y **OCRmyPDF + Tesseract para escaneada**, sin GPU, Torch ni servidores. La ingesta base no usa modelos. El manifiesto solo necesita documentos y páginas; `config/muestras-fase1.json` es un ejemplo con 9 páginas. Los overrides de motor se conservan para el benchmark. Tesseract sólo se exige si hay páginas escaneadas; sin él, esas páginas quedan pendientes y se conservan las transcripciones de visión o manuales ya hechas.
 
-Tesseract se resuelve por `PATH`. En esta máquina se utiliza `/home/sesquerre/miniconda3/bin/tesseract`, con datos en `/home/sesquerre/miniconda3/share/tessdata/`, **no** el Tesseract `5.5.3` del sistema. Comprobar:
-
-```bash
-command -v tesseract
-tesseract --version
-tesseract --list-langs
-```
-
-Solo si falta esa versión, puede restaurarse en un entorno separado, sin modificar Conda base:
-
-```bash
-conda create --prefix "$HOME/.cache/pi-learning/ocr" --channel conda-forge 'tesseract=5.5.2=h1f36d38_0'
-# Bash; en fish: set -gx PATH "$HOME/.cache/pi-learning/ocr/bin" $PATH
-export PATH="$HOME/.cache/pi-learning/ocr/bin:$PATH"
-```
-
-Paquete oficial observado: `https://conda.anaconda.org/conda-forge/linux-64/tesseract-5.5.2-h1f36d38_0.conda`, SHA-256 `67125e3aa53a069c1cd5b17ff2b9cb66019b8bc8615a45c456dbd9093721ebd6`. La restauración alternativa no se ejecutó: ya estaba instalado.
-
-### Procesar, consultar y reanudar
+### Procesar, consultar, reanudar y adoptar
 
 ```bash
 .pi/.venv/bin/python .pi/scripts/ingesta/ingestar.py iniciar --manifiesto .pi/config/muestras-fase1.json --salida _procesado/fase1/base-simple
 .pi/.venv/bin/python .pi/scripts/ingesta/ingestar.py estado --salida _procesado/fase1/base-simple
 ```
 
-Repetir `iniciar` con los mismos argumentos reanuda/reutiliza la caché. `procesar` hace lo mismo en primer plano. El umbral y los idiomas salen de `curso.config.json`; cambios de motor, versión, calidad, tipo o ruta de cita invalidan la caché correspondiente. Los originales solo se leen; si cambia un PDF o alguien edita el Markdown generado, se informa un conflicto en vez de borrar su trabajo.
+Repetir `iniciar` con los mismos argumentos reanuda/reutiliza la caché. `procesar` hace lo mismo en primer plano. `iniciar` espera unos 2 s: si el proceso muere al arrancar, sale con código 1 y el error. `estado` puede decir `iniciando`, `en_curso`, `completada`, `completada_con_pendientes`, `interrumpida` (cita la última línea de `proceso.log`) o `error`. El umbral, los idiomas y `ruta_tesseract` salen de `curso.config.json`; cambios de motor, versión, calidad, tipo o ruta de cita invalidan la caché correspondiente. Los originales solo se leen; si cambia un PDF se informa un conflicto en vez de borrar trabajo.
 
-Las salidas contienen metadatos, clasificación, Markdown por página, calidad, estructura, `busqueda.json`, estado e informe. Los fallos quedan por página. Los ejercicios, evaluaciones y soluciones quedan provisionales hasta visión en Fase 2, aunque su texto parezca bueno. Un puntaje alto no certifica las fórmulas ni las figuras.
+Una página cuyo Markdown editaste a mano se preserva, no se indexa y aparece como `editada` en `estado` y en el informe. Para que cuente como transcripción revisada, adoptala:
 
-Para revisar ahora en Obsidian: **`informes/fase1/resumen.md`** e **`informes/fase1/ingesta-base.md`**. Como `_procesado` está excluido, una copia manual de otro informe puede publicarse sin pisar notas:
+```bash
+.pi/.venv/bin/python .pi/scripts/ingesta/ingestar.py adoptar --salida cursos/<curso>/_procesado --doc <id> --pagina <n>
+```
+
+Queda como `manual` (revisión humana hecha) y ninguna ingesta ni visión la regenera.
+
+Las salidas contienen metadatos, clasificación, Markdown por página, calidad, estructura, `busqueda.json`, estado e informe. Los fallos quedan por página. Los ejercicios, evaluaciones y soluciones quedan pendientes de visión aunque su texto parezca bueno. El índice BM25 de evaluaciones y ejercicios guarda sólo enunciados (corta desde «Solución», «Resolución», «Respuesta(s)» o «Rta.:»), y los documentos de soluciones no se indexan. Un puntaje alto no certifica las fórmulas ni las figuras.
+
+Para revisar en Obsidian: **`informes/fase1/resumen.md`** e **`informes/fase1/ingesta-base.md`**. Como `_procesado` está excluido, una copia manual de otro informe puede publicarse sin pisar notas:
 
 ```bash
 mkdir -p informes/fase1
 cp -n _procesado/fase1/base-simple/informe-ingesta.md informes/fase1/ingesta-base.md
 ```
 
-Están disponibles `/curso-nuevo`, `/curso-agregar`, `/curso-check` y `/curso-estado` (Fase 3). `/estudiar` y `/cursos` están disponibles desde Fase 4 (ver abajo). Los ensayos de marker, docling y visión están separados en [`scripts/ingesta/benchmark/`](scripts/ingesta/benchmark/README.md); **no es necesario restaurarlos para usar la ingesta**.
+Los ensayos de marker, docling y visión están separados en [`scripts/ingesta/benchmark/`](scripts/ingesta/benchmark/README.md); **no es necesario restaurarlos para usar la ingesta**.
 
 ## Visión e ítems — Fase 2
 
-Se restaura con el mismo `uv sync --locked` de arriba; se añade únicamente PyYAML `6.0.3` para `items.yaml`. No requiere GPU ni dependencias ML. Después de cambiar los archivos de la extensión, ejecutar `/reload` o abrir una sesión nueva para que pi registre las tools.
+Mismo venv; PyYAML `6.0.3` guarda `items.yaml`. No requiere GPU ni dependencias ML. Después de cambiar los archivos de la extensión, ejecutar `/reload` o abrir una sesión nueva para que pi registre las tools.
 
-- `transcribir_paginas(curso, doc, paginas)` usa Luna, renderiza las páginas ya preparadas, guarda Markdown, actualiza BM25/informe y devuelve solo un resumen. Más de 50 páginas —límite configurable— exige confirmación interactiva; sin UI se rechaza. La caché evita repetir llamadas vigentes; cambiar modelo, prompt o umbral puede invalidarla y consumir nuevamente.
-- `guardar_items(curso, doc, items)` guarda la segmentación hecha por el agente: `{id, paginas, enunciado, solucion?: {doc, id}}`. Los ids conservan la numeración del documento. Requiere páginas transcritas, valida referencias y no pisa ediciones manuales.
+- `transcribir_paginas(curso, doc, paginas)` usa `modelo_vision`, renderiza las páginas ya ingeridas, guarda Markdown, actualiza BM25/informe y devuelve solo un resumen. Más de 50 páginas (`max_paginas_vision_sin_confirmar`) exige confirmación interactiva; sin UI se rechaza. La caché evita repetir llamadas vigentes y una página `manual` cuenta como caché; cambiar modelo, prompt o umbral puede invalidarla y consumir nuevamente. Sin credenciales del modelo de visión no llama y dice «… ejecutá /login.».
+- `guardar_items(curso, doc, items)` guarda una segmentación: `{id, paginas, enunciado, solucion?: {doc, id}, solucion_de?, puntos?}`. Los ids conservan la numeración del documento. Una solución integrada en el mismo PDF es otro ítem con `solucion_de: '<id del enunciado>'`; `puntos` es el puntaje oficial (número ≥ 0 o texto de hasta 40 caracteres). Requiere páginas transcriptas, valida referencias y no pisa ediciones manuales.
 
-Son tools de preparación, no comandos `/`. Los pilotos aislados de Fase 2 siguen disponibles; Fase 3 incorpora además el curso real `redes`. Para repetir la prueba digital original sin crear otro curso:
+Son tools de preparación, no comandos `/`. Desde la preparación por tema (Fase 3, abajo) ya no hace falta llamarlas a mano: sirven si querés preparar un documento antes de estudiarlo. Para repetir la prueba digital original sin crear otro curso:
 
 ```bash
 # Opcional, con LLM: puede enviar tres páginas a Luna si no hay caché vigente.
@@ -208,11 +253,11 @@ Primera prueba real: 3/3 páginas transcritas; segunda: 3/3 en caché y ninguna 
 
 Prueba externa: dos imágenes de papel escaneado de *Algebra elemental* (Limric, 1895), procedentes de Internet Archive / colección Library of Congress. El PDF de prueba contiene esos JPEG sin recomprimir y sin capa de texto; no deriva de un PDF digital rasterizado. Se cotejaron seis fracciones y ocho importes; quince ítems, incluido el 9 multipágina. Segunda ejecución con el prompt corregido: dos aciertos de caché y cero llamadas nuevas. Fuente, SHA-256, fallos iniciales y límites en `informes/verificacion-escaneo-fase2.json`; comparación visible en `informes/fase2/escaneo-real.md`.
 
-Un error o cancelación conserva el texto previo. Las transcripciones incompletas se rechazan; `[ilegible]` o LaTeX roto quedan pendientes. El prompt distingue moneda (`\$`) de LaTeX y un salto de página de contenido ilegible. `revision_humana: pendiente` no cambia automáticamente por tener puntaje alto. Al cerrar Fase 2, fotos/manuscritos no estaban verificados; el ensayo público aislado de Fase 5 se describe abajo, sin certificar respuestas reales de Redes. El usuario aprobó el checkpoint de Fase 2 con sus límites; esa aceptación global no modifica la revisión pendiente de páginas e ítems individuales.
+Un error o cancelación conserva el texto previo; una página que ya era buena sólo queda marcada para reintentar. Las transcripciones incompletas se rechazan; `[ilegible]` queda pendiente. El prompt distingue moneda (`\$`) de LaTeX y un salto de página de contenido ilegible. `revision_humana: pendiente` no cambia automáticamente por tener puntaje alto. El usuario aprobó el checkpoint de Fase 2 con sus límites; esa aceptación global no modifica la revisión pendiente de páginas e ítems individuales.
 
 ## Crear y ampliar cursos — Fase 3
 
-No agrega dependencias: usa el mismo Python/PyMuPDF/PyYAML fijado en `uv.lock`, con los comandos `uv sync --locked` de arriba. Después de `/reload` o de abrir una sesión nueva:
+No agrega dependencias. Después de `/reload` o de abrir una sesión nueva:
 
 ```text
 /curso-nuevo <slug>
@@ -221,11 +266,34 @@ No agrega dependencias: usa el mismo Python/PyMuPDF/PyYAML fijado en `uv.lock`, 
 /curso-estado redes
 ```
 
-Los dos primeros alias invocan las skills nativas `/skill:curso-nuevo` y `/skill:curso-agregar`. El agente selecciona material del curso y redacta una propuesta explícita, no importa toda la bandeja por defecto. `guardar_curso(curso, propuesta)` valida/copia fuentes nuevas y muestra un diff con confirmación interactiva antes de reemplazar curación existente; sin UI rechaza la actualización. No hay bandera de autoaprobación, ni reemplazo de PDFs o progreso existente. La selección de páginas y su ingesta en segundo plano reutilizan la CLI base.
+Los dos primeros invocan las skills `/skill:curso-nuevo` y `/skill:curso-agregar`. El agente selecciona material del curso y redacta una propuesta explícita, no importa toda la bandeja por defecto. La propuesta va en `_procesado/` de la raíz del vault. `guardar_curso(curso, propuesta)` valida/copia fuentes nuevas y, para un curso existente, muestra el diff completo y pide confirmación interactiva; sin UI rechaza la actualización. No hay bandera de autoaprobación, ni reemplazo de PDFs o progreso existente. Un curso nuevo se arma en `cursos/.<slug>.nuevo/` y recién completo pasa a `cursos/<slug>/`.
 
-Formatos, seguridad y comandos locales: [`scripts/ingesta/CURSOS.md`](scripts/ingesta/CURSOS.md). El validador es de sólo lectura; `ok` sólo acredita estructura/referencias, y `listo_estudio` exige cero avisos. El doctor comprueba cada curso y señala páginas pendientes sin fingir que su revisión humana es una dependencia faltante. `/curso-estado` actualiza su indicador al consultar, sin servicio de sondeo permanente.
+**Ingesta base completa al crear o ampliar.** Después de guardar, la skill ingiere sin modelo todas las páginas de todos los documentos:
 
-El curso real está en `cursos/redes/`: **17 PDFs / 987 páginas, 8 temas** y 52 páginas preparadas, 23 con Luna. Los 15 ítems ya están asignados. El usuario aprobó la tabla y las tres diapositivas complementarias; la propuesta `_procesado/fase3/propuesta-redes-curada.json` se aplicó verificando sus huellas. Abrí `cursos/redes/revision-inicial.md` e `informe-ingesta.md` en Obsidian. Hay **268 páginas referidas pendientes**, no el curso entero preparado.
+```bash
+.pi/.venv/bin/python .pi/scripts/ingesta/cursos.py manifiesto --curso <slug> --todo
+.pi/.venv/bin/python .pi/scripts/ingesta/ingestar.py iniciar --manifiesto _procesado/manifiesto-<slug>.json --salida cursos/<slug>/_procesado
+.pi/.venv/bin/python .pi/scripts/ingesta/ingestar.py estado --salida cursos/<slug>/_procesado
+```
+
+La caché saltea lo ya preparado. Mientras corre, la salida del curso queda bloqueada: `transcribir_paginas`, `guardar_items` e `informe` esperan hasta 5 s y fallan con «Ya hay una ingesta escribiendo en esta salida.», y la skill espera a que `estado` diga `completada` o `completada_con_pendientes`. El progreso, `/fin` y `ver_pagina` no usan ese bloqueo y siguen andando. `manifiesto --pendientes` (predeterminado) toma sólo las páginas referidas por el índice sin transcripción; `/curso-check` lo sugiere cuando `validar` encuentra páginas `sin_transcripcion`. `cruzar` es una ayuda de curación: busca las siglas y términos con guion de los objetivos e ítems de cada tema en su bibliografía.
+
+**Preparación por tema, al estudiar.** Lo que necesita modelo se hace solo la primera vez que se estudia cada tema (o mientras su preparación siga incompleta), en segundo plano y sin pedir confirmación: la primera pregunta no espera. En orden:
+
+1. transcribe con `modelo_vision` las páginas de la bibliografía del tema que siguen pendientes;
+2. transcribe todas las páginas de los parciales y prácticos sin segmentar (sus preguntas pueden ser de cualquier tema);
+3. segmenta cada uno en `items.yaml`, con soluciones integradas aparte (`solucion_de`) y `puntos`;
+4. clasifica por tema los ítems que `indice.yaml` no asigna y los guarda en `cursos/<c>/_procesado/asignaciones.json`. El índice no se toca y manda.
+
+Apenas están las páginas de la bibliografía del tema, el dossier se refresca. Formato y casos borde (ingesta base en curso, parcial editado a mano, marcador de solución) en [`scripts/ingesta/CURSOS.md`](scripts/ingesta/CURSOS.md), sección «Preparación por tema».
+
+*Qué gasta.* Todo va a `modelo_vision`: una llamada por página (imagen + prompt, hasta 8000 tokens de salida), una por documento a segmentar (hasta 32000) y una por cada 40 ítems a clasificar (hasta 8000). Una respuesta inválida se reintenta una vez. Tope: 150 páginas por corrida; lo que queda sigue la próxima vez que se estudie un tema. Las páginas en caché o `manual` no se mandan. Un documento de tipo `soluciones` no se segmenta solo: se prepara con `/curso-agregar`. En el e2e de la rama `fix/preparacion` (49 páginas), la corrida tardó unos 12 min y el dossier dejó de decir «sin texto confiable» a las 9 páginas.
+
+*Dónde se ve.* En la barra, «⏳ Preparando material de <tema>: N/M páginas»; al terminar, «Material de <tema> listo: N páginas transcriptas, M ítems nuevos.» o «… preparado en parte: …». Una falla es una línea «Preparación del material no disponible: <motivo>; seguimos con lo que hay.» y la clase sigue. `cursos/<c>/_procesado/preparacion.json` guarda por tema el estado (`completa`/`incompleta`), las páginas pendientes y la huella del índice. El uso de visión de cada página queda en `cursos/<c>/_procesado/<doc>/calidad.json` (`vision.uso`); el de segmentar y clasificar no se registra en ningún archivo.
+
+Formatos, seguridad y comandos locales: [`scripts/ingesta/CURSOS.md`](scripts/ingesta/CURSOS.md). El validador es de sólo lectura; `ok` sólo acredita estructura/referencias, y `listo_estudio` exige cero avisos. Documentos sin segmentar y temas sin preguntas de evaluaciones son avisos que la preparación por tema resuelve sola. El doctor valida cada curso y señala páginas pendientes sin fingir que su revisión humana es una dependencia faltante. `/curso-estado` muestra el estado de la ingesta (también el error, la interrupción y las páginas editadas) y actualiza su indicador al consultar, sin servicio de sondeo permanente.
+
+El curso real está en `cursos/redes/`: **17 PDFs / 987 páginas, 8 temas**. El usuario aprobó la tabla y las tres diapositivas complementarias; la propuesta `_procesado/fase3/propuesta-redes-curada.json` se aplicó verificando sus huellas. Abrí `cursos/redes/revision-inicial.md` e `informe-ingesta.md` en Obsidian. Para ver qué falta preparar:
 
 ```bash
 .pi/.venv/bin/python .pi/scripts/ingesta/cursos.py validar --curso redes
@@ -236,19 +304,34 @@ El informe visible se regenera sólo si conserva su huella generada; si se edit�
 
 ## Sesión de estudio — Fase 4
 
-No agregó dependencias: mismo `uv sync --locked` y Node 26.1.0; originalmente pi 1.3.0, ahora base verificada 1.4.0. El parser YAML se reutiliza en Python al activar/restaurar; páginas/BM25 se leen en TypeScript, sin OCR. Después de `/reload` o de abrir una sesión nueva:
+No agrega dependencias. Después de `/reload` o de abrir una sesión nueva con `pi-learn`:
 
 ```text
 /cursos
 /estudiar redes retardos
 /estudiar redes
+/estudiar retardos
 ```
 
-El último muestra un selector; tema por id, nombre o alias, sin tildes, con selector ante ambigüedad. Fuera del índice se ofrece un modo ad hoc sin escribirlo automáticamente al curso. El comando arranca hasta la primera pregunta sin otra orden. Cambia nombre/estado y vincula una **nota nueva**, sin rellenarla con la historia previa ni pisar notas del mismo día. Tras `/curso-agregar`, reactivá el tema para tomar la nueva curación.
+**Elegir el tema.** El curso se reconoce sin mayúsculas ni tildes, y con un solo curso alcanza con el tema. El tema se busca por id, nombre o alias sin tildes, y después por parecido; ante varios candidatos aparece un selector. Si no coincide, BM25 busca la consulta en la bibliografía y propone los temas cuyo rango la contiene: si es uno solo, lo activa; si son varios, el selector suma la opción ad hoc. Si no cae en ningún rango, pasa a un modo ad hoc que no escribe nada al curso. Sin tema, el selector lista primero los temas en curso y para repasar, después los que tienen los prerequisitos dominados y al final los dominados. El autocompletado lista cursos y temas. Sin la carpeta `cursos/`, remite a `/curso-nuevo`.
 
-Las tools `leer_paginas`, `buscar_material`, `leer_items` y `ver_pagina` requieren curso activo. Devuelven citas/texto acotado, sin rutas de derivados que el modelo deba recorrer; las soluciones se omiten por defecto. `ver_pagina` sólo renderiza localmente, con caché y protección de originales/renders. Los resultados de lectura no van al log. `teach` permanece intacto y se reinyecta junto a modo/dossier en cada arranque. Desde Fase 7 el progreso se valida y actualiza sólo mediante `registrar_progreso`; el modelo no edita el YAML.
+**Antes de arrancar**, `/estudiar` comprueba que haya modelo elegido y credenciales («Sin credenciales para <proveedor>/<modelo>: ejecutá /login y repetí /estudiar.») y el disco: con menos de 200 MB libres no arranca y con menos de 1 GB avisa.
 
-La sesión y el vínculo se restauran desde la rama activa. Para retomar una sesión real, cerrá pi y usá `pi --resume` o `/resume` en la próxima apertura; buscá el nombre `<Curso> · <Tema>`. `/compact` conserva el mecanismo de inyección y las entradas de estado. El log queda en `cursos/<curso>/sesiones/`. Si se inicia otra sesión sin registro final, se señala el log anterior y se ofrece reconstrucción con confirmación humana (ver Fase 7 abajo).
+**Al arrancar** crea una nota nueva `cursos/<curso>/sesiones/<fecha local>-<tema>[-n].md`, la vincula con md-log, nombra la sesión `<Curso> · <Tema>` y dispara el primer turno: el tutor empieza con la primera pregunta, o con una línea de dónde quedaron si el tema ya se estudió. Si md-log no confirma en 2 s, o falta permiso o disco, la clase sigue sin nota y con un aviso. Las órdenes internas de `/estudiar`, `/fin` y del cambio de tema son mensajes ocultos: no se ven en el chat ni en la nota. Tras `/curso-agregar`, reactivá el tema para tomar la nueva curación.
+
+**Durante la clase** sólo están activas las tools del curso: `quiz`, `ask_user_question`, `buscar_material`, `leer_paginas`, `leer_items`, `ver_pagina`, `registrar_progreso`, `leer_sesion_anterior`, `investigar_tema` y `read`, que sólo abre fotos fuera de `cursos/`. No se cargan skills (`teach` va en el prompt) y `visualize` no está disponible. Cada tool se ve en la terminal como una línea en español («Leí PDF 54–57 de kurose-7», «Progreso guardado»); el texto del material nunca se muestra. El quiz y las preguntas están en español, con «No sé» siempre al final. Antes del intento, las tools no devuelven soluciones ni la imagen de páginas de parciales; `leer_items` las da con `incluir_solucion` recién después. `/compact` resume en español con curso, tema, borde, práctica y próximo paso. Al cerrar vuelve el set de tools anterior.
+
+**Cambiar de tema.** `/estudiar` con un tema activo ofrece «Guardar y cambiar», «Cambiar sin guardar» o «Cancelar». Con el tutor escribiendo, primero pregunta y recién al confirmar corta el turno (Cancelar o Esc no lo cortan); sin tema activo y con una pregunta abierta, pide confirmación. Un quiz abierto no se corta: el cambio espera a que lo respondas o lo cierres.
+
+**Retomar.** La sesión, el curso y la nota se restauran desde la rama activa: cerrá pi y usá `pi-learn -c`, `pi-learn --resume` o `/resume`, y buscá `<Curso> · <Tema>`. Si el archivo de sesión de pi perdió las entradas del curso (disco lleno), vale el registro propio `cursos/<c>/.sesion-activa.json`. Tras un corte con un mensaje del alumno sin respuesta, el tutor lo responde solo al reabrir. Si se inicia otra sesión del tema sin registro final, se ofrece una vez reconstruir la última sesión real (ver Fase 7).
+
+**Sin Python, sin disco, sin credenciales.**
+
+- Si `.pi/.venv` no responde, la sesión usa la última carga buena (`cursos/<c>/.sesion-cargada.json`) y avisa «Material desde la última carga; el entorno de ingesta no respondió: corré .pi/scripts/doctor.». Sin esa copia, `/estudiar` falla con ese mismo consejo. Al restaurar espera hasta 30 s a Python. `ver_pagina`, la preparación por tema y `registrar_progreso` necesitan Python: sin él fallan con una línea y la clase sigue.
+- Con el disco lleno, el progreso no se guarda («Disco lleno: no se guardó el progreso; liberá espacio y repetí /fin.») y `progreso.yaml` queda intacto.
+- Sin credenciales, `/estudiar` no arranca, la preparación por tema y el researcher no llaman al modelo, y un error del proveedor a mitad de clase se explica en español (ver «Modelos»).
+
+Archivos propios por curso, ocultos en Obsidian y borrables sin perder nada: `.sesion-cargada.json`, `.sesion-activa.json` (se borra al cerrar) y `.no-reconstruir.json` (logs ya ofrecidos para reconstruir).
 
 Prueba opcional con el modelo principal real, en una sesión independiente:
 
@@ -256,13 +339,13 @@ Prueba opcional con el modelo principal real, en una sesión independiente:
 node .pi/scripts/probar-sesion
 ```
 
-Consume LLM para la primera pregunta y compactación; se detiene sin responder por vos. Usa sólo seis tools de lectura/preguntas y crea su propio JSONL bajo `_procesado/fase4/`. Primera prueba completa correcta: quiz a los **20,08 s**, compactación real y reapertura del mismo archivo con curso/tema/log restaurados. Dossier 6296 bytes, lectura 0,45 ms, BM25 4,75 ms y render frío adicional 388,6 ms. No son garantías ni una clase completa. `informes/fase4.md` documenta también dos intentos previos fallidos del harness, sus correcciones y una descarga redundante a la caché global; el harness final conserva el scope de paquetes y no modifica settings personales.
+Consume LLM para la primera pregunta y compactación; se detiene sin responder por vos y crea su propio JSONL bajo `_procesado/fase4/`. Primera prueba completa (Fase 4): quiz a los **20,08 s**, compactación real y reapertura del mismo archivo con curso/tema/log restaurados. No son garantías ni una clase completa; ver `informes/fase4.md`.
 
-El modo incorpora fotos persistentes desde Fase 5, researcher anclado/caché desde Fase 6 y progreso desde Fase 7. `/fin` guarda antes de cerrar; `/progreso [curso]` muestra estados y próximo paso. El md-log manual ahora pide confirmación para rellenar una nota no vacía; el vínculo de curso nunca la reemplaza.
+El modo incorpora fotos persistentes desde Fase 5, researcher anclado/caché desde Fase 6 y progreso desde Fase 7. `/fin` guarda antes de cerrar; `/progreso [curso]` muestra estados y próximo paso. El md-log manual pide confirmación para rellenar una nota no vacía; el vínculo de curso nunca la reemplaza. La nota se puede renombrar o mover dentro del vault: md-log la sigue; si se borra, la recrea con un aviso.
 
 ## Fotos persistentes — Fase 5
 
-Mismo `uv sync --locked`, sin dependencias nuevas ni comando propio de transferencia. El pegado real de pi puede enviar sólo una **ruta en un bloque de texto**, que el modelo abre con `read`, no un bloque `image`: el logger admite ambos. Copia rutas explícitas de imagen por línea (absolutas, `./`, `../`, `~/` o `@`, con comillas si hay espacios) y las rutas nativas `pi-clipboard-<UUID>` insertadas dentro de una respuesta; no captura menciones genéricas en prosa ni imágenes de resultados de herramientas. La fuente se abre sólo para lectura, sin seguir symlinks y verificando archivo regular. Después de `/reload`, cualquier imagen del usuario recibida por pi con un log vinculado se copia a `adjuntos/` junto a la nota, incluidos mensajes sin texto. En el curso es `cursos/<curso>/sesiones/adjuntos/`; `/estudiar` ya vincula el log. Se conservan PNG/JPEG/WebP/GIF y su orden, con nombre de timestamp, posición y SHA-256. Los embeds dentro del vault usan su ruta desde el vault.
+Mismo venv, sin comando propio de transferencia. El pegado real de pi puede enviar sólo una **ruta en un bloque de texto**, que el modelo abre con `read`, no un bloque `image`: el logger admite ambos. Copia rutas explícitas de imagen por línea (absolutas, `./`, `../`, `~/` o `@`, con comillas si hay espacios) y las rutas nativas `pi-clipboard-<UUID>` insertadas dentro de una respuesta; no captura menciones genéricas en prosa ni imágenes de resultados de herramientas. La fuente se abre sólo para lectura, sin seguir symlinks y verificando archivo regular. Cualquier imagen del usuario recibida con un log vinculado se copia a `adjuntos/` junto a la nota, incluidos mensajes sin texto. En el curso es `cursos/<curso>/sesiones/adjuntos/`. El formato sale de la firma del archivo, no de la extensión: PNG, JPEG, WebP y GIF se conservan; HEIC pasa a JPEG y BMP a PNG con ImageMagick (`magick`), y sin él la nota avisa en una línea. Nombre con timestamp, posición y SHA-256. Los embeds dentro del vault usan su ruta desde el vault.
 
 La misma ruta se usa al recuperar historial; reutiliza sólo copias idénticas y preserva cambios manuales. No sigue symlinks en adjuntos ni reemplaza archivos. Los nuevos archivos tienen permisos `0600` y los directorios nuevos `0700`; no se cambian permisos preexistentes. Un fallo deja aviso en el log/UI, sin perder texto ni las demás fotos. No hay limpieza automática de copias parciales o temporales nativos de pi.
 
@@ -276,34 +359,57 @@ node .pi/scripts/probar-fotos
 
 Usa una foto manuscrita pública de Wikimedia Commons (FlexingCA, CC0), **de finanzas y ajena a Redes**, no una muestra simulada ni material añadido al curso. Si falta, descarga sólo ese JPEG y exige el SHA documentado. Recorta/oculta un dato para el caso negativo con Pillow 13.0.0 (ya instalado por OCR), luego envía el original completo. El modelo pide aclaración y después transcribe/corrige según la pauta general de justificación, sin inventar escala. Reapertura, dos embeds y bytes idénticos a los mensajes comprobados. Evidencia, procedencia e incidente del harness: `informes/fase5.md`. Log visible: `informes/fase5/prueba-1792607375280.md`.
 
-**Manual confirmado por el usuario:** envió una foto por el recorrido nativo y confirmó el render recuperado en Obsidian con «Confirmado, avanzá». Esto no convierte el smoke SDK en observación física del teclado ni en una clase completa. Para repetir sin hacer una clase, creá otra nota vacía, abrí una sesión nueva de pi dentro de tmux y vinculala con `/md-log <nota-nueva>.md`. **No reutilices `informes/fase5/prueba-manual.md`: ya tiene contenido.** Pegá una imagen con Ctrl+V en el editor normal y enviá «Prueba técnica: transcribí esta foto, sin registrar progreso». En pi 1.3/1.4 puede aparecer una ruta temporal antes del envío. No se cambió el portapapeles personal. Abrí esa nota en Obsidian y comprobá la foto; `/md-unlog` al terminar. Si la nota ya tiene contenido, creá otra vacía: no la rellenes otra vez. No uses `prueba-base.md`.
+**Manual confirmado por el usuario:** envió una foto por el recorrido nativo y confirmó el render recuperado en Obsidian con «Confirmado, avanzá». Esto no convierte el smoke SDK en observación física del teclado ni en una clase completa. Para repetir sin hacer una clase, creá otra nota vacía, abrí una sesión nueva con `pi-learn` y vinculala con `/md-log <nota-nueva>.md`. **No reutilices `informes/fase5/prueba-manual.md`: ya tiene contenido.** Pegá una imagen con Ctrl+V en el editor normal y enviá «Prueba técnica: transcribí esta foto, sin registrar progreso». En pi 1.3/1.4 puede aparecer una ruta temporal antes del envío. No se cambió el portapapeles personal. Abrí esa nota en Obsidian y comprobá la foto; `/md-unlog` al terminar. Si la nota ya tiene contenido, creá otra vacía: no la rellenes otra vez. No uses `prueba-base.md`.
 
 Las imágenes y JSONL quedan locales, fuera del Git de `.pi/`. Pueden contener datos personales y metadatos: evitá información sensible innecesaria. El usuario sigue encargándose del paso celular → PC. No se verificó todavía una respuesta manuscrita real de Redes ni una rúbrica detallada inexistente.
 
 ## Comprobaciones y checkpoint
 
+### Doctor
+
 ```bash
-node --test .pi/tests/*.test.mjs
 .pi/scripts/doctor
-# Sin red ni gasto de modelos; las pruebas omitidas quedan explícitamente pendientes:
+# Sin red ni gasto de modelos; las pruebas omitidas quedan como pendientes:
 .pi/scripts/doctor --sin-red
 ```
 
-El diagnóstico carga las extensiones locales con confianza solo para su propio proceso, sin modificar `trust.json`. No envía un prompt de enseñanza ni lee el portapapeles. Por defecto ejecuta dos pings de hasta 64 tokens (uno con un PNG sintético), una búsqueda y una lectura web. No envía material del curso a modelos o proveedores web. Desde Fase 5 prueba además el guardado/embed de un PNG sintético en una carpeta temporal propia, sin LLM y sin leer el portapapeles.
+Carga las extensiones con confianza sólo para su propio proceso, sin modificar `trust.json`, y con las mismas skills que `pi-learn`. No envía un prompt de enseñanza, no lee el portapapeles ni manda material del curso a modelos o proveedores web. Comprueba:
 
-Resultado automático actual, Fase 7: **83 tests Node sin LLM en verde**, incluida una suite de **67 tests Python**; **doctor completo en verde** con pi `1.4.0`. Comprueba ambas entradas de foto (ruta y bloque `image`), carga de tools/comandos de progreso, investigador, modelos y web. El diagnóstico comprueba la instalación de uso diario; no exige los entornos ML experimentales ni confunde la aprobación humana de calidad con una dependencia rota. El lanzador se comprobó además con un pseudoterminal real ejecutando `pi-learn --version`.
+- versiones de pi, Node.js, fish y tmux, y que corre dentro de tmux;
+- el lanzador instalado igual a la copia versionada, el portapapeles (`wl-paste` o `xclip`), las rutas del vault (`_entrada/` y `cursos/`) y al menos 2 GB libres en el disco del vault y de pi;
+- Obsidian con `_procesado` excluido;
+- subagentes y pi-web-access fijados, la configuración web, `timeout` (coreutils), la web del researcher, el renombre a `web_fetch` y que el modelo de `agents/researcher.md` coincida con `curso.config.json`;
+- `skills/teach/SKILL.md` sin cambios respecto de upstream;
+- carga de extensiones, cada tool y comando del curso, el guardado/embed de un PNG sintético en md-log (sin modelo), el prompt del tutor sin secciones ajenas, las skills de cursos sin colisiones y el thinking oculto;
+- credenciales del principal, del researcher y de visión, sin llamar al modelo;
+- sin `--sin-red`: dos pings de hasta 64 tokens (researcher y visión, uno con un PNG sintético), una búsqueda y una lectura web;
+- el venv (Python 3.13.13 y las versiones de `uv.lock`), Tesseract y sus idiomas según `ruta_tesseract`, y los motores de ingesta;
+- cada curso con `validar`, con un aviso «!» de las páginas referidas pendientes.
 
-### Prueba del researcher real (opcional, con LLM y red)
+Un «!» es un aviso y no cuenta como falla. Corrido con `--sin-red` el 2026-10-22, fuera de tmux y sobre una copia del vault, las únicas faltas fueron las esperables: «Dentro de tmux», las rutas del vault (por ser una copia) y los cuatro chequeos omitidos por `--sin-red`. Redes dio «17 documentos, 8 temas: estructura válida» y el aviso de 72 páginas referidas pendientes: todos los documentos tienen ingesta base y lo que falta es la visión, que hace la preparación por tema.
+
+### Tests
+
+Sin modelos ni red. Desde la raíz del vault:
+
+```bash
+node --test .pi/tests/*.test.mjs
+.pi/.venv/bin/python -m unittest discover -s .pi/tests/ingesta
+```
+
+La suite Node incluye la Python: `tests/ingesta.test.mjs` corre el mismo `unittest discover` con un plazo de 90 s. El 2026-10-22, sobre la rama `cursos`, la suite Python dio 132 tests OK en 36 s, y la Node 204 tests, de los cuales falló uno: ese plazo de 90 s venció con la máquina cargada (la suite Python aislada pasa; `node --test .pi/tests/ingesta.test.mjs` dio 7/7). Si ves `actual: null` en «ingesta Python», es ese plazo: repetí ese archivo solo. Los tests de OCR real (`test_ocr_real_local_sin_llm`, `test_formula_escaneada_queda_pendiente_y_la_prosa_no`) necesitan un Tesseract con `spa` en el `PATH`; algunos tests se saltean si faltan los PDFs reales de `cursos/redes`.
+
+### Prueba del researcher con subagentes (opcional, con LLM y red)
 
 ```bash
 .pi/scripts/probar-researcher
 ```
 
-Ejecutar solo dentro de tmux. Abre un panel de researcher real, comprueba búsqueda y lectura web en el hijo y la entrega automática al padre. Usa una sesión temporal independiente, no modifica `prueba-base.md` y tiene un plazo de 180 segundos. Se mantiene fuera de la suite sin LLM. La primera ejecución aprobada tardó 17 segundos; no garantiza ese tiempo en otras ejecuciones.
+Ejecutar solo dentro de tmux. Prueba el researcher como subagente de pi-interactive-subagents (el recorrido de `teach` fuera de un curso): abre un panel, comprueba búsqueda y lectura web en el hijo y la entrega automática al padre. Usa una sesión temporal independiente, no modifica `prueba-base.md` y tiene un plazo de 180 segundos. La primera ejecución aprobada tardó 17 segundos; no garantiza ese tiempo en otras ejecuciones. El researcher del curso no usa este camino (ver Fase 6).
 
 ### Prueba manual: smoke aceptado; recorrido completo opcional
 
-El usuario aceptó la prueba técnica parcial para cerrar Fase 0. La lista siguiente queda como referencia para repetir un recorrido completo, no como evidencia de que ya se haya realizado.
+El usuario aceptó la prueba técnica parcial para cerrar Fase 0. La lista siguiente queda como referencia para repetir un recorrido completo de `teach` fuera de un curso, no como evidencia de que ya se haya realizado.
 
 `prueba-base.md` ya contiene material del usuario: **no volver a vincularla para rellenar el historial**, porque eso podría reemplazar su contenido. Para una nueva prueba, crear una nota vacía distinta.
 
@@ -312,7 +418,7 @@ El usuario aceptó la prueba técnica parcial para cerrar Fase 0. La lista sigui
 3. Ejecutar `/md-log <nombre-de-la-nota-nueva>.md`.
 4. Ejecutar `/skill:teach regla de la cadena` y completar el flujo: quiz, objetivo, researcher, aprobación del plan, explicación y verificaciones.
 5. Comprobar que el researcher abre un panel de tmux, busca y lee fuentes, y entrega un resultado en español al padre.
-6. Copiar una imagen al portapapeles y pegarla con Ctrl+V **dentro de esa sesión**. Comprobar que pi muestra el adjunto y el modelo lo recibe. Desde Fase 5 se espera además la copia en `adjuntos/` y su embed; el usuario confirmó recepción nativa/render en Fase 5; esta lista permite repetir la comprobación de teclado/tmux en otro entorno.
+6. Copiar una imagen al portapapeles y pegarla con Ctrl+V **dentro de esa sesión**. Comprobar que pi muestra el adjunto, el modelo lo recibe y md-log lo copia a `adjuntos/` con su embed.
 7. Verificar en Obsidian el log de texto y los quizzes; `/md-unlog` al terminar.
 8. Correr `doctor` desde otra terminal dentro de tmux, o pedir a pi que ejecute `.pi/scripts/doctor`.
 
@@ -320,11 +426,15 @@ La Fase 0 se cierra con la aceptación explícita del smoke técnico, los tests 
 
 ## Researcher anclado y caché (Fase 6)
 
-Sin dependencias nuevas. Tras `/reload`, `/estudiar redes retardos` usa la preparación silenciosa de `modo-curso.md`: si falta caché vigente, el principal llama `investigar_tema({modo: "alcance", afirmaciones: ["…"]})` antes del probe. La tool adjunta contrato completo, referencias/citas preparadas y enunciados curados de ejercicios sin soluciones, y despacha `subagent` con el modelo de config. No espera su informe. Para 1–3 afirmaciones nuevas, `modo: "verificar"`; en modo ad hoc sólo ese modo.
+Requiere `sh`, `timeout` (coreutils) y pi-web-access en `.pi/npm`; no usa tmux ni pi-interactive-subagents. Con `/estudiar redes retardos`, si el dossier no trae caché vigente, el tutor llama `investigar_tema({modo: "alcance", afirmaciones: ["…"]})` antes del probe; para 1–3 afirmaciones nuevas, `modo: "verificar"` (en ad hoc, sólo ese modo). La tool adjunta contrato del tema, citas preparadas y enunciados curados de ejercicios sin soluciones, lanza el researcher y no espera su informe.
+
+**Cómo se lanza.** Un `pi -p` propio y desacoplado, sin sesión, extensiones, skills ni archivos de contexto, que carga sólo pi-web-access y usa el modelo, el thinking y las tools (`web_search, web_fetch, read`) de `agents/researcher.md`. `timeout -k 5 180` lo corta a los 180 s. Trabaja en `cursos/<curso>/notas/verificaciones/.trabajos/<clave>/` (oculta para Obsidian): se borra al recoger con éxito y tras un fallo conserva `error.txt`, `salida.md` y `fallo` para diagnóstico. El hijo sobrevive a `/reload`, a un kill y al cierre de la terminal; cualquier sesión lo recoge por huella. Tras un plazo vencido, esa huella espera 10 min antes de relanzarse. Sin credenciales del modelo del researcher no se lanza nada.
+
+**Qué ve el alumno.** Con el tema activo, «Verificación del material lista.» o «Verificación del material no disponible; seguimos con el material del curso.». El informe le llega al tutor como mensaje oculto para el turno siguiente; no dispara turnos ni va a la nota.
 
 El informe separa veredicto sobre la afirmación recibida, corrección, contraste con el curso y extensiones. Páginas PDF base 1 y fuentes web leídas; sin rúbricas inventadas. Si falla el hijo, falta web o cambian las fuentes, se sigue con el material sin atribuir verificación externa. Se declara cualquier cobertura parcial.
 
-Alcance se publica en `cursos/<curso>/notas/verificaciones/<tema>.md`, o `<tema>-<huella>.md` si ya había otra generación; el dossier enlaza la vigente y conserva su presupuesto. Cabecera/control de integridad, fecha y modelo; las notas manuales o incompletas se preservan. Huella de tema/contrato/enunciados, modelo/config, prompt, índice y preparados usados; progreso queda afuera. No se sobrescribe ni se limpia automáticamente. La segunda sesión no relanza alcance si la caché sigue vigente. Verificar no reemplaza el mapa. Tras reinicio con despacho sin entrega, puede retomarse explícitamente con `subagent_message` por el nombre registrado; no se sondea ni se duplican tareas automáticamente.
+Alcance se publica en `cursos/<curso>/notas/verificaciones/<tema>.md`, o `<tema>-<huella>.md` si ya había otra generación; el dossier enlaza la vigente. Cabecera/control de integridad, fecha y modelo; las notas manuales o incompletas se preservan. La huella cubre tema, páginas y enunciados adjuntados, contrato sin objetivos ajenos y el cuerpo de `researcher.md`; el progreso queda afuera. Las cachés anteriores a este formato quedan como «previa»: la primera sesión de cada tema relanza alcance una vez. No se sobrescribe ni se limpia automáticamente. Verificar no reemplaza el mapa.
 
 Ensayo opcional, **consume principal y researcher** y genera notas/logs nuevos:
 
@@ -332,9 +442,9 @@ Ensayo opcional, **consume principal y researcher** y genera notas/logs nuevos:
 node .pi/scripts/probar-researcher-curso
 ```
 
-Requiere tmux. Comprueba arranque del probe, lectura local/web del hijo, entrega real, controles A1/A2/A3, caché en un segundo /estudiar y progreso intacto. La suite de tests usa fixtures y no consume modelos. El ensayo F4 `probar-sesion` sigue intencionalmente sin hijos para medir sólo ese recorrido.
+No requiere tmux. Comprueba arranque del probe, lectura local/web del hijo, recogida del informe, controles A1/A2/A3, caché en un segundo `/estudiar` y progreso intacto. Deja la evidencia en `_procesado/fase6/prueba-*/resultado.json`. La suite de tests usa fixtures y no consume modelos. El ensayo F4 `probar-sesion` sigue intencionalmente sin hijos para medir sólo ese recorrido.
 
-Evidencia final: `_procesado/fase6/prueba-1792630409914/resultado.json`. Probe en 20,62 s y siguiente en 7,42 s; alcance tardó 68 s en paralelo. A1/A3 discrepan y A2 concuerda; ninguna respuesta del estudiante. Hubo dos fallos de etiquetado en iteraciones anteriores: la calibración final no certifica fiabilidad general, atribuciones o exactitud del informe. Al cerrar Fase 6 aún no se había implementado progreso ni hecho una clase completa. La revisión humana sigue pendiente. Resumen histórico visible: `informes/fase6/resumen.md`.
+Evidencia del cierre de Fase 6 (con el lanzamiento anterior por subagente): `_procesado/fase6/prueba-1792630409914/resultado.json`. Probe en 20,62 s y siguiente en 7,42 s; alcance tardó 68 s en paralelo. A1/A3 discrepan y A2 concuerda; ninguna respuesta del estudiante. La calibración no certifica fiabilidad general, atribuciones o exactitud del informe. La revisión humana sigue pendiente. Resumen histórico visible: `informes/fase6/resumen.md`.
 
 ## Progreso persistente (Fase 7)
 
@@ -346,15 +456,15 @@ Sin dependencias nuevas. Después de `/reload`:
 /fin
 ```
 
-`registrar_progreso` fusiona estado, borde, conceptos, errores, intentos y discrepancias, sin duplicados exactos y sin tocar otros temas. El backend valida ids/fechas/rutas, usa el bloqueo del curso y guarda mediante temporal + fsync + rename. Antes conserva los bytes exactos previos en `progreso.yaml.bak`. El historial tiene una entrada por tema/log: `cierre:false` durante el probe/práctica y `cierre:true` al finalizar; es compatible con el historial anterior sin ese campo.
+`registrar_progreso` recibe sólo lo nuevo: `resumen` es obligatorio y lo omitido se conserva. Fusiona estado, borde, conceptos, errores, intentos y discrepancias, sin duplicados exactos y sin tocar otros temas. Un tema nuevo queda `sin_empezar` hasta que llega evidencia del alumno; `falla_resuelta` quita una falla por su texto exacto. El backend valida ids/fechas/rutas, completa fechas locales, toma su propio bloqueo `cursos/<c>/.progreso.lock` (espera hasta 5 s; si no se libera, «Otro proceso está guardando; reintentá.») y guarda mediante temporal + fsync + rename. Antes conserva los bytes exactos previos en `progreso.yaml.bak`. Leer el progreso no toma bloqueo, así que una ingesta en curso no impide guardar ni `/fin`. El historial tiene una entrada por tema/log: `cierre:false` durante el probe/práctica y `cierre:true` al finalizar.
 
-`/fin` pide el guardado, luego el resumen y próximo paso. Sólo desvincula el log después de un mensaje final completo y del acuse de md-log; aborto, guardado fallido o vínculo cambiado dejan el curso abierto. Sin respuestas nuevas conserva la evidencia previa. Ad hoc puede cerrar su log, pero no crea progreso ni temas ficticios.
+`/fin` pide el guardado, luego el resumen y próximo paso. Con el tutor ocupado corta el turno en vez de rechazarse (un quiz abierto primero tiene que cerrarse). Sólo desvincula el log después de un mensaje final completo y del acuse de md-log; aborto, guardado fallido o vínculo cambiado dejan el curso abierto. Sin respuestas nuevas conserva la evidencia previa. Ad hoc puede cerrar su log, pero no crea progreso ni temas ficticios.
 
-Al retomar un tema, el dossier incluye borde y próximo paso; el probe intenta confirmarlos en hasta tres preguntas conceptuales. Si los contradice la nueva evidencia, amplía el mapeo. `/progreso [curso]` sugiere un tema pendiente con prerequisitos dominados, sin asignar dominio por contestar una pregunta aislada.
+Al retomar un tema, el dossier incluye borde y próximo paso. `/progreso [curso]` sugiere un tema pendiente con prerequisitos dominados, sin asignar dominio por contestar una pregunta aislada.
 
-Un log anterior sin registro final se ofrece para reconstrucción: `leer_sesion_anterior` devuelve texto acotado y SHA; `registrar_progreso` muestra la propuesta y exige confirmación real. Sin UI o si se cancela, no guarda. El log previo nunca se modifica. Preguntas sin respuesta y pruebas técnicas no se convierten en errores del alumno. La reconstrucción se identifica en historial y no cierra la sesión actual.
+Un log anterior sin registro final se ofrece una sola vez para reconstrucción: `leer_sesion_anterior` devuelve texto acotado y SHA; `registrar_progreso` muestra la propuesta y exige confirmación real. Sin UI o si se cancela, no guarda. El log previo nunca se modifica. Preguntas sin respuesta y pruebas técnicas no se convierten en errores del alumno. La reconstrucción se identifica en historial y no cierra la sesión actual.
 
-Si el YAML es inválido y hay `.bak` válido, se restaura y avisa, conservando los bytes inválidos en `_procesado/progreso-invalido-<sha>.yaml`. Sin respaldo válido se continúa con material, sin guardar hasta reparar. Un `.bak` existente inválido tampoco se pisa a ciegas; requiere intervención. Son defensas contra cortes/ediciones accidentales, no contra un proceso externo que ignore los bloqueos y reemplace archivos en el último instante.
+Los ids de ítem se normalizan («2(a–c)» → `2`, el inciso va en notas). Un ítem que desaparece al volver a segmentar queda «huérfano» con aviso, sin invalidar `progreso.yaml`. Si el YAML es inválido y hay `.bak` válido, se restaura y avisa, conservando los bytes inválidos en `_procesado/progreso-invalido-<sha>.yaml`. Sin respaldo válido se continúa con material, sin guardar hasta reparar. Un `.bak` existente inválido tampoco se pisa a ciegas; requiere intervención. Son defensas contra cortes/ediciones accidentales, no contra un proceso externo que ignore los bloqueos y reemplace archivos en el último instante.
 
 Ensayo opcional, **consume Sol y usa respuestas programadas exclusivamente en una fixture aislada**:
 
@@ -364,10 +474,10 @@ node .pi/scripts/probar-progreso
 
 Evidencia: `_procesado/fase7/prueba-1792672775843/resultado.json`. Dos sesiones nuevas del mismo tema, ambas con tres preguntas; la segunda recibió el borde previo y lo confirmó en tres. Ambos `/fin` guardaron y conservaron el resumen final. Esto prueba la integración con modelo real y alumno virtual; **no** mide tu comprensión ni sustituye el piloto humano. No escribe progreso de Redes ni lanza researcher. Reconstrucción/confirmación se prueban sin modelo. Resumen visible: `informes/fase7/resumen.md`.
 
-El cambio autorizado a `openai-codex` invalida por huella las cachés anteriores de alcance/visión: se preservan, pero el próximo alcance o una preparación de visión explícita pueden generar una nueva salida y consumir modelo. No se relanzó el researcher ni la ingesta para rellenarlas durante Fase 7; el primer estudio puede lanzar un nuevo alcance en paralelo.
+El cambio autorizado a `openai-codex` invalidó por huella las cachés anteriores de alcance/visión: se preservan, pero el próximo alcance o una preparación de visión pueden generar una nueva salida y consumir modelo.
 
 ## Piloto humano (Fase 8, en curso)
 
-Seguimiento en `../fricciones.md`, visible en Obsidian. Se requieren 3–5 sesiones reales, sin sustituirlas por scripts o respuestas simuladas. Empezá en una sesión nueva de pi dentro del proyecto/tmux con `/estudiar redes retardos`, estudiá y terminá con `/fin`. En la segunda sesión retomá el mismo tema para comprobar el borde. Anotá las trabas, su impacto y el log; se priorizarán las tres principales para corregir y reprobar. Si aparecen menos, se acuerda el cierre, no se inventan problemas.
+Seguimiento en `../fricciones.md`, visible en Obsidian. Se requieren 3–5 sesiones reales, sin sustituirlas por scripts o respuestas simuladas. Empezá con `pi-learn` en la carpeta del vault y `/estudiar redes retardos`, estudiá y terminá con `/fin`. En la segunda sesión retomá el mismo tema para comprobar el borde. Anotá las trabas, su impacto y el log; se priorizarán las tres principales para corregir y reprobar. Si aparecen menos, se acuerda el cierre, no se inventan problemas.
 
-Doctor completo volvió a verde al preparar el piloto; no se ejecutaron ensayos generativos ni se escribió progreso de Redes. La traducción opcional de la UI se difiere hasta observar si es una fricción. El commit único y el checkpoint de Fase 8 quedan pendientes de sesiones y arreglos; no se declara la fase terminada.
+Los logs técnicos de las pruebas de Redes se movieron a `_procesado/archivo-pruebas/redes/`, fuera de las notas del curso. El commit único y el checkpoint de Fase 8 quedan pendientes de sesiones y arreglos; no se declara la fase terminada.
