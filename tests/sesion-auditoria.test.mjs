@@ -315,23 +315,37 @@ test("X01: un disco lleno al anotar el curso se informa en español, sin el erro
 });
 test("H26: /estudiar con el agente ocupado corta el turno y sigue; con una pregunta abierta, antes confirma", async t => {
   const e = entorno(t), orden = [];
-  let ocupado = true, acepta = false;
+  let ocupado = true, eleccion = "Seguir con la pregunta";
   Object.assign(e.ctx, { isIdle: () => !ocupado, abort: () => orden.push("abort"), waitForIdle: async () => { orden.push("espera"); ocupado = false; } });
-  e.ctx.ui.confirm = async () => (orden.push("confirma"), acepta);
+  e.ctx.ui.select = async (titulo, o) => titulo === "Hay una pregunta abierta" ? (orden.push("confirma"), eleccion) : o.includes("Cambiar sin guardar") ? "Cambiar sin guardar" : o[0];
   await e.estudiar("calculo derivacion");
   assert.deepEqual(orden, ["abort", "espera"]);
   assert.equal(e.ordenes.length, 1);
+  await e.sesion.cerrar(e.ctx);
   ocupado = true; orden.length = 0;
   e.eventos.get("tool_execution_start")({ toolName: "quiz", toolCallId: "q1" });
   await e.estudiar("calculo derivacion");
   assert.deepEqual(orden, ["confirma"]); assert.equal(e.ordenes.length, 1);
-  acepta = true; orden.length = 0;
+  eleccion = "Cortarla y cambiar de tema"; orden.length = 0;
   await e.estudiar("calculo derivacion");
   assert.deepEqual(orden, ["confirma", "abort", "espera"]); assert.equal(e.ordenes.length, 2);
-  e.eventos.get("tool_execution_end")({ toolName: "quiz", toolCallId: "q1" });
   ocupado = true; orden.length = 0;
   await e.estudiar("calculo derivacion");
-  assert.deepEqual(orden, ["abort", "espera"]);
+  assert.deepEqual(orden, ["abort", "espera"], "con un tema activo, elegir «Cambiar sin guardar» ya confirma");
+  e.eventos.get("tool_execution_end")({ toolName: "quiz", toolCallId: "q1" });
+});
+test("H26/H25: cancelar el cambio de tema o el selector no corta el turno en curso", async t => {
+  const d = datos(); d.temas.push({ id: "integracion", nombre: "Integración", alias: [], unidad: 2, prerequisitos: [], objetivos: [], bibliografia: [] });
+  const e = entorno(t, d);
+  await e.estudiar("calculo derivacion");
+  let cortes = 0;
+  Object.assign(e.ctx, { isIdle: () => false, abort: () => cortes++, waitForIdle: async () => {} });
+  e.ctx.ui.select = async (_t, o) => o.includes("Cancelar") ? "Cancelar" : o[0];
+  await e.estudiar("calculo integracion");
+  e.ctx.ui.select = async () => undefined;
+  await e.estudiar("calculo");
+  assert.equal(cortes, 0);
+  assert.equal(e.sesion.actual().a.tema, "derivacion");
 });
 test("H25: con un tema activo, /estudiar ofrece guardar y cambiar, cambiar sin guardar o cancelar", async t => {
   const d = datos();

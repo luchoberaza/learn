@@ -221,11 +221,6 @@ export function registrarSesion(pi: ExtensionAPI, vault = vaultDir, recursos = p
         try { const disco = statfsSync(vault); libres = disco.bavail * disco.bsize; } catch { /* sin datos del disco */ }
         if (libres < 2e8) { ctx.ui.notify(`Disco casi lleno (${Math.floor(libres / 1e6)} MB libres): liberá espacio y repetí /estudiar.`, "error"); return; }
         if (libres < 1e9) ctx.ui.notify(`Queda poco disco (${Math.floor(libres / 1e6)} MB libres): liberá espacio pronto para no perder la sesión.`, "warning");
-        // pi ya vació el editor: como /fin, se corta el turno en vez de perder el comando; una pregunta abierta se confirma antes.
-        if (!ctx.isIdle()) {
-          if (preguntas && !(await ctx.ui.confirm("Cambiar de tema", "Hay una pregunta abierta: ¿la cortamos y cambiamos de tema?"))) return;
-          ctx.abort(); await ctx.waitForIdle();
-        }
         let d = await cargar(curso, true);
         for (const aviso of d.avisos.filter(a => a.startsWith("Progreso") || a === COPIA)) ctx.ui.notify(aviso, "warning");
         let candidatos = consulta ? resolverTemas(d.temas, consulta) : ordenarTemas(d), resultados: ReturnType<typeof buscarMaterial> = [];
@@ -256,18 +251,21 @@ export function registrarSesion(pi: ExtensionAPI, vault = vaultDir, recursos = p
         }
         if (!esSlug(tema.id)) throw new Error("Id del tema inválido; revisá el índice.");
         // Con un tema activo, lo trabajado se guarda (como /fin, con orden oculta y espera) o se descarta a propósito.
-        if (activo && !activo.adHoc && ctx.hasUI) {
-          const viejo = activo, nombre = datos?.temas.find(t => t.id === viejo.tema)?.nombre || viejo.tema;
-          const eleccion = await ctx.ui.select(`Estás en «${nombre}»`, ["Guardar y cambiar", "Cambiar sin guardar", "Cancelar"]);
-          if (eleccion === "Guardar y cambiar") {
-            pi.appendEntry("curso-cierre", { log: viejo.log, adHoc: false });
-            ordenar(pi, "Cambiamos de tema. Llamá registrar_progreso con cierre:true, resumen y sólo la evidencia observada desde el último guardado; después cerrá con una línea de resumen, sin preguntas.");
-            await ctx.waitForIdle();
-            if (activo === viejo) { ctx.ui.notify(`No se confirmó el guardado: seguís en «${nombre}»; repetí /estudiar o elegí «Cambiar sin guardar».`, "warning"); return; }
-            d = await cargar(curso, true);
-          } else if (eleccion === "Cambiar sin guardar") noOfrecer(viejo.curso, viejo.log.slice(`cursos/${viejo.curso}/`.length));
-          else return;
+        const viejo = activo && !activo.adHoc && ctx.hasUI ? activo : undefined, nombre = viejo && (datos?.temas.find(t => t.id === viejo.tema)?.nombre || viejo.tema);
+        const eleccion = viejo && await ctx.ui.select(`Estás en «${nombre}»`, ["Guardar y cambiar", "Cambiar sin guardar", "Cancelar"]);
+        if (viejo && eleccion !== "Guardar y cambiar" && eleccion !== "Cambiar sin guardar") return;
+        // pi ya vació el editor: como /fin, se corta el turno en vez de perder el comando, recién ahora para que cancelar no lo corte; una pregunta abierta se confirma antes.
+        if (!ctx.isIdle()) {
+          if (preguntas && !viejo && await ctx.ui.select("Hay una pregunta abierta", ["Cortarla y cambiar de tema", "Seguir con la pregunta"]) !== "Cortarla y cambiar de tema") return;
+          ctx.abort(); await ctx.waitForIdle();
         }
+        if (viejo && eleccion === "Guardar y cambiar") {
+          pi.appendEntry("curso-cierre", { log: viejo.log, adHoc: false });
+          ordenar(pi, "Cambiamos de tema. Llamá registrar_progreso con cierre:true, resumen y sólo la evidencia observada desde el último guardado; después cerrá con una línea de resumen, sin preguntas.");
+          await ctx.waitForIdle();
+          if (activo === viejo) { ctx.ui.notify(`No se confirmó el guardado: seguís en «${nombre}»; repetí /estudiar o elegí «Cambiar sin guardar».`, "warning"); return; }
+          d = await cargar(curso, true);
+        } else if (viejo) noOfrecer(viejo.curso, viejo.log.slice(`cursos/${viejo.curso}/`.length));
         const a: Activo = { curso, tema: tema.id, log: "", ...(tema.id === "ad-hoc" ? { adHoc: tema } : {}) }, previo = activo;
         pendiente = undefined;
         preparar(a, d);
