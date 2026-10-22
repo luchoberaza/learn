@@ -1,6 +1,7 @@
 """Regresiones de la auditoría de progreso, con datos sintéticos y sin modelos."""
 from datetime import datetime, timezone
 import fcntl
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -166,6 +167,24 @@ class ProgresoAuditoriaTest(unittest.TestCase):
         self.assertEqual(t['borde']['falla'], ['tasa de cambio'])
         r = self.guardar({'resumen': 'Dominado', 'estado': 'dominado'})
         self.assertIn("'dominado' con fallas", ' '.join(r['avisos']))
+
+    def test_h29_reconstruir_una_sesion_vieja_no_pisa_lo_actual(self):
+        actual = {**self.datos, 'borde': {'domina': ['d_trans = L/R'], 'falla': ['composición']}, 'proximo_paso': 'Seguir con propagación',
+                  'errores_de_concepto': [{'descripcion': 'invierte L/R', 'resuelto': True}]}
+        self.guardar(actual)
+        viejo = 'sesiones/2026-01-01-derivacion.md'
+        (self.raiz / viejo).write_text('Log de una sesión anterior sin cierre.')
+        huella = hashlib.sha256((self.raiz / viejo).read_bytes()).hexdigest()
+        reconstruir = lambda datos: registrar(self.vault, 'ejemplo', 'derivacion', viejo, datos, cierre=True, reconstruido=True, huella_log=huella)
+        reconstruir({'resumen': 'Sesión vieja', 'estado': 'repasar', 'proximo_paso': 'Repasar desde cero', 'conceptos_firmes': ['otra cosa'],
+                     'borde': {'domina': ['composición'], 'falla': ['d_trans = L/R', 'unidades']}, 'errores_de_concepto': [{'descripcion': 'invierte L/R', 'resuelto': False}]})
+        t = self.tema()
+        self.assertEqual((t['estado'], t['proximo_paso']), ('en_curso', 'Seguir con propagación'))
+        self.assertEqual(t['borde'], {'domina': ['d_trans = L/R'], 'falla': ['composición', 'unidades']})
+        self.assertIn('otra cosa', t['conceptos_firmes'])
+        self.assertEqual(t['errores_de_concepto'], [{'descripcion': 'invierte L/R', 'resuelto': True, 'detectado': t['errores_de_concepto'][0]['detectado']}])
+        reconstruir({'resumen': 'Sin respuestas', 'estado': 'sin_empezar'})
+        self.assertEqual(self.tema()['estado'], 'en_curso')
 
 
 class SesionAuditoriaTest(unittest.TestCase):

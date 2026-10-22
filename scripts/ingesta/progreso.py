@@ -99,10 +99,18 @@ def unicos(valores):
     return resultado
 
 
-def fusionar(anterior, nuevo):
+def fusionar(anterior, nuevo, previo=False):
+    falla, domina = anterior.get("borde", {}).get("falla", []), anterior.get("borde", {}).get("domina", [])
+    if previo:
+        # Evidencia más vieja que la guardada: suma sólo lo que no contradice y conserva estado y próximo paso.
+        conocidos = {e["descripcion"] for e in anterior.get("errores_de_concepto", [])}
+        nuevo = {**{k: v for k, v in nuevo.items() if k not in {"estado", "proximo_paso"}}, "falla_resuelta": [],
+                 "borde": {"domina": [s for s in nuevo["borde"]["domina"] if s not in falla],
+                           "falla": [s for s in nuevo["borde"]["falla"] if s not in domina + anterior.get("conceptos_firmes", [])]},
+                 "conceptos_firmes": [s for s in nuevo["conceptos_firmes"] if s not in falla],
+                 "errores_de_concepto": [e for e in nuevo["errores_de_concepto"] if e["descripcion"] not in conocidos]}
     if anterior.get("estado", "sin_empezar") != "sin_empezar" and nuevo.get("estado") == "sin_empezar":
         raise ValueError("Ya hay evidencia del tema: conservá su estado previo o usá repasar, no sin_empezar.")
-    falla = anterior.get("borde", {}).get("falla", [])
     avisos = [f"falla_resuelta '{s}' no coincide con ninguna falla del borde; textos exactos: " + ("; ".join(f"'{x}'" for x in falla) or "ninguno") + "."
               for s in nuevo["falla_resuelta"] if s not in falla]
     r = {"estado": "en_curso", **deepcopy(anterior), **deepcopy({k: v for k, v in nuevo.items() if k != "falla_resuelta"})}
@@ -110,13 +118,13 @@ def fusionar(anterior, nuevo):
         r[k] = unicos(anterior.get(k, []) + nuevo[k])
     r["conceptos_firmes"] = [s for s in r["conceptos_firmes"] if s not in nuevo["borde"]["falla"]]
     r["borde"] = {
-        "domina": [s for s in unicos(anterior.get("borde", {}).get("domina", []) + nuevo["borde"]["domina"]) if s not in nuevo["borde"]["falla"]],
+        "domina": [s for s in unicos(domina + nuevo["borde"]["domina"]) if s not in nuevo["borde"]["falla"]],
         "falla": [s for s in unicos(falla + nuevo["borde"]["falla"]) if s not in nuevo["borde"]["domina"] and s not in nuevo["falla_resuelta"]],
     }
     errores = {e["descripcion"]: deepcopy(e) for e in anterior.get("errores_de_concepto", [])}
     for e in nuevo["errores_de_concepto"]:
-        previo = errores.get(e["descripcion"], {"resuelto": False})
-        errores[e["descripcion"]] = {**previo, **e, "detectado": previo.get("detectado", e["detectado"])}
+        antes = errores.get(e["descripcion"], {"resuelto": False})
+        errores[e["descripcion"]] = {**antes, **e, "detectado": antes.get("detectado", e["detectado"])}
     r["errores_de_concepto"] = list(errores.values())
     if r["estado"] == "dominado" and r["borde"]["falla"]:
         avisos.append(f"Estado 'dominado' con fallas en el borde ({'; '.join(r['borde']['falla'])}): quitá las superadas con falla_resuelta o usá en_curso.")
@@ -203,12 +211,18 @@ def validar_datos(datos, ctx):
     return t, avisos
 
 
+def orden(log, tema):
+    """sesiones/AAAA-MM-DD-<tema>[-N].md → (fecha, N); None si el nombre no es de ese tema."""
+    m = isinstance(log, str) and re.fullmatch(rf"sesiones/(\d{{4}}-\d{{2}}-\d{{2}})-{re.escape(tema)}(?:-(\d+))?\.md", log)
+    return (m[1], int(m[2] or 1)) if m else None
+
+
 def registrar(vault: Path, curso: str, tema: str, log: str, datos: dict, cierre=False, reconstruido=False, huella_log=None):
     raiz = carpeta(vault, curso)
     if not re.fullmatch(SLUG, tema) or type(cierre) is not bool or type(reconstruido) is not bool:
         raise ValueError("Tema o flags de progreso inválidos.")
     # El nombre ata el historial al tema sin admitir adjuntos, subdirectorios ni otros cursos.
-    if not isinstance(log, str) or not re.fullmatch(rf"sesiones/\d{{4}}-\d{{2}}-\d{{2}}-{re.escape(tema)}(?:-\d+)?\.md", log):
+    if not orden(log, tema):
         raise ValueError("Log fuera del tema o de sesiones/.")
     archivo_log = ruta_segura(raiz, log)
     if not archivo_log.is_file():
@@ -221,7 +235,11 @@ def registrar(vault: Path, curso: str, tema: str, log: str, datos: dict, cierre=
         indice = texto(raiz, "indice.yaml")
         p, raw, avisos = cargar(raiz, ctx)
         avisos += observaciones
-        p["temas"][tema], fusion = fusionar(p["temas"].get(tema, {}), nuevo)
+        actual = p["temas"].get(tema, {})
+        if reconstruido and nuevo.get("estado") == "sin_empezar" and "estado" in actual:
+            del nuevo["estado"]  # una sesión sin respuestas no cambia el estado
+        posterior = reconstruido and any(orden(h["log"], tema) > orden(log, tema) for h in p["historial"] if h["tema"] == tema and orden(h["log"], tema))
+        p["temas"][tema], fusion = fusionar(actual, nuevo, posterior)
         avisos += fusion
         historia = {"fecha": log.split("/")[1][:10], "tema": tema, "log": log, "resumen": datos["resumen"], "cierre": cierre}
         if reconstruido:
