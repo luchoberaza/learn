@@ -145,7 +145,8 @@ class FalloVisionTest(Base):
     def test_reingerir_recupera_pagina_digital_tras_fallo_de_vision(self):
         self.pdf("libro.pdf", [PROSA])
         self.ejecutar(self.doc("libro"))
-        datos = {"doc": "libro", "pagina": 1, "modelo": "openai/gpt-6-luna", "umbral": 0.6}
+        # Umbral imposible: reproduce la página que el vision.py anterior a H39 degradaba (p. ej. kurose-7 p. 54).
+        datos = {"doc": "libro", "pagina": 1, "modelo": "openai/gpt-6-luna", "umbral": 1.01}
         with bloquear(self.salida, self.vault) as raiz:
             datos.update(vision.preparar(raiz, self.vault, datos))
             vision.guardar(raiz, self.vault, datos, fallo=True)

@@ -161,7 +161,7 @@ test("H80/H14/H09: el doctor marca credenciales, secciones, colisiones y thinkin
 test("comprobar: respeta ruta_tesseract y dice cómo recrear el venv con Python de uv", t => {
   const v = mkdtempSync(join(tmpdir(), "pi-comprobar-")), ingesta = join(v, ".pi/scripts/ingesta"), falso = join(v, "bin/tesseract");
   t.after(() => rmSync(v, { recursive: true, force: true }));
-  cpSync(join(piDir, "scripts/ingesta"), ingesta, { recursive: true, filter: f => !f.includes("__pycache__") });
+  cpSync(join(piDir, "scripts/ingesta"), ingesta, { recursive: true, filter: f => !/__pycache__|\/benchmark(\/|$)/.test(f) });
   mkdirSync(join(v, "bin"));
   writeFileSync(falso, '#!/bin/sh\n[ "$1" = --version ] && echo "tesseract 5.5.2" || printf "List of available languages (1):\\neng\\n"\n', { mode: 0o755 });
   const config = JSON.parse(readFileSync(join(piDir, "curso.config.json"), "utf8"));
