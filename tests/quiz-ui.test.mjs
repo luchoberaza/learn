@@ -142,3 +142,10 @@ test("H49: quitar enlaces no borra condiciones del enunciado", async () => {
   for (const l of ["Considerá un enlace de retardo de propagación alto", "Pensá en retardo de cola y en el tamaño del buffer", "Según el libro calculá el retardo de cola", "Sin propagación  ni cola"]) assert.ok(encabezado.includes(l), l);
   assert.doesNotMatch(encabezado, /\[\[|page=|^ *!$|^ *Ver$/m);
 });
+
+test("H46: fracciones con potencias y \\displaystyle quedan legibles", async () => {
+  let parcial;
+  await quiz.execute("l2", { ...base, question: "¿$\\frac{2^{10}}{8}$ y $\\displaystyle\\frac{dy}{du}=12u^2$ si $h\\ne0$ y $\\left(a+b\\right)$?" },
+    undefined, u => { parcial ??= u; }, { hasUI: false });
+  assert.equal(parcial.details.question, "¿2¹⁰/8 y dy/du=12u² si h≠0 y (a+b)?");
+});

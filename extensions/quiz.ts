@@ -122,7 +122,7 @@ const QuizParams = Type.Object({
 
 const SUPERINDICES: Record<string, string> = { "0": "⁰", "1": "¹", "2": "²", "3": "³", "4": "⁴", "5": "⁵", "6": "⁶", "7": "⁷", "8": "⁸", "9": "⁹", "-": "⁻", "+": "⁺" };
 const SUBINDICES: Record<string, string> = { "0": "₀", "1": "₁", "2": "₂", "3": "₃", "4": "₄", "5": "₅", "6": "₆", "7": "₇", "8": "₈", "9": "₉", "-": "₋", "+": "₊" };
-const SIMBOLOS: Record<string, string> = { times: "×", cdot: "·", to: "→", rightarrow: "→", le: "≤", leq: "≤", ge: "≥", geq: "≥", approx: "≈", neq: "≠", pm: "±" };
+const SIMBOLOS: Record<string, string> = { times: "×", cdot: "·", to: "→", rightarrow: "→", le: "≤", leq: "≤", ge: "≥", geq: "≥", approx: "≈", neq: "≠", ne: "≠", pm: "±" };
 
 // El popup es texto plano: el LaTeX común pasa a Unicode y lo que no se reconoce queda como está.
 function textoPlano(texto: string): string {
@@ -132,14 +132,15 @@ function textoPlano(texto: string): string {
 	return texto
 		.replace(/\$\$?([^$]+?)\$\$?/g, "$1")
 		.replace(/\{,\}/g, ",")
+		.replace(/\\(?:displaystyle|left|right)\b\s*/g, "")
 		.replace(/\s*\\([a-zA-Z]+)\s*/g, (m, c) => SIMBOLOS[c] ?? m)
 		.replace(/\\(?:text|mathrm)\{([^{}]*)\}/g, "$1")
-		.replace(/\\[dt]?frac\{([^{}]*)\}\{([^{}]*)\}/g, (_, a, b) => `${operando(a)}/${operando(b)}`)
-		.replace(/\\,/g, "\u2009")
-		.replace(/\\%/g, "%")
 		.replace(/\^(?:\{([-+]?\d+)\}|(\d))/g, mapear(SUPERINDICES))
 		.replace(/_(?:\{([-+]?\d+)\}|(\d))/g, mapear(SUBINDICES))
-		.replace(/_\{([\p{L}]+)\}/gu, "_$1");
+		.replace(/_\{([\p{L}]+)\}/gu, "_$1")
+		.replace(/\\[dt]?frac\{([^{}]*)\}\{([^{}]*)\}/g, (_, a, b) => `${operando(a)}/${operando(b)}`)
+		.replace(/\\,/g, "\u2009")
+		.replace(/\\%/g, "%");
 }
 
 // D5: antes de responder no se muestran enlaces (la página citada puede traer la respuesta); se conserva
