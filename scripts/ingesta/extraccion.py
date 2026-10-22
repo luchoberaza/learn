@@ -144,11 +144,14 @@ def extraer(documento: pymupdf.Document, numero: int, motor: str, idiomas: list[
             copia.insert_pdf(documento, from_page=numero - 1, to_page=numero - 1)
             copia.save(entrada)
         entorno = {**os.environ, "OMP_THREAD_LIMIT": "2"}
-        resultado = subprocess.run(
-            [sys.executable, "-m", "ocrmypdf", "--force-ocr", "--output-type", "pdf", "--optimize", "0",
-             "--jobs", "1", "--language", "+".join(idiomas), "--sidecar", str(lateral),
-             "--tesseract-timeout", "90", str(entrada), str(salida)],
-            capture_output=True, text=True, timeout=120, env=entorno)
+        try:
+            resultado = subprocess.run(
+                [sys.executable, "-m", "ocrmypdf", "--force-ocr", "--output-type", "pdf", "--optimize", "0",
+                 "--jobs", "1", "--language", "+".join(idiomas), "--sidecar", str(lateral),
+                 "--tesseract-timeout", "90", str(entrada), str(salida)],
+                capture_output=True, text=True, timeout=120, env=entorno)
+        except subprocess.TimeoutExpired:
+            raise RuntimeError("OCRmyPDF tardó más de 120 s; la página queda pendiente.") from None
         if resultado.returncode != 0:
             raise RuntimeError(f"OCRmyPDF terminó con código {resultado.returncode}; la página queda pendiente.")
         if not lateral.exists():

@@ -336,6 +336,14 @@ class ArranqueTest(Base):
         self.assertEqual((q["motor"], q["ruta"]), ("vision", "vision"))
         self.assertIn("Transcripción de visión", (self.salida / "escaneado/paginas/0001.md").read_text())
 
+    def test_aviso_de_ocr_lento_en_espanol_y_sin_el_comando(self):
+        manifiesto = {"version": 1, "motores": {c: "ocrmypdf" for c in ["digital", "escaneada", "mixta"]}, "documentos": [self.doc("libro")]}
+        with patch("pipeline.identidad_motor", side_effect=lambda motor, idiomas: {"motor": motor}), \
+             patch("extraccion.subprocess.run", side_effect=subprocess.TimeoutExpired(["ocrmypdf", "--force-ocr"], 120)):
+            ejecutar(manifiesto, self.vault, self.salida)
+        self.assertEqual(self.q("libro")["avisos"][0], "Falló la extracción (RuntimeError: OCRmyPDF tardó más de 120 s; "
+                                                       "la página queda pendiente.); se continúa con las otras páginas.")
+
     def test_ruta_tesseract_va_primero_en_el_path(self):
         (self.vault / "curso.config.json").write_text(json.dumps({**self.config, "ruta_tesseract": str(self.vault / "otro/tesseract")}))
         caminos = []
