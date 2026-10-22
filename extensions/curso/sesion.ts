@@ -1,5 +1,5 @@
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { mkdirSync, openSync, closeSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { mkdirSync, openSync, closeSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { basename, join, relative } from "node:path";
 import { piDir, vaultDir } from "../../scripts/lib/pi-sdk.mjs";
 import { normalizar } from "../../scripts/ingesta/bm25.ts";
@@ -9,6 +9,17 @@ import { buscarMaterial, cita, documento, dossier, esSlug, leerItems, leerPagina
 import { verificacionPrevia } from "./researcher.ts";
 
 type Config = { max_tokens_dossier: number; max_tokens_curso_md: number };
+const COPIA = "Material desde la última carga; el entorno de ingesta no respondió: corré .pi/scripts/doctor.";
+// pi.exec devuelve code 0 cuando mata al proceso por tiempo (exec.js:63): manda killed. Un traceback no es un mensaje para el alumno.
+export function fallaPython(r: { stderr: string; killed: boolean }) {
+  const causa = r.stderr.trim().split("\n").at(-1) || "";
+  return r.killed ? "El entorno de ingesta (Python) no respondió a tiempo: corré .pi/scripts/doctor y reintentá."
+    : causa && !/^(Traceback|[\w.]+(Error|Exception)\b)/.test(causa) ? causa : "El entorno de ingesta (Python) falló: corré .pi/scripts/doctor y reintentá.";
+}
+function escribir(file: string, texto: string) {
+  const temporal = `${file}.${process.pid}.tmp`;
+  try { writeFileSync(temporal, texto); renameSync(temporal, file); } catch (e) { rmSync(temporal, { force: true }); throw e; }
+}
 // Las órdenes internas van ocultas: llegan al modelo como mensaje custom y md-log no las anota como del alumno.
 export const ordenar = (pi: ExtensionAPI, content: string) => pi.sendMessage({ customType: "curso-orden", content, display: false }, { triggerTurn: true, deliverAs: "followUp" });
 export function registrarSesion(pi: ExtensionAPI, vault = vaultDir, recursos = piDir) {
@@ -20,11 +31,18 @@ export function registrarSesion(pi: ExtensionAPI, vault = vaultDir, recursos = p
     if (!esSlug(curso)) throw new Error("Curso inválido: usá su slug.");
     return rutaSegura(vault, `cursos/${curso}`);
   };
-  async function cargar(curso: string, validar = false, signal?: AbortSignal): Promise<DatosCurso> {
-    raiz(curso);
-    const r = await pi.exec(join(recursos, ".venv/bin/python"), [join(recursos, "scripts/ingesta/sesion.py"), "cargar", "--vault", vault, "--curso", curso, ...(validar ? ["--validar"] : [])], { timeout: 10000, signal });
-    if (r.code !== 0) throw new Error(r.stderr.trim() || "Curso no disponible.");
-    return JSON.parse(r.stdout);
+  // Sin Python, la última carga buena del curso mantiene teach, modo-curso y dossier.
+  async function cargar(curso: string, validar = false, signal?: AbortSignal, timeout = 10000): Promise<DatosCurso> {
+    const copia = rutaSegura(raiz(curso), ".sesion-cargada.json");
+    const r = await pi.exec(join(recursos, ".venv/bin/python"), [join(recursos, "scripts/ingesta/sesion.py"), "cargar", "--vault", vault, "--curso", curso, ...(validar ? ["--validar"] : [])], { timeout, signal });
+    if (!r.killed && r.code === 0) try {
+      const d = JSON.parse(r.stdout);
+      try { escribir(copia, r.stdout); } catch { /* La copia es un respaldo: sin disco o sin permiso se sigue con lo cargado. */ }
+      return d;
+    } catch { /* Salida cortada: como un fallo del entorno. */ }
+    let d: DatosCurso;
+    try { d = JSON.parse(readFileSync(copia, "utf8")); } catch { throw new Error(fallaPython(r)); }
+    return { ...d, avisos: [...d.avisos, COPIA] };
   }
   function preparar(a: Activo, d: DatosCurso) {
     const config: Config = JSON.parse(readFileSync(join(recursos, "curso.config.json"), "utf8"));
@@ -58,8 +76,8 @@ export function registrarSesion(pi: ExtensionAPI, vault = vaultDir, recursos = p
       const a = ultimo.data as Activo;
       if (!esSlug(a.curso) || !esSlug(a.tema) || typeof a.log !== "string" || !a.log.startsWith(`cursos/${a.curso}/sesiones/`) || !a.log.endsWith(".md")) throw new Error("Estado de curso inválido.");
       rutaSegura(vault, a.log);
-      const d = await cargar(a.curso);
-      for (const aviso of d.avisos.filter(a => a.startsWith("Progreso"))) ctx.ui.notify(aviso, "warning");
+      const d = await cargar(a.curso, false, undefined, 30000);
+      for (const aviso of d.avisos.filter(a => a.startsWith("Progreso") || a === COPIA)) ctx.ui.notify(aviso, "warning");
       const tema = preparar(a, d);
       ctx.ui.setStatus("curso", `📚 ${a.curso} › ${tema.nombre}`);
     } catch (e) { ctx.ui.notify(`No se restauró el curso: ${e instanceof Error ? e.message : "estado inválido"}`, "warning"); }
@@ -98,7 +116,7 @@ export function registrarSesion(pi: ExtensionAPI, vault = vaultDir, recursos = p
         if (!curso) { ctx.ui.notify("Uso: /estudiar <curso> [tema]", "warning"); return; }
         const consulta = palabras.join(" ");
         const d = await cargar(curso, true);
-        for (const aviso of d.avisos.filter(a => a.startsWith("Progreso"))) ctx.ui.notify(aviso, "warning");
+        for (const aviso of d.avisos.filter(a => a.startsWith("Progreso") || a === COPIA)) ctx.ui.notify(aviso, "warning");
         cacheCompletar.delete(curso);
         let candidatos = consulta ? resolverTemas(d.temas, consulta) : ordenarTemas(d), resultados: ReturnType<typeof buscarMaterial> = [];
         if (consulta && !candidatos.length) {
@@ -189,7 +207,7 @@ export function registrarSesion(pi: ExtensionAPI, vault = vaultDir, recursos = p
       if (!Number.isInteger(pagina) || pagina < 1 || pagina > fuente.paginas) throw new Error("Página PDF fuera de rango.");
       if (!despues_del_intento && (["evaluaciones", "soluciones"].includes(fuente.tipo) || d.items[doc]?.some(i => i.solucion_de !== undefined))) throw new Error("La imagen de esta página trae la solución: leé el enunciado con leer_items y mostrala recién después del intento (despues_del_intento:true).");
       const resultado = await pi.exec(join(recursos, ".venv/bin/python"), [join(recursos, "scripts/ingesta/sesion.py"), "renderizar", "--vault", vault, "--curso", a.curso, "--doc", doc, "--pagina", String(pagina)], { timeout: 10000, signal });
-      if (resultado.code !== 0) throw new Error(resultado.stderr.trim() || "No se pudo renderizar la página.");
+      if (resultado.killed || resultado.code !== 0) throw new Error(fallaPython(resultado));
       return { imagen: readFileSync(rutaSegura(r, `_procesado/${doc}/render/${String(pagina).padStart(4, "0")}.png`)).toString("base64"), cita: cita(d, doc, pagina) };
     },
   };

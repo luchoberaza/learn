@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { registrarSesion } from "../extensions/curso/sesion.ts";
 import { registrarProgreso } from "../extensions/curso/progreso.ts";
 import { resolverTemas } from "../extensions/curso/material.ts";
+import { registrarCuracion } from "../extensions/curso/curacion.ts";
 import { tokenizar } from "../scripts/ingesta/bm25.ts";
 
 // Regresiones de la auditoría de sesión: vault sintético, pi simulado, sin modelos.
@@ -116,4 +117,51 @@ test("H24: un subtema que sólo encuentra BM25 resuelve al tema cuyo rango conti
   await e.estudiar("calculo cadena sustitucion");
   assert.match(opciones[0], /^Integración \[integracion\]/); assert.match(opciones[1], /^Derivación \[derivacion\]/); assert.match(opciones.at(-1), /ad hoc/);
   assert.equal(e.entradas.at(-1).data.tema, "integracion");
+});
+const colgado = async () => ({ code: 0, killed: true, stdout: "", stderr: "" });
+const roto = async () => ({ code: 1, killed: false, stdout: "", stderr: "Traceback (most recent call last):\nModuleNotFoundError: No module named 'yaml'" });
+test("H03: Python colgado o roto sin copia previa: una línea en español que remite al doctor, sin curso a medias", async t => {
+  for (const exec of [colgado, roto]) {
+    const e = entorno(t); e.pi.exec = exec;
+    await e.estudiar("calculo derivacion");
+    assert.equal(e.entradas.length, 0);
+    assert.deepEqual(readdirSync(join(e.raiz, "sesiones")), []);
+    assert.match(e.avisos.at(-1)[1], /^El entorno de ingesta \(Python\) .*corré \.pi\/scripts\/doctor/);
+  }
+});
+test("H03: con una carga previa, /estudiar y la restauración siguen con la copia y lo avisan una vez", async t => {
+  const e = entorno(t);
+  await e.estudiar("calculo derivacion");
+  e.pi.exec = roto; e.avisos.length = 0;
+  await e.estudiar("calculo derivacion");
+  assert.equal(e.entradas.filter(x => x.customType === "curso").length, 2);
+  assert.deepEqual(e.avisos.map(([, m]) => m), ["Material desde la última carga; el entorno de ingesta no respondió: corré .pi/scripts/doctor."]);
+  const tiempos = []; e.pi.exec = async (_p, _a, o) => (tiempos.push(o.timeout), colgado()); e.avisos.length = 0;
+  await e.eventos.get("session_start")({ type: "session_start", reason: "startup" }, e.ctx);
+  assert.deepEqual(tiempos, [30000]);
+  assert.match(e.avisos[0][1], /^Material desde la última carga/);
+  const evento = { systemPromptOptions: { sections: {}, skills: [] } };
+  e.eventos.get("before_agent_start")(evento);
+  for (const s of ["teach", "modo_curso", "curso"]) assert.ok(evento.systemPromptOptions.sections[s], s);
+});
+test("H03: ver_pagina con el render colgado falla en español", async t => {
+  const e = entorno(t);
+  await e.estudiar("calculo derivacion");
+  e.pi.exec = colgado;
+  await assert.rejects(() => e.sesion.ver_pagina({ doc: "libro", pagina: 1 }), /^Error: El entorno de ingesta \(Python\) no respondió/);
+});
+test("H03: /curso-check y /curso-estado no muestran JSON roto y /curso-estado informa error, interrupción y editadas", async () => {
+  const comandos = new Map(), avisos = [], estados = {};
+  const pi = { registerCommand: (n, c) => comandos.set(n, c), exec: colgado, sendMessage: () => {} };
+  const ctx = { ui: { notify: (m, tipo) => avisos.push([tipo, m]), setStatus: (k, v) => { estados[k] = v; } } };
+  registrarCuracion(pi);
+  for (const c of ["curso-check", "curso-estado"]) {
+    await comandos.get(c).handler("calculo", ctx);
+    assert.match(avisos.at(-1)[1], /^El entorno de ingesta \(Python\) no respondió/, c);
+  }
+  pi.exec = async () => ({ code: 0, killed: false, stderr: "", stdout: JSON.stringify({ estado: "interrumpida", procesadas: 3, solicitadas: 9, pendientes: 2,
+    aviso: "El proceso ya no mantiene el bloqueo; podés reanudar con el mismo manifiesto.", error: "El proceso terminó al arrancar: sin memoria", editadas: ["libro/0002.md", "libro/0003.md"] }) });
+  await comandos.get("curso-estado").handler("calculo", ctx);
+  assert.equal(estados["curso-ingesta"], "calculo: interrumpida · 3/9 · pendientes: 2 · editadas: 2");
+  assert.match(avisos.at(-1)[1], /terminó al arrancar: sin memoria\nEl proceso ya no mantiene el bloqueo/);
 });

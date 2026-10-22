@@ -2,6 +2,7 @@ import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-a
 import { readdirSync } from "node:fs";
 import { join } from "node:path";
 import { piDir, vaultDir } from "../../scripts/lib/pi-sdk.mjs";
+import { fallaPython } from "./sesion.ts";
 
 const patron = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
@@ -9,8 +10,8 @@ async function ejecutar(pi: ExtensionAPI, accion: string, curso: string, extras:
   if (!patron.test(curso)) throw new Error("Curso inválido: indicá un slug sin tildes.");
   const r = await pi.exec(join(piDir, ".venv/bin/python"), [join(piDir, "scripts/ingesta/cursos.py"), accion,
     "--vault", vaultDir, "--curso", curso, ...extras], { cwd: vaultDir, timeout: 30000, signal });
-  if (r.code !== 0 && !r.stdout.trim().startsWith("{")) throw new Error(r.stderr.trim() || "No se completó la operación.");
-  return JSON.parse(r.stdout);
+  if (!r.killed && (r.code === 0 || r.stdout.trim().startsWith("{"))) try { return JSON.parse(r.stdout); } catch { /* Salida cortada: como un fallo del entorno. */ }
+  throw new Error(fallaPython(r));
 }
 
 export function registrarCuracion(pi: ExtensionAPI) {
@@ -50,11 +51,12 @@ export function registrarCuracion(pi: ExtensionAPI) {
       try {
         const r = await pi.exec(join(piDir, ".venv/bin/python"), [join(piDir, "scripts/ingesta/ingestar.py"), "estado",
           "--vault", vaultDir, "--salida", join(vaultDir, "cursos", curso, "_procesado")], { cwd: vaultDir, timeout: 10000 });
-        if (r.code !== 0) throw new Error(r.stdout.trim() || r.stderr.trim());
-        const estado = JSON.parse(r.stdout);
-        const resumen = `${curso}: ${estado.estado} · ${estado.procesadas}/${estado.solicitadas} · pendientes: ${estado.pendientes}`;
+        let estado;
+        try { estado = !r.killed && r.code === 0 ? JSON.parse(r.stdout) : undefined; } catch { /* Salida vacía o cortada. */ }
+        if (!estado) throw new Error(!r.killed && r.code !== 0 && r.stdout.trim() || fallaPython(r));
+        const resumen = `${curso}: ${estado.estado} · ${estado.procesadas}/${estado.solicitadas} · pendientes: ${estado.pendientes}${estado.editadas?.length ? ` · editadas: ${estado.editadas.length}` : ""}`;
         ctx.ui.setStatus("curso-ingesta", resumen);
-        ctx.ui.notify(resumen, "info");
+        ctx.ui.notify([resumen, estado.error, estado.aviso].filter(Boolean).join("\n"), estado.error || estado.aviso ? "warning" : "info");
       } catch (e) { ctx.ui.notify(e instanceof Error ? e.message : "No hay ingesta registrada.", "warning"); }
     },
   });

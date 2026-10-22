@@ -128,7 +128,7 @@ test("modo ad hoc continúa sin BM25 y no escribe el índice ni progreso", async
   await e.comandos.get("estudiar").handler("calculo electricidad", e.ctx);
   assert.equal(e.entradas.at(-1).data.tema, "ad-hoc");
   assert.equal(e.entradas.at(-1).data.adHoc.nombre, "electricidad");
-  assert.deepEqual(readdirSync(e.raiz).sort(), ["_procesado", "sesiones"]);
+  assert.deepEqual(readdirSync(e.raiz).filter(n => !n.startsWith(".")).sort(), ["_procesado", "sesiones"]);
 });
 test("runtime instalado registra comandos y tools de sesión sin modificar teach", async () => {
   const p = await loadProject();
