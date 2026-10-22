@@ -176,3 +176,47 @@ test("H17: el autocompletado no se ofrece sobre un texto exacto y no vuelve a ll
   assert.deepEqual((await completar("calculo d")).map(o => o.value), ["calculo derivacion"]);
   assert.equal(llamadas, 2);
 });
+const real = "> [!quote] VOS\n\nCreo que es L/R.\n\n> [!success] Quiz — correcto ✓\n> Tu respuesta: 1. Transmisión\n";
+const dossierDe = e => { const evento = { systemPromptOptions: { sections: {}, skills: [] } }; e.eventos.get("before_agent_start")(evento); return evento.systemPromptOptions.sections.curso; };
+test("H06: con el progreso no disponible, inválido o desde la copia no se ofrece reconstruir", async t => {
+  for (const aviso of ["Progreso no disponible: Ya hay una ingesta escribiendo en esta salida.; se sigue con el material.", "Progreso inválido restaurado desde .bak; el contenido inválido se conservó en _procesado/.", "Material desde la última carga; el entorno de ingesta no respondió: corré .pi/scripts/doctor."]) {
+    const d = datos(); d.avisos = [aviso];
+    const e = entorno(t, d);
+    writeFileSync(join(e.raiz, "sesiones/2026-01-01-derivacion.md"), real);
+    await e.estudiar("calculo derivacion");
+    assert.doesNotMatch(dossierDe(e), /Ofrecé reconstruirla/, aviso);
+    assert.equal(e.sesion.actual().pendiente, undefined);
+  }
+});
+test("H15: sólo se ofrece reconstruir una sesión real, una sola vez", async t => {
+  const e = entorno(t), log = n => join(e.raiz, `sesiones/${n}`);
+  writeFileSync(log("2026-01-01-derivacion.md"), real);
+  writeFileSync(log("2026-01-02-derivacion.md"), "> [!quote] VOS\n\nEmpecemos con «Derivación» (calculo). Iniciá el probe con la primera pregunta.\n\n> [!abstract] PI\n\n¿Qué es una derivada?\n");
+  writeFileSync(log("2026-01-03-derivacion.md"), "> [!quote] VOS\n\nPrueba técnica de Fase 6, no es una respuesta del estudiante.\n");
+  writeFileSync(log("2026-01-04-derivacion.md"), "");
+  await e.estudiar("calculo derivacion");
+  assert.equal(e.sesion.actual().pendiente, "sesiones/2026-01-01-derivacion.md");
+  assert.match(dossierDe(e), /Ofrecé reconstruirla/);
+  e.sesion.refrescar();
+  assert.equal(e.sesion.actual().pendiente, "sesiones/2026-01-01-derivacion.md");
+  assert.doesNotMatch(dossierDe(e), /Ofrecé reconstruirla/);
+  await e.estudiar("calculo derivacion");
+  assert.equal(e.sesion.actual().pendiente, undefined);
+});
+test("H15: no se ofrece el ad hoc, el log vivo de otra sesión ni el de otro tema con sufijo", async t => {
+  const d = datos(); d.temas.push({ ...d.temas[0], id: "derivacion-2", nombre: "Derivación II", alias: [] });
+  const e = entorno(t, d);
+  writeFileSync(join(e.raiz, "sesiones/2026-01-01-derivacion-2.md"), real);
+  writeFileSync(join(e.raiz, "sesiones/2026-01-01-ad-hoc.md"), real);
+  await e.estudiar("calculo derivacion");
+  assert.equal(e.sesion.actual().pendiente, undefined);
+  await e.estudiar("calculo electricidad");
+  assert.equal(e.sesion.actual().pendiente, undefined);
+  writeFileSync(join(e.raiz, "sesiones/2026-01-02-derivacion.md"), real);
+  writeFileSync(join(e.raiz, ".sesion-activa.json"), JSON.stringify({ sesion: "otra", pid: process.ppid, curso: "calculo", tema: "derivacion", log: "cursos/calculo/sesiones/2026-01-02-derivacion.md" }));
+  await e.estudiar("calculo derivacion");
+  assert.equal(e.sesion.actual().pendiente, undefined);
+  writeFileSync(join(e.raiz, ".sesion-activa.json"), JSON.stringify({ sesion: "otra", pid: 2 ** 22 + 1, curso: "calculo", tema: "derivacion", log: "cursos/calculo/sesiones/2026-01-02-derivacion.md" }));
+  await e.estudiar("calculo derivacion");
+  assert.equal(e.sesion.actual().pendiente, "sesiones/2026-01-02-derivacion.md");
+});

@@ -11,7 +11,7 @@ async function entorno(t, anterior=false) {
   for(const p of [join(recursos,'skills/teach'),join(raiz,'sesiones')])mkdirSync(p,{recursive:true});
   writeFileSync(join(recursos,'skills/teach/SKILL.md'),'TEACH');writeFileSync(join(recursos,'modo-curso.md'),'MODO');writeFileSync(join(recursos,'curso.config.json'),JSON.stringify({max_tokens_dossier:3000,max_tokens_curso_md:1500}));
   writeFileSync(join(raiz,'indice.yaml'),'documentos: []\ntemas:\n- {id: derivacion}\n');writeFileSync(join(raiz,'progreso.yaml'),'version: 1\ntemas: {}\nhistorial: []\n');
-  if(anterior)writeFileSync(join(raiz,`sesiones/${new Date().toISOString().slice(0,10)}-derivacion.md`),'LOG ANTERIOR: pregunta sin respuesta, no un error del estudiante.');
+  if(anterior)writeFileSync(join(raiz,`sesiones/${new Date().toISOString().slice(0,10)}-derivacion.md`),'> [!quote] VOS\n\nRespuesta del alumno.\n\nLOG ANTERIOR: pregunta sin respuesta, no un error del estudiante.');
   const d={curso:'ejemplo',nombre:'Ejemplo',contrato:'Contrato',documentos:[],temas:[{id:'derivacion',nombre:'Derivación',unidad:1,alias:[],objetivos:[],prerequisitos:[]}],items:{},progreso:{temas:{},historial:[]},avisos:[]};
   const comandos=new Map(),tools=new Map(),eventos=new Map(),entradas=[],avisos=[],bus=[],mensajes=[];
   const pi={registerCommand:(n,c)=>comandos.set(n,c),registerTool:c=>tools.set(c.name,c),on:(n,h)=>eventos.set(n,h),appendEntry:(customType,data)=>entradas.push({type:'custom',customType,data}),setSessionName:()=>{},sendUserMessage:m=>mensajes.push(m),sendMessage:m=>mensajes.push(m.content),exec:async()=>({code:0,stdout:JSON.stringify(d)}),events:{emit:(n,p)=>{bus.push(n);p.onComplete?.();}}};

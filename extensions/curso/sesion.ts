@@ -3,7 +3,7 @@ import { mkdirSync, openSync, closeSync, readdirSync, readFileSync, renameSync, 
 import { basename, join, relative } from "node:path";
 import { piDir, vaultDir } from "../../scripts/lib/pi-sdk.mjs";
 import { normalizar } from "../../scripts/ingesta/bm25.ts";
-import { buscarMaterial, cita, documento, dossier, esSlug, leerItems, leerPaginas, ordenarTemas, resolverTemas, rutaSegura,
+import { buscarMaterial, cita, documento, dossier, esSlug, leer, leerItems, leerPaginas, ordenarTemas, resolverTemas, rutaSegura,
   type Activo, type DatosCurso, type Tema } from "./material.ts";
 
 import { verificacionPrevia } from "./researcher.ts";
@@ -16,6 +16,11 @@ export function fallaPython(r: { stderr: string; killed: boolean }) {
   return r.killed ? "El entorno de ingesta (Python) no respondió a tiempo: corré .pi/scripts/doctor y reintentá."
     : causa && !/^(Traceback|[\w.]+(Error|Exception)\b)/.test(causa) ? causa : "El entorno de ingesta (Python) falló: corré .pi/scripts/doctor y reintentá.";
 }
+// Una sesión real tiene alguna respuesta del alumno: un mensaje propio (no las órdenes que antes se anotaban como suyas) o un quiz o pregunta respondidos.
+const conRespuestas = (t: string) => /^> \[!quote\] VOS\n\n(?!Empecemos con «|Terminemos (la|esta) sesión)|^> \[!(success|failure)\] Quiz|^> \[!question\] Quiz — No sé|^> \[!example\] Respuesta\n> (?!\(sin respuesta\))/m.test(t)
+  && !/Prueba técnica|Ensayo técnico|SINTÉTICO/.test(t);
+const cerrado = (d: DatosCurso, log: string) => (d.progreso.historial || []).some(h => typeof h === "object" && h !== null && "log" in h && basename(String(h.log)) === basename(log) && (!("cierre" in h) || h.cierre !== false));
+const vivo = (pid: unknown) => { try { return Number.isInteger(pid) && (pid as number) > 0 && process.kill(pid as number, 0); } catch (e) { return (e as NodeJS.ErrnoException).code === "EPERM"; } };
 function escribir(file: string, texto: string) {
   const temporal = `${file}.${process.pid}.tmp`;
   try { writeFileSync(temporal, texto); renameSync(temporal, file); } catch (e) { rmSync(temporal, { force: true }); throw e; }
@@ -44,21 +49,32 @@ export function registrarSesion(pi: ExtensionAPI, vault = vaultDir, recursos = p
     try { d = JSON.parse(readFileSync(copia, "utf8")); } catch { throw new Error(fallaPython(r)); }
     return { ...d, avisos: [...d.avisos, COPIA] };
   }
+  // Se ofrece una sola vez (queda en .no-reconstruir.json) la última sesión real del tema sin cierre; no con el progreso dudoso, en ad hoc ni la viva de otro pi.
+  function sinCierre(a: Activo, d: DatosCurso, tema: Tema) {
+    if (a.adHoc || d.avisos.some(x => /^Progreso (no disponible|inválido)/.test(x) || x === COPIA)) return;
+    const r = raiz(a.curso), lista = rutaSegura(r, ".no-reconstruir.json"), carpeta = rutaSegura(r, "sesiones");
+    let viva = "";
+    try { const o = JSON.parse(readFileSync(rutaSegura(r, ".sesion-activa.json"), "utf8")); if (o.pid !== process.pid && vivo(o.pid)) viva = o.log; } catch { /* sin otra sesión registrada */ }
+    const log = readdirSync(carpeta).filter(n => {
+      const sufijo = n.match(new RegExp(`^\\d{4}-\\d{2}-\\d{2}-${tema.id}(?:-(\\d+))?\\.md$`));
+      return sufijo && !d.temas.some(t => t.id === `${tema.id}-${sufijo[1]}`) && ![a.log, viva].includes(`cursos/${a.curso}/sesiones/${n}`);
+    }).sort((x, y) => statSync(rutaSegura(carpeta, x)).mtimeMs - statSync(rutaSegura(carpeta, y)).mtimeMs || x.localeCompare(y, undefined, { numeric: true }))
+      .findLast(n => { try { return conRespuestas(leer(r, `sesiones/${n}`)); } catch { return false; } });
+    let vistos: string[] = [];
+    try { vistos = JSON.parse(readFileSync(lista, "utf8")); } catch { /* nada ofrecido todavía */ }
+    if (!log || cerrado(d, `sesiones/${log}`) || vistos.includes(`sesiones/${log}`)) return;
+    try { escribir(lista, JSON.stringify([...vistos, `sesiones/${log}`])); } catch { /* Sin disco, la oferta puede repetirse. */ }
+    return `sesiones/${log}`;
+  }
   function preparar(a: Activo, d: DatosCurso) {
     const config: Config = JSON.parse(readFileSync(join(recursos, "curso.config.json"), "utf8"));
     const tema = a.adHoc || d.temas.find(t => t.id === a.tema);
     if (!tema) throw new Error("El tema ya no está en el índice; volvé a seleccionarlo con /estudiar.");
     let anterior = "";
-    pendiente = undefined;
-    try {
-      const carpeta = rutaSegura(vault, `cursos/${a.curso}/sesiones`);
-      const logs = readdirSync(carpeta).filter(n => new RegExp(`^\\d{4}-\\d{2}-\\d{2}-${tema.id}(?:-\\d+)?\\.md$`).test(n) && relative(vault, join(carpeta, n)) !== a.log)
-        .sort((a, b) => statSync(rutaSegura(carpeta, a)).mtimeMs - statSync(rutaSegura(carpeta, b)).mtimeMs || a.localeCompare(b, undefined, { numeric: true }));
-      const ultimo = logs.at(-1);
-      if (ultimo && !(d.progreso.historial || []).some(h => typeof h === "object" && h !== null && "log" in h && basename(String(h.log)) === ultimo && (!("cierre" in h) || h.cierre !== false))) {
-        pendiente = `sesiones/${ultimo}`;
-        anterior = `Última sesión sin registro final de progreso: [[cursos/${a.curso}/${pendiente}]]. Ofrecé reconstruirla con leer_sesion_anterior y confirmación; no infieras errores de preguntas sin respuesta.`;
-      }
+    if (pendiente && cerrado(d, pendiente)) pendiente = undefined;
+    if (!pendiente) try {
+      pendiente = sinCierre(a, d, tema);
+      if (pendiente) anterior = `Última sesión sin registro final de progreso: [[cursos/${a.curso}/${pendiente}]]. Ofrecé reconstruirla con leer_sesion_anterior y confirmación; no infieras errores de preguntas sin respuesta.`;
     } catch { /* Sin sesiones anteriores no hay nada para reconstruir. */ }
     const nuevo = dossier(raiz(a.curso), { ...d, avisos: [...d.avisos, ...(anterior ? [anterior] : [])] }, tema, config.max_tokens_dossier, config.max_tokens_curso_md, verificacionPrevia(vault, recursos, d, tema));
     teach = readFileSync(join(recursos, "skills/teach/SKILL.md"), "utf8");
@@ -153,6 +169,7 @@ export function registrarSesion(pi: ExtensionAPI, vault = vaultDir, recursos = p
         const a: Activo = { curso, tema: tema.id, log: "", ...(tema.id === "ad-hoc" ? { adHoc: tema } : {}) };
         // Preparar antes de crear archivos evita dejar un log vacío por configuración inválida.
         const anterior = { activo, datos, resumen, teach, modo, pendiente };
+        pendiente = undefined;
         preparar(a, d);
         try {
           const carpeta = rutaSegura(vault, `cursos/${curso}/sesiones`);

@@ -77,9 +77,9 @@ test("las cuatro tools de lectura rechazan el estado sin curso activo", async t 
 test("activar enlaza un log nuevo sin historial anterior y arranca solo", async t => {
   const e = entorno(t), fecha = new Date().toLocaleDateString("sv-SE");
   const viejo = join(e.raiz, "sesiones", `${fecha}-derivacion.md`);
-  writeFileSync(viejo, "NOTA DEL USUARIO");
+  writeFileSync(viejo, "> [!quote] VOS\n\nNOTA DEL USUARIO");
   await e.comandos.get("estudiar").handler("calculo derivada", e.ctx);
-  assert.equal(readFileSync(viejo, "utf8"), "NOTA DEL USUARIO");
+  assert.equal(readFileSync(viejo, "utf8"), "> [!quote] VOS\n\nNOTA DEL USUARIO");
   assert.equal(e.vinculos[0][1].backfill, false);
   assert.match(e.entradas.at(-1).data.log, /-2\.md$/);
   assert.equal(e.mensajes.filter(m => m.orden).length, 1);
