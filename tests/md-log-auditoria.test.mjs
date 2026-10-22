@@ -164,3 +164,8 @@ test("H48: la página que el tutor muestra con ver_pagina queda enlazada en la n
   await comandos.get("md-log").handler(e.file, e.ctx);
   assert.equal(readFileSync(e.file, "utf8"), `> [!info] Página mostrada\n> ${cita}\n`);
 });
+
+test("H49: la limpieza de enlaces de md-log es la misma que la de quiz (D5)", () => {
+  const funcion = archivo => readFileSync(new URL(`../extensions/${archivo}`, import.meta.url), "utf8").match(/function sinEnlaces[\s\S]*?\n\t?}\n/)[0].replace(/^\t+/gm, "");
+  assert.equal(funcion("md-log.ts"), funcion("quiz.ts"));
+});
