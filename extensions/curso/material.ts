@@ -138,6 +138,22 @@ export function leerItems(datos: DatosCurso, doc: string, ids: string[], incluir
     return t;
   }).join("\n\n"), 32000);
 }
+// Qué referencias del tema todavía no tienen texto confiable: las completa la preparación automática (H55).
+export function faltantesTema(raiz: string, datos: DatosCurso, tema: Tema): string[] {
+  const faltan: string[] = [];
+  for (const ref of tema.bibliografia || []) {
+    let qs: Record<string, { pendiente?: boolean }> = {};
+    try { qs = JSON.parse(leer(raiz, `_procesado/${ref.doc}/calidad.json`, 50_000_000)).paginas || {}; } catch { /* Sin ingesta falta todo el rango. */ }
+    const [desde, hasta] = ref.paginas, total = hasta - desde + 1;
+    const sin = Array.from({ length: total }, (_, i) => desde + i).filter(p => !qs[p] || qs[p].pendiente).length;
+    if (sin) faltan.push(`${ref.doc} PDF ${desde}–${hasta} (${sin} de ${total} páginas)`);
+  }
+  for (const clase of ["ejercicios", "evaluaciones"] as const) for (const ref of tema[clase] || []) {
+    const sin = ref.items.filter(id => !datos.items[ref.doc]?.some(i => i.id === id));
+    if (sin.length) faltan.push(`${ref.doc}: ítems ${sin.join(", ")}`);
+  }
+  return faltan;
+}
 // acotar corta el final: primero estado, próximo paso, fallas, errores sin resolver y últimos ejercicios (H28).
 function progresoCompacto(p: any, bytes: number): string {
   if (!p) return "sin registro";
@@ -182,7 +198,8 @@ export function dossier(raiz: string, datos: DatosCurso, tema: Tema, maxTokens: 
     if (d && i ? esSolucion(d, i) : d?.tipo === "soluciones") continue;
     lineas.push(`${clase}: ${ref.doc}/${id} · ${i?.enunciado.replace(/\s+/g, " ").slice(0, 140) || "sin preparar"}`);
   }
-  if (datos.avisos.length || datos.validacion?.errores.length || datos.validacion?.avisos.length) lineas.push("Preparación incompleta: usá sólo referencias comprobables; los avisos no certifican fidelidad.");
+  const faltan = faltantesTema(raiz, datos, tema);
+  if (faltan.length) lineas.push(`Preparación del tema: sin texto confiable todavía en ${faltan.join("; ")}. Se preparan solos en segundo plano; mientras, cotejá esas páginas con ver_pagina antes de citarlas.`);
   // Lo que puede cortarse va al final: el progreso de los prerequisitos.
   lineas.push(`Progreso ${tema.id}: ${progresoCompacto(datos.progreso.temas[tema.id], 3000)}`, "## Verificación previa", resumirVerificacion(verificacion));
   for (const id of tema.prerequisitos || []) lineas.push(`Progreso ${id} (prerequisito): ${progresoCompacto(datos.progreso.temas[id], 800)}`);
