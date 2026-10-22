@@ -102,19 +102,25 @@ def unicos(valores):
 def fusionar(anterior, nuevo):
     if anterior.get("estado", "sin_empezar") != "sin_empezar" and nuevo.get("estado") == "sin_empezar":
         raise ValueError("Ya hay evidencia del tema: conservá su estado previo o usá repasar, no sin_empezar.")
-    r = {"estado": "en_curso", **deepcopy(anterior), **deepcopy(nuevo)}
+    falla = anterior.get("borde", {}).get("falla", [])
+    avisos = [f"falla_resuelta '{s}' no coincide con ninguna falla del borde; textos exactos: " + ("; ".join(f"'{x}'" for x in falla) or "ninguno") + "."
+              for s in nuevo["falla_resuelta"] if s not in falla]
+    r = {"estado": "en_curso", **deepcopy(anterior), **deepcopy({k: v for k, v in nuevo.items() if k != "falla_resuelta"})}
     for k in ["conceptos_firmes", "ejercicios", "discrepancias"]:
         r[k] = unicos(anterior.get(k, []) + nuevo[k])
+    r["conceptos_firmes"] = [s for s in r["conceptos_firmes"] if s not in nuevo["borde"]["falla"]]
     r["borde"] = {
         "domina": [s for s in unicos(anterior.get("borde", {}).get("domina", []) + nuevo["borde"]["domina"]) if s not in nuevo["borde"]["falla"]],
-        "falla": [s for s in unicos(anterior.get("borde", {}).get("falla", []) + nuevo["borde"]["falla"]) if s not in nuevo["borde"]["domina"]],
+        "falla": [s for s in unicos(falla + nuevo["borde"]["falla"]) if s not in nuevo["borde"]["domina"] and s not in nuevo["falla_resuelta"]],
     }
     errores = {e["descripcion"]: deepcopy(e) for e in anterior.get("errores_de_concepto", [])}
     for e in nuevo["errores_de_concepto"]:
         previo = errores.get(e["descripcion"], {"resuelto": False})
         errores[e["descripcion"]] = {**previo, **e, "detectado": previo.get("detectado", e["detectado"])}
     r["errores_de_concepto"] = list(errores.values())
-    return r
+    if r["estado"] == "dominado" and r["borde"]["falla"]:
+        avisos.append(f"Estado 'dominado' con fallas en el borde ({'; '.join(r['borde']['falla'])}): quitá las superadas con falla_resuelta o usá en_curso.")
+    return r, avisos
 
 
 ETIQUETA = re.compile(r"^(?:ejercicio|problema|pregunta|[ií]tem|ej)\.?\s*", re.I)
@@ -141,7 +147,7 @@ def rango(ids):
 
 def validar_datos(datos, ctx):
     # Delta: sólo resumen es obligatorio; lo omitido se conserva al fusionar.
-    listas = ["conceptos_firmes", "errores_de_concepto", "ejercicios", "discrepancias"]
+    listas = ["conceptos_firmes", "errores_de_concepto", "ejercicios", "discrepancias", "falla_resuelta"]
     if not isinstance(datos, dict) or set(datos) - {"estado", "borde", "proximo_paso", "resumen", *listas} or "resumen" not in datos:
         raise ValueError("Registro sin resumen o con campos ajenos al esquema de progreso.")
     def cadena(s, maximo=2000):
@@ -155,10 +161,10 @@ def validar_datos(datos, ctx):
     if not isinstance(datos.get("borde", {}), dict) or set(datos.get("borde", {})) - {"domina", "falla"}:
         raise ValueError("El borde admite sólo domina y falla.")
     datos = {**{k: [] for k in listas}, **datos, "borde": {"domina": [], "falla": [], **datos.get("borde", {})}}
-    for valores in [datos["borde"]["domina"], datos["borde"]["falla"], *[datos[k] for k in ["conceptos_firmes", "discrepancias", "errores_de_concepto", "ejercicios"]]]:
+    for valores in [datos["borde"]["domina"], datos["borde"]["falla"], *[datos[k] for k in listas]]:
         if not isinstance(valores, list) or len(valores) > 100:
             raise ValueError("Las listas de progreso admiten hasta 100 entradas por registro.")
-    for valores in [datos["borde"]["domina"], datos["borde"]["falla"], datos["conceptos_firmes"], datos["discrepancias"]]:
+    for valores in [datos["borde"]["domina"], datos["borde"]["falla"], datos["conceptos_firmes"], datos["discrepancias"], datos["falla_resuelta"]]:
         for s in valores:
             cadena(s)
     if set(datos["borde"]["domina"]) & set(datos["borde"]["falla"]):
@@ -215,7 +221,8 @@ def registrar(vault: Path, curso: str, tema: str, log: str, datos: dict, cierre=
         indice = texto(raiz, "indice.yaml")
         p, raw, avisos = cargar(raiz, ctx)
         avisos += observaciones
-        p["temas"][tema] = fusionar(p["temas"].get(tema, {}), nuevo)
+        p["temas"][tema], fusion = fusionar(p["temas"].get(tema, {}), nuevo)
+        avisos += fusion
         historia = {"fecha": log.split("/")[1][:10], "tema": tema, "log": log, "resumen": datos["resumen"], "cierre": cierre}
         if reconstruido:
             historia["reconstruido"] = True

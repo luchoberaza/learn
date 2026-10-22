@@ -39,3 +39,8 @@ test('H10: un delta con sólo resumen y borde se fusiona sin borrar lo previo',a
   assert.deepEqual(p.borde.domina,['Derivar un polinomio','Regla de la cadena']);assert.equal(p.proximo_paso,'Composición');assert.equal(p.estado,'en_curso');
   await e.comandos.get('fin').handler('',e.ctx);assert.match(e.mensajes.at(-1),/desde el último guardado/);
 });
+test('H27: falla_resuelta quita la falla del borde y el modelo recibe el aviso de dominado con fallas',async t=>{
+  const e=await entorno(t);await e.guardar({borde:{domina:[],falla:['Identificar la interna','Signo']}});
+  const r=await e.progreso.registrar('resuelta',{resumen:'Supera una',estado:'dominado',falla_resuelta:['Identificar la interna']},undefined,undefined,e.ctx);
+  assert.deepEqual(e.sesion.actual().d.progreso.temas.derivacion.borde.falla,['Signo']);assert.match(r.content[0].text,/'dominado' con fallas/);
+});

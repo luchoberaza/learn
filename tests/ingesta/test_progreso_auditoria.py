@@ -155,6 +155,18 @@ class ProgresoAuditoriaTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.guardar({'borde': {'domina': ['sin resumen']}})
 
+    def test_h27_falla_resuelta_y_falla_nueva_sacan_lo_contradicho(self):
+        self.guardar()
+        r = self.guardar({'resumen': 'Supera la falla', 'falla_resuelta': ['composición', 'algo que no estaba']})
+        self.assertEqual(self.tema()['borde']['falla'], [])
+        self.assertIn("'algo que no estaba'", ' '.join(r['avisos']))
+        self.guardar({'resumen': 'Vuelve a fallar', 'borde': {'falla': ['tasa de cambio']}})
+        t = self.tema()
+        self.assertNotIn('tasa de cambio', t['conceptos_firmes'])
+        self.assertEqual(t['borde']['falla'], ['tasa de cambio'])
+        r = self.guardar({'resumen': 'Dominado', 'estado': 'dominado'})
+        self.assertIn("'dominado' con fallas", ' '.join(r['avisos']))
+
 
 class SesionAuditoriaTest(unittest.TestCase):
     def setUp(self):
