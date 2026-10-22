@@ -247,5 +247,15 @@ class SesionAuditoriaTest(unittest.TestCase):
             self.assertTrue(renderizar(vault, 'ejemplo', 'libro', 1)['cache'])
             self.assertFalse(renderizar(vault, 'ejemplo', 'libro', 2)['cache'])
 
+    def test_x01_disco_lleno_al_renderizar_da_una_linea_en_espanol(self):
+        script = SCRIPT.with_name('sesion.py')
+        codigo = ("import errno, runpy, sys; from unittest.mock import patch\n"
+                  "sys.path.insert(0, sys.argv[1].rsplit('/', 1)[0]); sys.argv = sys.argv[1:]\n"
+                  "with patch('os.fsync', side_effect=OSError(errno.ENOSPC, 'No space left on device')):\n"
+                  "    runpy.run_path(sys.argv[0], run_name='__main__')")
+        r = subprocess.run([sys.executable, '-c', codigo, str(script), 'renderizar', '--vault', str(self.base.vault), '--curso', 'ejemplo', '--doc', 'libro', '--pagina', '1'],
+                           capture_output=True, text=True, timeout=30)
+        self.assertEqual((r.returncode, r.stderr), (1, 'Disco lleno: no se pudo preparar el material; liberá espacio y reintentá.\n'))
+
 
 if __name__ == '__main__': unittest.main()

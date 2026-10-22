@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import errno
 import hashlib
 import json
 from pathlib import Path
@@ -123,5 +124,6 @@ if __name__ == "__main__":
     try:
         main()
     except (OSError, ValueError, KeyError, TypeError, RuntimeError, IndexError) as e:
-        print(f"Material no disponible: {e}", file=sys.stderr)
+        lleno = isinstance(e, OSError) and e.errno == errno.ENOSPC
+        print("Disco lleno: no se pudo preparar el material; liberá espacio y reintentá." if lleno else f"Material no disponible: {e}", file=sys.stderr)
         raise SystemExit(1)
