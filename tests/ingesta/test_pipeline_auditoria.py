@@ -132,5 +132,20 @@ class MatematicaOcrTest(Base):
         self.assertEqual((prosa["ruta"], prosa["requiere_vision"]), ("ocr", False))
 
 
+
+class FalloVisionTest(Base):
+    def test_reingerir_recupera_pagina_digital_tras_fallo_de_vision(self):
+        self.pdf("libro.pdf", [PROSA])
+        self.ejecutar(self.doc("libro"))
+        datos = {"doc": "libro", "pagina": 1, "modelo": "openai/gpt-6-luna", "umbral": 0.6}
+        with bloquear(self.salida, self.vault) as raiz:
+            datos.update(vision.preparar(raiz, self.vault, datos))
+            vision.guardar(raiz, self.vault, datos, fallo=True)
+        self.assertEqual(self.q("libro")["ruta"], "pendiente")
+        self.assertEqual(self.ejecutar(self.doc("libro"))["cache"], 0)
+        q = self.q("libro")
+        self.assertEqual((q["ruta"], q["pendiente"]), ("digital", False))
+        self.assertNotIn("error_vision", q)
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

@@ -243,7 +243,9 @@ def ejecutar(manifiesto: dict, vault: Path, salida: Path, *, limite_paginas: int
                         # Visión y ediciones humanas no se regeneran desde el PDF mientras no cambien el archivo ni el tipo.
                         ajena = (almacenado is not None and previo.get("motor") in {"vision", "manual"} and anterior is not None
                                  and (anterior["archivo"], anterior["tipo"]) == (doc["archivo"], doc["tipo"]))
-                        if previo.get("clave") == clave and almacenado is not None and not previo.get("error"):
+                        # Un fallo de visión sobre texto de la ingesta se recupera reextrayendo la página.
+                        if (previo.get("clave") == clave and almacenado is not None and not previo.get("error")
+                                and (ajena or not previo.get("error_vision"))):
                             estado["cache"] += 1
                             estado["procesadas"] += 1
                             estado["pendientes"] += previo["ruta"] == "pendiente"
