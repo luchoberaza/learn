@@ -364,7 +364,16 @@ export default function mdLog(pi: ExtensionAPI) {
 			d.onComplete?.();
 		} catch (e) { d.onComplete?.(e instanceof Error ? e.message : "No se pudo vincular el log."); }
 	});
-	pi.events.on("md-log:unlink", async () => { await withLock(desvincular); });
+	pi.events.on("md-log:unlink", async (data) => {
+		const d = data as { file?: string; onComplete?: (error?: string) => void } | undefined;
+		try {
+			await withLock(() => {
+				if (d?.file && logFile !== d.file) throw new Error("El log activo cambió; se preservó su vínculo.");
+				desvincular();
+			});
+			d?.onComplete?.();
+		} catch (e) { d?.onComplete?.(e instanceof Error ? e.message : "No se pudo cerrar el log."); }
+	});
 
 	// --- Commands ---
 

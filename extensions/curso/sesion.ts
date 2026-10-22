@@ -12,7 +12,7 @@ type Config = { max_tokens_dossier: number; max_tokens_curso_md: number };
 export function registrarSesion(pi: ExtensionAPI, vault = vaultDir, recursos = piDir) {
   let activo: Activo | undefined;
   let datos: DatosCurso | undefined;
-  let resumen = "", teach = "", modo = "";
+  let resumen = "", teach = "", modo = "", pendiente: string | undefined;
   const cursos = () => readdirSync(rutaSegura(vault, "cursos"), { withFileTypes: true }).filter(d => d.isDirectory() && esSlug(d.name)).map(d => d.name);
   const raiz = (curso: string) => {
     if (!esSlug(curso)) throw new Error("Curso inválido: usá su slug.");
@@ -29,12 +29,16 @@ export function registrarSesion(pi: ExtensionAPI, vault = vaultDir, recursos = p
     const tema = a.adHoc || d.temas.find(t => t.id === a.tema);
     if (!tema) throw new Error("El tema ya no está en el índice; volvé a seleccionarlo con /estudiar.");
     let anterior = "";
+    pendiente = undefined;
     try {
       const carpeta = rutaSegura(vault, `cursos/${a.curso}/sesiones`);
-      const logs = readdirSync(carpeta).filter(n => (n.endsWith(`-${tema.id}.md`) || new RegExp(`-${tema.id}-\\d+\\.md$`).test(n)) && relative(vault, join(carpeta, n)) !== a.log)
+      const logs = readdirSync(carpeta).filter(n => new RegExp(`^\\d{4}-\\d{2}-\\d{2}-${tema.id}(?:-\\d+)?\\.md$`).test(n) && relative(vault, join(carpeta, n)) !== a.log)
         .sort((a, b) => statSync(rutaSegura(carpeta, a)).mtimeMs - statSync(rutaSegura(carpeta, b)).mtimeMs || a.localeCompare(b, undefined, { numeric: true }));
       const ultimo = logs.at(-1);
-      if (ultimo && !(d.progreso.historial || []).some(h => typeof h === "object" && h !== null && "log" in h && basename(String(h.log)) === ultimo)) anterior = `Última sesión sin registro de progreso: [[cursos/${a.curso}/sesiones/${ultimo}]]. No atribuyas ese log a progreso ya guardado; reconstrucción automática: Fase 7.`;
+      if (ultimo && !(d.progreso.historial || []).some(h => typeof h === "object" && h !== null && "log" in h && basename(String(h.log)) === ultimo && (!("cierre" in h) || h.cierre !== false))) {
+        pendiente = `sesiones/${ultimo}`;
+        anterior = `Última sesión sin registro final de progreso: [[cursos/${a.curso}/${pendiente}]]. Ofrecé reconstruirla con leer_sesion_anterior y confirmación; no infieras errores de preguntas sin respuesta.`;
+      }
     } catch { /* Sin sesiones anteriores no hay nada para reconstruir. */ }
     const nuevo = dossier(raiz(a.curso), { ...d, avisos: [...d.avisos, ...(anterior ? [anterior] : [])] }, tema, config.max_tokens_dossier, config.max_tokens_curso_md, verificacionPrevia(vault, recursos, d, tema));
     teach = readFileSync(join(recursos, "skills/teach/SKILL.md"), "utf8");
@@ -43,7 +47,7 @@ export function registrarSesion(pi: ExtensionAPI, vault = vaultDir, recursos = p
     return tema;
   }
   async function restaurar(_event: unknown, ctx: ExtensionContext) {
-    activo = undefined; datos = undefined; resumen = "";
+    activo = undefined; datos = undefined; resumen = ""; pendiente = undefined;
     ctx.ui.setStatus("curso", undefined);
     const entradas = ctx.sessionManager.getBranch();
     const ultimo = [...entradas].reverse().find(e => e.type === "custom" && e.customType === "curso");
@@ -52,7 +56,9 @@ export function registrarSesion(pi: ExtensionAPI, vault = vaultDir, recursos = p
       const a = ultimo.data as Activo;
       if (!esSlug(a.curso) || !esSlug(a.tema) || typeof a.log !== "string" || !a.log.startsWith(`cursos/${a.curso}/sesiones/`) || !a.log.endsWith(".md")) throw new Error("Estado de curso inválido.");
       rutaSegura(vault, a.log);
-      const tema = preparar(a, await cargar(a.curso));
+      const d = await cargar(a.curso);
+      for (const aviso of d.avisos.filter(a => a.startsWith("Progreso"))) ctx.ui.notify(aviso, "warning");
+      const tema = preparar(a, d);
       ctx.ui.setStatus("curso", `📚 ${a.curso} › ${tema.nombre}`);
     } catch (e) { ctx.ui.notify(`No se restauró el curso: ${e instanceof Error ? e.message : "estado inválido"}`, "warning"); }
   }
@@ -85,6 +91,7 @@ export function registrarSesion(pi: ExtensionAPI, vault = vaultDir, recursos = p
       if (!curso) { ctx.ui.notify("Uso: /estudiar <curso> [tema]", "warning"); return; }
       try {
         const d = await cargar(curso, true);
+        for (const aviso of d.avisos.filter(a => a.startsWith("Progreso"))) ctx.ui.notify(aviso, "warning");
         cacheCompletar.delete(curso);
         const candidatos = consulta ? resolverTemas(d.temas, consulta) : ordenarTemas(d);
         let tema: Tema | undefined;
@@ -113,7 +120,7 @@ export function registrarSesion(pi: ExtensionAPI, vault = vaultDir, recursos = p
         if (!esSlug(tema.id)) throw new Error("Id del tema inválido; revisá el índice.");
         const a: Activo = { curso, tema: tema.id, log: "", ...(tema.id === "ad-hoc" ? { adHoc: tema } : {}) };
         // Preparar antes de crear archivos evita dejar un log vacío por configuración inválida.
-        const anterior = { activo, datos, resumen, teach, modo };
+        const anterior = { activo, datos, resumen, teach, modo, pendiente };
         preparar(a, d);
         try {
           const carpeta = rutaSegura(vault, `cursos/${curso}/sesiones`);
@@ -129,12 +136,12 @@ export function registrarSesion(pi: ExtensionAPI, vault = vaultDir, recursos = p
             pi.events.emit("md-log:link", { file: rutaSegura(vault, a.log), backfill: false,
               onComplete(error?: string) { clearTimeout(timer); error ? reject(new Error(error)) : resolve(); } });
           });
-        } catch (e) { ({ activo, datos, resumen, teach, modo } = anterior); throw e; }
+        } catch (e) { ({ activo, datos, resumen, teach, modo, pendiente } = anterior); throw e; }
         pi.appendEntry("curso", a);
         pi.setSessionName(`${d.nombre || curso} · ${tema.nombre}`);
-        const pendiente = d.avisos.length || d.validacion?.errores.length || d.validacion?.avisos.length;
-        ctx.ui.setStatus("curso", `📚 ${curso} › ${tema.nombre}${pendiente ? " · preparación parcial" : ""}`);
-        if (pendiente) ctx.ui.notify("Preparación parcial: seguimos con el material disponible, cotejando sus páginas dudosas.", "warning");
+        const parcial = d.avisos.length || d.validacion?.errores.length || d.validacion?.avisos.length;
+        ctx.ui.setStatus("curso", `📚 ${curso} › ${tema.nombre}${parcial ? " · preparación parcial" : ""}`);
+        if (parcial) ctx.ui.notify("Preparación parcial: seguimos con el material disponible, cotejando sus páginas dudosas.", "warning");
         pi.sendUserMessage(`Empecemos con «${tema.nombre}» (${curso}). Iniciá el probe con la primera pregunta, sin preámbulo ni una nueva orden del estudiante.`, { deliverAs: "followUp" });
       } catch (e) { ctx.ui.notify(e instanceof Error ? e.message : "No se pudo activar el curso.", "error"); }
     },
@@ -148,10 +155,22 @@ export function registrarSesion(pi: ExtensionAPI, vault = vaultDir, recursos = p
   });
   function actual() {
     if (!activo || !datos) throw new Error("No hay curso activo. Usá /estudiar <curso> <tema>.");
-    return { a: activo, d: datos, r: raiz(activo.curso) };
+    return { a: activo, d: datos, r: raiz(activo.curso), pendiente };
   }
   return {
     actual: () => activo && datos ? actual() : undefined,
+    cargar,
+    actualizarProgreso: (progreso: DatosCurso["progreso"]) => { if (datos) datos.progreso = progreso; },
+    async cerrar(ctx: ExtensionContext) {
+      const { a } = actual();
+      await new Promise<void>((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error("md-log no confirmó el cierre; el curso sigue activo.")), 2000);
+        pi.events.emit("md-log:unlink", { file: rutaSegura(vault, a.log), onComplete(error?: string) { clearTimeout(timer); error ? reject(new Error(error)) : resolve(); } });
+      });
+      pi.appendEntry("curso", null);
+      activo = undefined; datos = undefined; resumen = ""; pendiente = undefined;
+      ctx.ui.setStatus("curso", undefined);
+    },
     refrescar: () => { if (activo && datos) preparar(activo, datos); return resumen; },
     leer_paginas({ doc, desde, hasta }: { doc: string; desde: number; hasta: number }) { const { d, r } = actual(); return leerPaginas(r, d, doc, desde, hasta); },
     buscar_material({ consulta, tipo }: { consulta: string; tipo?: string }) { const { d, r } = actual(); return JSON.stringify(buscarMaterial(r, d, consulta, tipo)); },

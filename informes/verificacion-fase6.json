@@ -1,6 +1,9 @@
 {
   "version": 1,
-  "estado": "fase6_implementada_checkpoint_usuario_pendiente",
+  "estado": "fase6_aprobada_por_usuario",
+  "aprobacion": "Aprobado, continuá",
+  "alcance_aprobacion": "Autoriza sólo Fase 7; no cambia revisión humana individual ni resultados históricos.",
+  "proveedor_historico": "En Fase 7 se autorizó pasar a openai-codex; los modelos/caché de este informe son los del ensayo original.",
   "fase5_confirmada": "Confirmado, avanzá",
   "pi_verificado": "1.4.0",
   "reinstalaciones_o_cambios_personales": false,

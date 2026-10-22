@@ -6,9 +6,9 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { piDir } from "../../scripts/lib/pi-sdk.mjs";
 
-export function python(accion: string, datos: object, signal?: AbortSignal): Promise<any> {
+export function python(accion: string, datos: object, signal?: AbortSignal, script: "vision.py" | "progreso.py" = "vision.py"): Promise<any> {
   return new Promise((resolve, reject) => {
-    const hijo = spawn(join(piDir, ".venv/bin/python"), [join(piDir, "scripts/ingesta/vision.py"), accion],
+    const hijo = spawn(join(piDir, ".venv/bin/python"), [join(piDir, "scripts/ingesta", script), accion],
       { stdio: ["pipe", "pipe", "pipe"], signal, timeout: 30000 });
     let salida = "", error = "";
     hijo.stdout.on("data", bloque => { salida += bloque; });
@@ -16,8 +16,8 @@ export function python(accion: string, datos: object, signal?: AbortSignal): Pro
     hijo.on("error", reject);
     hijo.stdin.on("error", reject);
     hijo.on("close", codigo => {
-      if (codigo !== 0) return reject(new Error(error.trim() || "No se completó la operación de ingesta."));
-      try { resolve(JSON.parse(salida)); } catch { reject(new Error("La ingesta devolvió un resultado inválido.")); }
+      if (codigo !== 0) return reject(new Error(error.trim() || "No se completó la operación local."));
+      try { resolve(JSON.parse(salida)); } catch { reject(new Error("El backend local devolvió un resultado inválido.")); }
     });
     hijo.stdin.end(JSON.stringify(datos));
   });

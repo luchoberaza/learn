@@ -33,6 +33,15 @@ test("bus enlaza con acuse sin rellenar historia ni sustituir notas", async t =>
   await e.handlers.get("message_end")({ message: { role: "user", content: "No registrar" } }, e.ctx);
   assert.equal(readFileSync(e.file, "utf8"), antes);
 });
+test("cierre con acuse rechaza un vínculo distinto y conserva el resumen final", async t => {
+  const e=entorno(t);await e.handlers.get('session_start')({},e.ctx);
+  await e.bus.get('md-log:link')({file:e.file,backfill:false});let error;
+  await e.bus.get('md-log:unlink')({file:join(e.dir,'otro.md'),onComplete:err=>error=err});assert.match(error,/activo cambió/);
+  await e.handlers.get('message_end')({message:{role:'assistant',content:[{type:'text',text:'RESUMEN FINAL'}]}},e.ctx);
+  assert.match(readFileSync(e.file,'utf8'),/RESUMEN FINAL/);
+  let acuse=false;await e.bus.get('md-log:unlink')({file:e.file,onComplete:err=>{assert.equal(err,undefined);acuse=true;}});assert.ok(acuse);
+  const antes=readFileSync(e.file,'utf8');await e.handlers.get('message_end')({message:{role:'user',content:'Fuera del log'}},e.ctx);assert.equal(readFileSync(e.file,'utf8'),antes);
+});
 test("bus y comando rechazan backfill destructivo sin confirmación", async t => {
   const e = entorno(t); await e.handlers.get("session_start")({}, e.ctx);
   let error;

@@ -25,7 +25,7 @@ try{
   await loader.reload();assert.deepEqual(loader.getExtensions().errors,[]);settings.applyOverrides({retry:{enabled:false},compaction:{enabled:false}});
   const manager=sdk.SessionManager.create(vaultDir,salida);
   ({session}=await sdk.createAgentSession({cwd:vaultDir,agentDir,settingsManager:settings,resourceLoader:loader,sessionManager:manager}));
-  await session.bindExtensions({onError:e=>errores.push(e)});assert.equal(`${session.model.provider}/${session.model.id}`,'openai/gpt-6.1-sol');session.setThinkingLevel('off');
+  await session.bindExtensions({onError:e=>errores.push(e)});assert.equal(`${session.model.provider}/${session.model.id}`,'openai-codex/gpt-6.1-sol');session.setThinkingLevel('off');
   session.setActiveToolsByName(['leer_paginas','buscar_material','leer_items','ver_pagina','quiz','ask_user_question','investigar_tema','subagent']);
   const primera=new Promise(r=>{recibirPregunta=r}),alcance=new Promise(r=>{recibirInforme=r});inicio=performance.now();
   const inicioSesion=session.prompt('/estudiar redes retardos');await esperar(primera,120000);await inicioSesion;await session.abort();
@@ -60,7 +60,7 @@ try{
   });
   assert.equal(hijos.length,alcanceLanzado?2:1);assert.deepEqual(comprobar(),antes);assert.deepEqual(errores,[]);
   for(const log of logs)appendFileSync(join(vaultDir,log),'\n\n> [!note] Ensayo técnico Fase 6: sin respuestas del estudiante, sin calificación ni progreso. Las afirmaciones de control fueron introducidas por el script para probar discrepancias, no por el estudiante.\n');
-  const evidencia={estado:'correcto',principal:'openai/gpt-6.1-sol',researcher:'openai/gpt-6-luna',preguntas,entregas,hijos,segunda_sesion_sin_nuevo_hijo:true,alcance_lanzado:alcanceLanzado,discrepancia_controlada:true,protegidos_intactos:true,logs,sessionFile:manager.getSessionFile(),limites:'Dos arranques de probe sin respuestas; no clase completa ni certificación humana del informe.'};
+  const evidencia={estado:'correcto',principal:'openai-codex/gpt-6.1-sol',researcher:'openai-codex/gpt-6-luna',preguntas,entregas,hijos,segunda_sesion_sin_nuevo_hijo:true,alcance_lanzado:alcanceLanzado,discrepancia_controlada:true,protegidos_intactos:true,logs,sessionFile:manager.getSessionFile(),limites:'Dos arranques de probe sin respuestas; no clase completa ni certificación humana del informe.'};
   writeFileSync(join(salida,'resultado.json'),JSON.stringify(evidencia,null,2)+'\n',{flag:'wx'});console.log(JSON.stringify(evidencia,null,2));
 }catch(e){writeFileSync(join(salida,'fallo.json'),JSON.stringify({error:e.message,preguntas,entregas,sessionFile:session?.sessionManager.getSessionFile()},null,2)+'\n',{flag:'wx'});console.error(`Ensayo incompleto: ${e.stack||e.message}. Artefactos: ${salida}`);process.exitCode=1;}
 finally{if(session){await session.abort();await session.extensionRunner.emit({type:'session_shutdown'});session.dispose();}}

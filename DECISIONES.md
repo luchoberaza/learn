@@ -1,6 +1,6 @@
 # Decisiones de implementación
 
-## Estado — 2026-10-21
+## Estado — 2026-10-22
 
 **Fase 0 cerrada**, commit `79b1976`, con aceptación explícita del smoke técnico y de la prueba independiente del researcher real. La lección se interrumpió en el probe: no se afirma que se completó. Evidencia: `informes/verificacion-base.md`.
 
@@ -14,7 +14,9 @@
 
 **Fase 5 aprobada:** «Confirmado, avanzá» confirma la imagen recuperada en Obsidian y autoriza Fase 6. Fotos guardadas/embebidas y protocolo transcribir → aclarar → corregir, con ensayo público separado de Redes y corrección del pegado nativo en `53a7476`. Su advertencia de pi 1.4.0 frente al antiguo pin 1.3.0 se resolvió validando la base 1.4.0 en Fase 6, sin reinstalar. Revisiones individuales y progreso no cambian. Detalle: `informes/fase5.md`.
 
-**Fase 6 implementada, checkpoint pendiente:** investigar_tema usa el subagent existente con referencias, contrato y enunciados curados sin soluciones. Alcance en caché y verificar para 1–3 afirmaciones. 71 tests Node / 56 Python; doctor completo correcto en pi 1.4.0. Ensayo final real: primer probe en 20,62 s, siguiente en 7,42 s sin nuevo hijo, controles A1/A3 discrepan y A2 concuerda. Se conservan fallos semánticos anteriores: la estructura/caché no certifica la verdad del informe. Fase 7 no iniciada. Detalle: `informes/fase6.md`.
+**Fase 6 aprobada:** «Aprobado, continuá», commit `f9aeea7`. Researcher anclado, modos y caché; 71 tests Node / 56 Python y doctor completo correcto en pi 1.4.0 al cierre. Ensayo final: probes en 20,62 s / 7,42 s sin nuevo hijo; A1/A3 discrepan y A2 concuerda. Fallos semánticos anteriores conservados; estructura/caché no certifican verdad. Detalle: `informes/fase6.md`.
+
+**Fase 7 implementada, aprobación pendiente:** progreso validado/fusionado/atómico con `.bak`, `/fin`, `/progreso`, reconstrucción confirmada y sugerencia. 83 tests Node / 67 Python, doctor completo en verde. Dos sesiones con Sol y alumno virtual aislado: segundo probe confirma el borde en tres preguntas. Sin progreso ficticio en Redes. El usuario autorizó «Usar openai-codex» al faltar credenciales para el proveedor anterior; se verificaron Sol/Luna texto y Luna imagen antes de cambiar sólo configuración local del proyecto. Fase 8 no iniciada. Detalle: `informes/fase7.md`.
 
 ## D0.1 — Conservar el upstream y fijar los subagentes
 
@@ -254,3 +256,31 @@ La huella incorpora tema, contrato, enunciados, configuración/modelo, prompt de
 ## D6.4 — Evidencia y límites
 
 Cinco iteraciones técnicas con principal Sol y diez hijos Luna quedan en _procesado/fase6/. Dos se detuvieron por el fallo de veredicto; las intermedias no se confunden con el ensayo del contexto final. Evidencia final: prueba-1792630409914. Primera pregunta 20,62 s mientras alcance tardó 68 s en segundo plano; segunda pregunta 7,42 s y cero hijos adicionales. Safe_bash, web_search y web_fetch reales en los hijos. Controles falsos del script, no errores del estudiante. Ninguna pregunta respondida, nota de progreso escrita ni curso completo realizado. Los 18 originales, 17 copias, contrato, índice, progreso, teach y plan conservan integridad. Costo de catálogo de todos los ensayos: 0,3807107; no factura. Revisión de informes y piloto humano siguen pendientes.
+
+## D7.1 — Un backend de progreso, sin segunda base de datos
+
+`progreso.py` reutiliza YAML seguro, rutas seguras, bloqueo del curso y escritura atómica/fsync existentes. `sesion.py` lo consulta al activar/restaurar; el registro usa el puente Python asíncrono ya instalado, ahora con selector interno de script. No agrega dependencia, daemon, watcher ni OCR. La tool es secuencial y conserva la cola de mutación de archivos; el bloqueo Python protege también dos procesos del proyecto. Las ediciones externas no cooperativas aún pueden competir en el último intervalo antes de rename: se comprueban bytes antes de publicar, no se promete una transacción con editores arbitrarios.
+
+Cada guardado valida esquema, fechas de evidencia no futuras, tema/ítems del curso y log del mismo tema; conserva exactamente los bytes previos como .bak. Fusiona listas por igualdad exacta, errores por descripción y borde moviendo textos explícitamente confirmados entre domina/falla. No hace deduplicación semántica ni decide dominio: eso sigue siendo juicio del modelo sobre respuestas observadas. Conserva otros temas e historial, con una entrada por tema/log y cierre monotónico. No permite pasar evidencia existente a sin_empezar por cerrar sin respuestas nuevas.
+
+Si progreso es inválido, un .bak válido se restaura con aviso, preservando los bytes inválidos por SHA en _procesado/. Sin respaldo válido se conserva todo y se continúa sin registrar hasta reparar; un backup inválido existente tampoco se reemplaza sin intervención. Tests cubren cortes, bloqueo, edición concurrente, UTF-8 inválido, symlinks e idempotencia. No se usó progreso real de Redes para probar recuperación.
+
+## D7.2 — Cierre confirmado y recuperación desde logs
+
+`/fin` solicita un registro final; cierre natural usa `cierre:true`. Entradas curso-cierre/curso-progreso en getBranch correlacionan solicitud y guardado con el log activo. Se verificó AgentSettledEvent de pi 1.4.0: incluye aborted y ocurre después de continuaciones/reintentos. Sólo se desvincula tras un mensaje assistant completo con texto y stopReason stop, sin llamadas pendientes; Escape/error no cierra. La regresión inicial falló al cerrar sin mensaje final y quedó verde con esta condición. md-log serializa su resumen y el unlink con el mismo lock, comprueba el archivo esperado y acusa éxito/error. Sin acuse se mantiene el curso activo. Ad hoc puede cerrar sin escribir un tema ficticio.
+
+La próxima activación detecta el último log del tema sin cierre final; coincide el nombre completo del tema y no sólo un sufijo (regresión roja→verde con otra-derivacion frente a derivacion). Historial legado sin flag se considera registrado. leer_sesion_anterior devuelve texto acotado y SHA; la propuesta se confirma con UI real y el backend verifica esa huella. La reconstrucción se etiqueta, preserva el log y no cierra la sesión actual. No supone errores a partir de preguntas sin respuesta ni persiste pruebas técnicas como si fueran intentos del usuario. La confirmación se cubrió con fixtures (aceptar, rechazar, sin UI y cambio del log), no como clic humano real.
+
+## D7.3 — Confirmar el borde, no reiniciar el probe
+
+Modo-curso pide confirmar domina/falla previos con hasta tres preguntas conceptuales en total; si los contradice la nueva evidencia, se amplía el mapeo. El dossier prioriza borde/próximo paso frente a listas de intentos. La sugerencia omite dominados y exige prerequisitos dominados; orden de preferencia: en curso, repasar, temas nuevos accesibles. No se agrega un planificador de repasos.
+
+Ensayo real final: _procesado/fase7/prueba-1792672775843/resultado.json. Dos sesiones nuevas de la fixture prueba-progreso con Sol, tres preguntas en cada una. El sistema recibió el borde de la primera; se cotejó en el JSONL de la segunda y las preguntas lo confirmaron en tres, con igual borde registrado. Dos /fin guardaron y conservaron el resumen antes de desvincular. Respuestas programadas: primer quiz correcto y siguientes no sé; sólo describen al alumno virtual aislado. No certifican el nivel del usuario, una clase completa, práctica evaluada ni el piloto humano. Researcher/visión se excluyeron de este smoke porque ya tienen ensayos propios.
+
+Se conservan los intentos fallidos: modelo inicial distinto (1792636116750); ruta de backend incorrecta (1792636295117); rechazo prudente a convertir respuestas sintéticas en evidencia del usuario (1792636612356); simulador que respondió todo bien, sin techo (1792636786643); divergencia de proveedor (1792672185762); openai sin credenciales (1792672223350). Se corrigieron el harness y su guardia temprana de autenticación, no se relajó la exigencia de piso/techo. También se corrigió una fixture de test que editaba los datos antes de su serialización, no el snapshot activo. Uso registrado en JSONL de todos los ensayos: 54873 entrada, 3199 salida, 172544 lectura de caché, costo de catálogo 0,1589904 (no factura; excluye doctor y pings).
+
+## D7.4 — Cambio de proveedor autorizado, no fallback silencioso
+
+Al retomar la fase, openai ya no tenía autenticación configurada y el modelo seleccionado por el runtime era openai-codex/gpt-6.1-sol. Doctor falló ambos pings openai/gpt-6-luna. Se informó y el usuario eligió «Usar openai-codex». Antes de adoptar el cambio respondieron openai-codex/gpt-6.1-sol por texto y gpt-6-luna por texto/PNG. Se verificaron docs de modelos y las declaraciones públicas del runtime instalado. Se cambiaron sólo .pi/settings.json, curso.config.json, frontmatter del researcher y las expectativas de los scripts de ensayo; ninguna credencial ni configuración personal.
+
+Doctor completo volvió a verde con el nuevo proveedor; los informes previos conservan sus ids históricos. El cambio de modelo/config invalida por diseño las claves de researcher/visión, preservando sus generaciones anteriores. No se recreó alcance ni se retranscribieron PDFs durante Fase 7: el próximo estudio puede lanzar un alcance nuevo, y una futura preparación de visión explícita puede consumir llamadas nuevas. No se alteró la versión de pi ni se eligió otro nombre de modelo. No se relanzaron los ensayos históricos de fotos/visión/researcher sólo para actualizar su etiqueta de proveedor; siguen disponibles como opcionales.

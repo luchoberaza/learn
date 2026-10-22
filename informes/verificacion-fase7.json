@@ -1,0 +1,83 @@
+{
+  "version": 1,
+  "estado": "fase7_implementada_checkpoint_usuario_pendiente",
+  "fase6_aprobada": "Aprobado, continuá",
+  "fase8_iniciada": false,
+  "pi_verificado": "1.4.0",
+  "principal": "openai-codex/gpt-6.1-sol",
+  "researcher_y_vision": "openai-codex/gpt-6-luna",
+  "cambio_proveedor": {
+    "motivo": "openai sin autenticación configurada; ambos pings de doctor fallaron",
+    "autorizacion_usuario": "Usar openai-codex (Recommended)",
+    "previo_a_adoptar": ["Sol texto OK", "Luna texto OK", "Luna PNG OK"],
+    "credenciales_o_preferencias_personales_modificadas": false,
+    "cache_previa_preservada_no_vigente_con_nueva_huella": true,
+    "ensayos_historicos_fotos_vision_researcher_repetidos": false
+  },
+  "pruebas": {
+    "node": 83,
+    "python_incluidas": 67,
+    "python_independiente": 67,
+    "sin_llm_en_suite": true,
+    "doctor": "completo correcto con pi 1.4.0 y openai-codex; modelos texto/imagen y web reales",
+    "regresiones_rojas_antes_de_corregir": [
+      "Guardar cierre no desvincula sin mensaje final o si se abortó el turno",
+      "Activar/restaurar muestra aviso explícito de restauración de .bak",
+      "No ofrece reconstruir el log de otro tema con sufijo coincidente"
+    ],
+    "reconstruccion": "fixtures: lectura, cancelación, sin UI, aceptación y SHA cambiado; no clic humano real",
+    "persistencia": ["backup byte exacto", "fusión", "idempotencia", "schema", "fechas", "ítems", "rutas", "symlinks", "interrupción", "bloqueo", "edición concurrente", "UTF-8 inválido", "backup inválido preservado"],
+    "cierre": "mensaje final completo, sin aborto/error/toolCall pendiente, acuse de md-log y archivo esperado; fallo conserva curso activo"
+  },
+  "ensayo_final": {
+    "evidencia": "_procesado/fase7/prueba-1792672775843/resultado.json",
+    "fixture": "_procesado/fase7/prueba-1792672775843/vault/cursos/prueba-progreso",
+    "sesiones_nuevas": 2,
+    "preguntas_primera": 3,
+    "preguntas_segunda": 3,
+    "segunda_sesion_dossier_contiene_borde_previo_cotejado_jsonl": true,
+    "borde_igual_en_ambas_sesiones": true,
+    "cierres_fin_exitosos_con_resumen_en_log": 2,
+    "historial_entradas": 2,
+    "progreso_redes_intacto": true,
+    "control": "Alumno virtual: primer quiz correcto, siguientes no sé; no representa al usuario humano",
+    "researcher_o_vision_lanzados": false,
+    "clase_completa_o_piloto_humano": false
+  },
+  "iteraciones_conservadas": [
+    {"artefactos": "_procesado/fase7/prueba-1792636116750", "resultado": "modelo predeterminado distinto"},
+    {"artefactos": "_procesado/fase7/prueba-1792636295117", "resultado": "harness con ruta de backend/venv equivocada"},
+    {"artefactos": "_procesado/fase7/prueba-1792636612356", "resultado": "no convirtió respuestas sintéticas en evidencia del usuario; borde incompleto"},
+    {"artefactos": "_procesado/fase7/prueba-1792636786643", "resultado": "simulador respondió todo correcto; techo ausente"},
+    {"artefactos": "_procesado/fase7/prueba-1792672185762", "resultado": "proveedor distinto al histórico"},
+    {"artefactos": "_procesado/fase7/prueba-1792672223350", "resultado": "openai sin credenciales configuradas"},
+    {"artefactos": "_procesado/fase7/prueba-1792672775843", "resultado": "dos sesiones correctas con alumno virtual aislado y proveedor autorizado"}
+  ],
+  "uso_registrado_jsonl_ensayos_sin_doctor_ni_pings": {
+    "entrada_nueva": 54873,
+    "salida": 3199,
+    "lectura_cache": 172544,
+    "costo_catalogo": 0.1589904,
+    "costo_ensayo_final": 0.0980644,
+    "no_es_factura": true,
+    "limite": "Sin JSONL no hay uso registrado; no constituye contabilidad del proveedor"
+  },
+  "integridad": {
+    "originales_pdf_cotejados": 18,
+    "copias_redes_cotejadas": 17,
+    "contrato_indice_cotejados_con_propuesta_aplicada": true,
+    "progreso_redes_vacio_original": true,
+    "progreso_redes_sha256": "98e1d8ce367adbffd7f928be907bb8fe8c1a32e39b6b28e2d386d3a0c30a798d",
+    "teach_sin_cambios_contra_upstream": true,
+    "plan_sha256": "ba3ab49513e1fee2ec7c4e3ab60638fb28fb2e58460f3c24af785b987277b5fa"
+  },
+  "limites": [
+    "Criterio de tres preguntas comprobado con modelo real y respuestas programadas aisladas, no con usuario humano.",
+    "Ninguna prueba sintética se registró en progreso de Redes.",
+    "Validación estructural no certifica el juicio semántico del modelo; deduplicación por texto exacto.",
+    "Reconstrucción sólo probada con fixtures; no confirmación humana real ni piloto de 3–5 sesiones.",
+    "Bloqueos para procesos cooperativos y chequeos de bytes, no transacción contra editores arbitrarios.",
+    "268 páginas referidas pendientes; revisiones humanas de materiales/informes no cambiaron.",
+    "El proveedor nuevo invalida las huellas previas sin borrar cachés; próximo alcance o preparación explícita pueden consumir llamadas nuevas."
+  ]
+}

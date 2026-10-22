@@ -7,6 +7,7 @@ import { python, transcribir } from "./ingesta.ts";
 import { guardarCurso, registrarCuracion } from "./curacion.ts";
 import { registrarSesion } from "./sesion.ts";
 import { registrarResearcher } from "./researcher.ts";
+import { registrarProgreso } from "./progreso.ts";
 
 const slug = Type.String({ pattern: "^[a-z0-9]+(?:-[a-z0-9]+)*$" });
 const paginas = Type.Array(Type.Integer({ minimum: 1 }), { minItems: 1 });
@@ -21,6 +22,34 @@ function salida(curso: string): string {
 export default function (pi: ExtensionAPI) {
   registrarCuracion(pi);
   const sesion = registrarSesion(pi);
+  const progreso = registrarProgreso(pi, sesion);
+  const textoProgreso = Type.String({ minLength: 1, maxLength: 2000 });
+  const listaProgreso = Type.Array(textoProgreso, { maxItems: 100 });
+  const fecha = Type.String({ pattern: "^\\d{4}-\\d{2}-\\d{2}$" });
+  pi.registerTool({
+    name: "leer_sesion_anterior", label: "Leer sesión sin cierre",
+    description: "Lee el último log del tema sin registro final. Devuelve texto acotado y SHA para reconstruir sin inventar respuestas. No modifica notas ni progreso.",
+    parameters: Type.Object({}), executionMode: "sequential", execute: progreso.leerAnterior,
+  });
+  pi.registerTool({
+    name: "registrar_progreso", label: "Guardar progreso del curso",
+    description: "Fusiona evidencia observada del tema activo, valida y guarda atómicamente con .bak. No inventes resultados ni puntajes. cierre:true al terminar; el log se cierra tras el mensaje final. Para reconstruir leé leer_sesion_anterior y usá su log/SHA; requiere confirmación humana. Ad hoc no crea temas persistentes.",
+    parameters: Type.Object({
+      estado: Type.Union([Type.Literal("sin_empezar"), Type.Literal("en_curso"), Type.Literal("dominado"), Type.Literal("repasar")]),
+      borde: Type.Object({ domina: listaProgreso, falla: listaProgreso }), conceptos_firmes: listaProgreso,
+      errores_de_concepto: Type.Array(Type.Object({ descripcion: textoProgreso, detectado: fecha, resuelto: Type.Boolean() }), { maxItems: 100 }),
+      ejercicios: Type.Array(Type.Object({ doc: slug, item: textoProgreso, fecha,
+        resultado: Type.Union([Type.Literal("correcto"), Type.Literal("parcial"), Type.Literal("incorrecto")]),
+        puntaje: Type.Optional(Type.String({ maxLength: 200 })), notas: Type.Optional(Type.String({ maxLength: 2000 })) }), { maxItems: 100 }),
+      discrepancias: listaProgreso, proximo_paso: textoProgreso, resumen: textoProgreso, cierre: Type.Optional(Type.Boolean()),
+      reconstruir_log: Type.Optional(Type.String()), huella_log: Type.Optional(Type.String({ pattern: "^[a-f0-9]{64}$" })),
+    }), executionMode: "sequential",
+    execute: (...args) => {
+      const e = sesion.actual();
+      if (!e) throw new Error("No hay curso activo. Usá /estudiar.");
+      return withFileMutationQueue(e.r, () => progreso.registrar(...args));
+    },
+  });
   const investigar = registrarResearcher(pi, sesion.actual, sesion.refrescar, vaultDir, piDir);
   pi.registerTool({
     name: "investigar_tema", label: "Verificar material del curso",

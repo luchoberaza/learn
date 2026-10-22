@@ -12,6 +12,7 @@ import pymupdf
 
 from almacen import Conflicto, atomico, bloquear, guardar_json, leer_json, ruta_segura, sha256
 from cursos import carpeta, cargar_yaml, texto, validar
+from progreso import leer as leer_progreso
 
 
 def cargar(vault: Path, curso: str, comprobar=False):
@@ -57,10 +58,13 @@ def cargar(vault: Path, curso: str, comprobar=False):
     except (OSError, ValueError):
         contrato = "Contrato no disponible: no inferir rúbrica ni objetivos."
         avisos.append(contrato)
-    progreso = yaml("progreso.yaml", {})
-    if not isinstance(progreso, dict) or not isinstance(progreso.get("temas"), dict):
-        progreso = {"temas": {}, "historial": []}
-        avisos.append("Progreso inválido: se continúa sin reconstruirlo ni escribirlo.")
+    try:
+        registro = leer_progreso(vault, curso)
+        progreso = registro["progreso"]
+        avisos.extend(registro["avisos"])
+    except (OSError, ValueError, RuntimeError, TypeError, KeyError) as e:
+        progreso = {"version": 1, "temas": {}, "historial": []}
+        avisos.append(f"Progreso no disponible: {e}; se sigue con el material.")
     nombre = re.search(r"(?m)^nombre:\s*(.+)$", contrato)
     return {"curso": curso, "nombre": nombre[1].strip("\"'") if nombre else curso, "contrato": contrato, "documentos": documentos, "temas": temas,
             "items": bancos, "progreso": progreso, "avisos": avisos,

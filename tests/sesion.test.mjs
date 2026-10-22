@@ -90,6 +90,13 @@ test("activar enlaza un log nuevo sin historial anterior y arranca solo", async 
   assert.match(evento.systemPromptOptions.sections.curso, /Última sesión sin registro/);
   assert.equal(evento.systemPromptOptions.sections.ajena, "conservar");
 });
+test("activar y restaurar avisan explícitamente si se recuperó el progreso", async t => {
+  const d=datos();d.avisos=['Progreso inválido restaurado desde .bak; contenido inválido conservado.'];
+  const e=entorno(t,d);await e.comandos.get('estudiar').handler('calculo derivacion',e.ctx);
+  assert.ok(e.avisos.some(([texto])=>texto.includes('restaurado desde .bak')));
+  e.avisos.length=0;await e.eventos.get('session_start')({},e.ctx);
+  assert.ok(e.avisos.some(([texto])=>texto.includes('restaurado desde .bak')));
+});
 test("autocompleta ambos argumentos completos y respeta cancelación/busy", async t => {
   const e = entorno(t), c = e.comandos.get("estudiar");
   writeFileSync(join(e.raiz, "indice.yaml"), "Índice de la prueba de completado");
@@ -127,7 +134,7 @@ test("runtime instalado registra comandos y tools de sesión sin modificar teach
   const p = await loadProject();
   try {
     assert.deepEqual(p.errors, []);
-    for (const n of ["leer_paginas", "ver_pagina", "buscar_material", "leer_items", "investigar_tema"]) assert.ok(p.session.getActiveToolNames().includes(n));
-    for (const n of ["estudiar", "cursos"]) assert.ok(p.session.extensionRunner.getRegisteredCommands().some(c => c.name === n));
+    for (const n of ["leer_paginas", "ver_pagina", "buscar_material", "leer_items", "investigar_tema", "leer_sesion_anterior", "registrar_progreso"]) assert.ok(p.session.getActiveToolNames().includes(n));
+    for (const n of ["estudiar", "cursos", "fin", "progreso"]) assert.ok(p.session.extensionRunner.getRegisteredCommands().some(c => c.name === n));
   } finally { await p.close(); }
 });

@@ -1,0 +1,66 @@
+#!/usr/bin/env node
+// Ensayo opcional con modelo real y estudiante simulado; nunca escribe progreso de Redes.
+import assert from 'node:assert/strict';
+import { mkdirSync, readFileSync, writeFileSync, copyFileSync } from 'node:fs';
+import { join, relative } from 'node:path';
+import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
+import { registrarSesion } from '../extensions/curso/sesion.ts';
+import { registrarProgreso } from '../extensions/curso/progreso.ts';
+import { python } from '../extensions/curso/ingesta.ts';
+import { agentDir, loadProject, piDir, vaultDir } from './lib/pi-sdk.mjs';
+
+if(process.argv.length>2)throw new Error('Uso: node .pi/scripts/probar-progreso (consume modelo; datos sintéticos aislados).');
+const sha=f=>createHash('sha256').update(readFileSync(f)).digest('hex');
+const protegido=join(vaultDir,'cursos/redes/progreso.yaml'),antes=sha(protegido);
+const salida=join(vaultDir,'_procesado/fase7',`prueba-${Date.now()}`),vault=join(salida,'vault'),recursos=join(vault,'.pi'),raiz=join(vault,'cursos/prueba-progreso');
+for(const dir of ['sesiones','fuentes/bibliografia','_procesado/libro/paginas'])mkdirSync(join(raiz,dir),{recursive:true});
+for(const f of ['modo-curso.md','curso.config.json','agents/researcher.md','skills/teach/SKILL.md']){mkdirSync(join(recursos,f,'..'),{recursive:true});copyFileSync(join(piDir,f),join(recursos,f));}
+const material='# Material sintético de prueba\nEl retardo de transmisión es $L/R$: introducir L bits en un enlace de tasa R bits/s. El de propagación es $d/s$: recorrer distancia d a velocidad s. Con d y s constantes, cambiar L no cambia propagación. Con R constante, duplicar L duplica transmisión. Este documento es una fixture, no una bibliografía del usuario.\n';
+const pdf=join(raiz,'fuentes/bibliografia/nota.pdf');execFileSync(join(piDir,'.venv/bin/python'),['-c','import pymupdf,sys; d=pymupdf.open();p=d.new_page();p.insert_text((50,50),"Fixture digital de progreso: transmision L/R; propagacion d/s.");d.save(sys.argv[1])',pdf]);
+writeFileSync(join(raiz,'curso.md'),'---\nnombre: Prueba sintética de progreso\nslug: prueba-progreso\n---\n# Objetivos\n- O1.1: Distinguir transmisión y propagación.\n# Cómo se evalúa\nJustificar conceptualmente; no hay escala de puntaje.\n');
+writeFileSync(join(raiz,'indice.yaml'),'version: 1\ndocumentos:\n- {id: libro, titulo: Fixture, tipo: bibliografia, archivo: fuentes/bibliografia/nota.pdf, paginas: 1, prioridad: principal}\ntemas:\n- id: retardos\n  nombre: Retardos\n  unidad: 1\n  alias: []\n  prerequisitos: []\n  objetivos: [O1.1]\n  bibliografia:\n  - {doc: libro, seccion: Definiciones, paginas: [1, 1]}\n');
+writeFileSync(join(raiz,'progreso.yaml'),'version: 1\ntemas: {}\nhistorial: []\n');
+writeFileSync(join(raiz,'_procesado/control.json'),JSON.stringify({generador:'pi-learning-ingesta',version:1}));
+writeFileSync(join(raiz,'_procesado/libro/meta.json'),JSON.stringify({id:'libro',sha256:sha(pdf)}));
+writeFileSync(join(raiz,'_procesado/libro/paginas/0001.md'),material);
+writeFileSync(join(raiz,'_procesado/libro/calidad.json'),JSON.stringify({paginas:{'1':{pendiente:false,ruta:'digital',sha256_markdown:sha(join(raiz,'_procesado/libro/paginas/0001.md'))}}}));
+const proyecto=await loadProject(),sdk=proyecto.sdk,modelo=proyecto.session.modelRuntime.getModel('openai-codex','gpt-6.1-sol'),defs=Object.fromEntries(['quiz','ask_user_question','leer_paginas','registrar_progreso','leer_sesion_anterior'].map(n=>[n,proyecto.session.extensionRunner.getToolDefinition(n)]));await proyecto.close();
+assert.ok(modelo,'Modelo acordado no disponible en el catálogo.');
+const settings=sdk.SettingsManager.create(vault,agentDir,{projectTrusted:true});let session,control,etapa='probe',resolver,numero=0;const preguntas=[],registros=[],sesiones=[],errores=[];
+async function abrir(){
+  const loader=new sdk.DefaultResourceLoader({cwd:vault,agentDir,settingsManager:settings,noExtensions:true,noContextFiles:true,noSkills:true,noPromptTemplates:true,additionalExtensionPaths:[join(piDir,'extensions/md-log.ts')],extensionFactories:[pi=>{
+    control=registrarSesion(pi,vault,piDir);const progreso=registrarProgreso(pi,control,vault);
+    pi.registerTool({...defs.leer_paginas,execute:async(_id,args)=>({content:[{type:'text',text:control.leer_paginas(args)}],details:undefined})});
+    pi.registerTool({...defs.registrar_progreso,execute:progreso.registrar});pi.registerTool({...defs.leer_sesion_anterior,execute:progreso.leerAnterior});
+    pi.registerTool({...defs.ask_user_question,execute:async()=>({content:[{type:'text',text:'Control del estudiante simulado: lo que pide este curso sintético.'}],details:undefined})});
+    pi.registerTool({...defs.quiz,execute:async(_id,args)=>{
+      const n=preguntas.filter(p=>p.sesion===numero).length+1;assert.ok(n<=4,'Probe demasiado largo para esta fixture acotada.');
+      const valores=Array.isArray(args.correctAnswer)?args.correctAnswer:args.correctAnswer.startsWith('[')?JSON.parse(args.correctAnswer):[args.correctAnswer];
+      const opciones=args.options.map((o,i)=>({index:i+1,label:o.label,value:o.value||o.label})),correctIndices=opciones.filter(o=>valores.includes(o.value)).map(o=>o.index);assert.ok(correctIndices.length);
+      // Control por turno: un piso seguido de desconocimiento; no estima capacidades humanas.
+      const sabe=n===1;preguntas.push({sesion:numero,n,pregunta:args.question,control:sabe?'correcta':'no sé'});
+      const details={status:'answered',question:args.question,mode:args.multiSelect?'multi-select':'single-select',options:opciones,answers:sabe?opciones.filter(o=>correctIndices.includes(o.index)):[],correctIndices,...(sabe?{correct:true}:{dontKnow:true}),note:'Respuesta del alumno virtual de esta fixture aislada.',explanation:args.explanation};
+      return {content:[{type:'text',text:JSON.stringify(details)}],details};
+    }});
+    pi.on('before_agent_start',event=>{event.systemPromptOptions.sections.ensayo_fase7=`El estudiante de prueba-progreso es una entidad virtual, distinta del usuario humano. Las respuestas de quiz SON observaciones del alumno virtual para esta simulación y DEBEN definir SU borde con domina/falla; no se proyectan al usuario real. Registrar sólo en esta fixture, con resumen SINTÉTICO. La regla que impide atribuir pruebas al usuario sigue vigente para el humano, no impide registrar el estado del alumno virtual aquí. No uses researcher: se probó en Fase 6 y aquí no está disponible. Etapa ${etapa}. Si es probe, limitate a localizar/confirmar el borde de las dos definiciones del único documento; en cuanto esté observado llamá registrar_progreso con cierre:false y un resumen rotulado sintético. No empieces plan ni enseñanza en este smoke. En etapa fin respetá /fin y cierre:true, con resumen final en español. No inventes otros temas ni ejercicios.`;});
+    pi.on('tool_result',(event,ctx)=>{if(event.toolName==='registrar_progreso'&&!event.isError&&event.details?.guardado){registros.push({sesion:numero,etapa,...event.details});if(etapa==='probe'){resolver();ctx.abort();}}});
+  }]});await loader.reload();assert.deepEqual(loader.getExtensions().errors,[]);settings.applyOverrides({compaction:{enabled:false},retry:{enabled:false}});
+  const p=await sdk.createAgentSession({cwd:vault,agentDir,settingsManager:settings,resourceLoader:loader,sessionManager:sdk.SessionManager.create(vault,salida),model:modelo,noTools:true});session=p.session;await session.bindExtensions({onError:e=>errores.push(e)});assert.ok(session.modelRuntime.hasConfiguredAuth(modelo.provider),`Sin credenciales configuradas para ${modelo.provider}; no se cambia de proveedor automáticamente.`);assert.equal(`${session.model.provider}/${session.model.id}`,'openai-codex/gpt-6.1-sol');session.setThinkingLevel('off');sesiones.push(session.sessionManager.getSessionFile());
+}
+async function cerrar(){if(session){await session.abort();await session.extensionRunner.emit({type:'session_shutdown'});session.dispose();session=undefined;}}
+let timer;
+try{
+  const bordes=[];
+  for(numero=1;numero<=2;numero++){
+    etapa='probe';await abrir();let rechazar;const guardado=new Promise((r,j)=>{resolver=r;rechazar=j;}),run=session.prompt('/estudiar prueba-progreso retardos');run.then(()=>{if(!control.actual())rechazar(new Error('No se activó el curso sintético; revisar rutas del backend.'));},rechazar);
+    await Promise.race([guardado,new Promise((_,r)=>{timer=setTimeout(()=>r(new Error('No se registró el borde en 180 s.')),180000);})]);clearTimeout(timer);await run;await session.abort();
+    const p=await python('leer',{vault,curso:'prueba-progreso'},undefined,'progreso.py');const borde=p.progreso.temas.retardos.borde;assert.ok(borde.domina.length&&borde.falla.length,'Borde no acotado por piso y techo.');bordes.push(borde);
+    if(numero===2)assert.ok(preguntas.filter(p=>p.sesion===2).length<=3,'La segunda sesión excedió tres preguntas.');
+    etapa='fin';await session.prompt('/fin');await session.waitForIdle();assert.equal(control.actual(),undefined,'/fin no cerró el curso tras guardar.');
+    const h=(await python('leer',{vault,curso:'prueba-progreso'},undefined,'progreso.py')).progreso.historial;assert.ok(h.every(x=>x.cierre===true));await cerrar();
+  }
+  assert.equal(sha(protegido),antes);assert.deepEqual(errores,[]);const p=await python('leer',{vault,curso:'prueba-progreso'},undefined,'progreso.py');assert.equal(p.progreso.historial.length,2);
+  const resultado={estado:'correcto',modelo:'openai-codex/gpt-6.1-sol',fixture:relative(vaultDir,vault),preguntas,bordes,registros,historial:p.progreso.historial,sesiones,progreso_redes_intacto:true,limites:'Respuestas programadas de un estudiante simulado, no una clase completa ni una validación del nivel del usuario. Reconstrucción/confirmación se cubren sin modelo en tests separados.'};writeFileSync(join(salida,'resultado.json'),JSON.stringify(resultado,null,2)+'\n');console.log(JSON.stringify(resultado,null,2));
+}catch(e){writeFileSync(join(salida,'resultado-fallido.json'),JSON.stringify({estado:'incompleto',error:String(e),preguntas,registros,sesiones,errores},null,2)+'\n');console.error(`Ensayo incompleto: ${e.stack||e}. Artefactos: ${salida}`);process.exitCode=1;}
+finally{clearTimeout(timer);await cerrar();assert.equal(sha(protegido),antes,'Se modificó progreso de Redes.');}

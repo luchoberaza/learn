@@ -2,7 +2,7 @@
 name: researcher
 description: Investigación web y contraste con el material del curso
 tools: web_search, web_fetch, safe_bash
-model: openai/gpt-6-luna
+model: openai-codex/gpt-6-luna
 thinking: medium
 system-prompt: append
 auto-exit: true

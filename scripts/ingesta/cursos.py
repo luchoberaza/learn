@@ -256,6 +256,8 @@ def validar_progreso(p, temas, documentos, items):
         if not isinstance(h, dict) or h.get("tema") not in temas or not isinstance(h.get("resumen"), str) or not isinstance(h.get("log"), str):
             raise ValueError("Historial inválido en progreso.yaml.")
         fecha(h.get("fecha"))
+        if any(k in h and type(h[k]) is not bool for k in ["cierre", "reconstruido"]):
+            raise ValueError("Cierre/reconstruido del historial deben ser booleanos.")
         log = Path(h["log"])
         if log.is_absolute() or ".." in log.parts or log.parts[:1] != ("sesiones",) or log.suffix != ".md":
             raise ValueError("El log del historial debe estar en sesiones/.")

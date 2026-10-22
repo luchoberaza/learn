@@ -62,11 +62,11 @@ try {
   const tools = new Set(session.getActiveToolNames());
   check(project.errors.length === 0 && !(project.loader.getExtensions().warnings?.length),
     "Carga de extensiones / alias", project.errors.length ? "hay errores; abrí pi --verbose" : "API instalada compatible, sin errores de carga");
-  for (const name of ["quiz", "ask_user_question", "subagent", "web_search", "web_fetch", "transcribir_paginas", "guardar_items", "guardar_curso", "leer_paginas", "ver_pagina", "buscar_material", "leer_items", "investigar_tema"]) {
+  for (const name of ["quiz", "ask_user_question", "subagent", "web_search", "web_fetch", "transcribir_paginas", "guardar_items", "guardar_curso", "leer_paginas", "ver_pagina", "buscar_material", "leer_items", "investigar_tema", "leer_sesion_anterior", "registrar_progreso"]) {
     check(tools.has(name), `Herramienta ${name}`, tools.has(name) ? "cargada y activa" : "revisá la confianza del proyecto y SETUP.md");
   }
   const commands = new Set(session.extensionRunner.getRegisteredCommands().map(c => c.name));
-  for (const name of ["curso-nuevo", "curso-agregar", "curso-check", "curso-estado", "estudiar", "cursos"]) {
+  for (const name of ["curso-nuevo", "curso-agregar", "curso-check", "curso-estado", "estudiar", "cursos", "fin", "progreso"]) {
     check(commands.has(name), `Comando /${name}`, commands.has(name) ? "registrado" : "ejecutá /reload y revisá extensions/curso/");
   }
   const pruebaFotos = mkdtempSync(join(tmpdir(), "pi-learn-fotos-"));

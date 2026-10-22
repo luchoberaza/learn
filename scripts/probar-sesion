@@ -45,7 +45,7 @@ async function abrir(m) {
 let timer;
 try {
   session = await abrir(manager);
-  assert.equal(`${session.model.provider}/${session.model.id}`, "openai/gpt-6.1-sol");
+  assert.equal(`${session.model.provider}/${session.model.id}`, "openai-codex/gpt-6.1-sol");
   session.setThinkingLevel("off");
   session.setActiveToolsByName(["leer_paginas", "buscar_material", "leer_items", "ver_pagina", "quiz", "ask_user_question"]);
   inicio = performance.now();
@@ -83,7 +83,7 @@ try {
   assert.deepEqual(errores, []);
   const log = join(vaultDir, estado.log);
   appendFileSync(log, "\n\n> [!note] Prueba técnica Fase 4: primera pregunta emitida; sin respuesta del usuario ni progreso registrado. Compactación y reapertura comprobadas.\n");
-  const evidencia = { modelo: "openai/gpt-6.1-sol", primera_pregunta: pregunta, tiempos_ms: tiempos, compaction_real: true, reapertura_real: true, estado_restaurado: estado2, progreso_intacto: true,
+  const evidencia = { modelo: "openai-codex/gpt-6.1-sol", primera_pregunta: pregunta, tiempos_ms: tiempos, compaction_real: true, reapertura_real: true, estado_restaurado: estado2, progreso_intacto: true,
     limite: "Smoke técnico con seis tools de lectura/preguntas, no una clase completa ni una respuesta real del alumno; no prueba fotos ni researcher anclado.", sessionFile: file };
   writeFileSync(join(salida, "resultado.json"), JSON.stringify(evidencia, null, 2) + "\n");
   console.log(JSON.stringify(evidencia, null, 2));

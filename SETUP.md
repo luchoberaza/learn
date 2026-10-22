@@ -1,6 +1,6 @@
-# Instalación reproducible — Fases 0 a 6
+# Instalación reproducible — Fases 0 a 7
 
-**Estado:** Fases 0–4 aprobadas y cerradas (`79b1976`, `352c249`, `6409acd`, `3616e71`, `c757542`). Redes: 17 documentos / 987 páginas y 8 temas, con 268 páginas referidas todavía pendientes; aprobación de organización no equivale a revisión individual. Fase 5 aprobada con «Confirmado, avanzá», tras verificar la foto recuperada en Obsidian (`98f642a`, corrección `53a7476`). Fase 6 implementada, pendiente de checkpoint: researcher anclado, modos y caché; sin progreso de Fase 7. Historial y límites en `informes/fase1.md` a `informes/fase6.md` y `DECISIONES.md`.
+**Estado:** Fases 0–4 aprobadas y cerradas (`79b1976`, `352c249`, `6409acd`, `3616e71`, `c757542`). Redes: 17 documentos / 987 páginas y 8 temas, con 268 páginas referidas todavía pendientes; aprobación de organización no equivale a revisión individual. Fase 5 aprobada con «Confirmado, avanzá», tras verificar la foto recuperada en Obsidian (`98f642a`, corrección `53a7476`). Fase 6 aprobada con «Aprobado, continuá» (`f9aeea7`). Fase 7 implementada, pendiente de aprobación: progreso persistente, cierre y reconstrucción confirmada. Historial y límites en `informes/fase1.md` a `informes/fase7.md` y `DECISIONES.md`.
 
 **Base actual: pi 1.4.0.** La instalación administrada ya se había actualizado al probar Fase 5. En Fase 6 se verificaron docs/declaraciones/ejemplos instalados, tests y runtime real, y se adoptó esa versión exacta en doctor y esta guía. No se reinstaló ni degradó pi, ni se cambió la configuración personal. La base original fue 1.3.0; los informes de esas fases conservan su versión histórica. Doctor detectará futuras divergencias de versión.
 
@@ -91,16 +91,16 @@ No fue necesario crear cuentas ni guardar claves. Las consultas salen hacia el p
 
 Por elección explícita del usuario:
 
-- researcher: `openai/gpt-6-luna`;
-- visión: `openai/gpt-6-luna`.
+- researcher: `openai-codex/gpt-6-luna`;
+- visión: `openai-codex/gpt-6-luna`.
 
-El frontmatter de `agents/researcher.md` coincide con `curso.config.json`. Las dos llamadas reales de `doctor` respondieron correctamente con la autenticación existente, incluida la petición con un PNG sintético. No se agregaron claves ni se cambió el login.
+El frontmatter de `agents/researcher.md` coincide con `curso.config.json`. En Fase 7 el usuario autorizó «Usar openai-codex» al comprobar que `openai` ya no tenía credenciales configuradas. Antes de cambiar el proyecto respondieron Sol por texto y Luna por texto/PNG; doctor repitió los dos pings de Luna correctamente. Sólo cambiaron archivos del proyecto, sin claves nuevas, login ni preferencias personales. Los informes anteriores conservan el proveedor histórico `openai`.
 
 Esto confirma disponibilidad y aceptación de imágenes, **no** la fidelidad del OCR matemático. En Fase 1 se transcribieron tres páginas con Luna solo como referencia del benchmark; todavía requieren revisión. Ver `informes/fase1.md`.
 
 La primera propuesta (`gpt-5.4-mini` / `gpt-5.5`) había fallado con HTTP 400 porque esta cuenta ChatGPT/Codex no admite esos ids, pese a figurar en el catálogo. Se conserva el antecedente en `DECISIONES.md`: aparecer en `/model` no prueba el acceso real.
 
-El modelo principal del proyecto sigue siendo `openai/gpt-6.1-sol`, ya verificado; no se modificaron las preferencias globales. Las claves, si se necesitan en el futuro, se ingresan mediante `/login`, nunca en el chat ni en archivos versionados.
+El modelo principal del proyecto es `openai-codex/gpt-6.1-sol`, verificado en el ensayo de dos sesiones de Fase 7; no se modificaron las preferencias globales. Las claves, si se necesitan en el futuro, se ingresan mediante `/login`, nunca en el chat ni en archivos versionados.
 
 ## Lanzador fish: `pi-learn`
 
@@ -246,9 +246,9 @@ No agregó dependencias: mismo `uv sync --locked` y Node 26.1.0; originalmente p
 
 El último muestra un selector; tema por id, nombre o alias, sin tildes, con selector ante ambigüedad. Fuera del índice se ofrece un modo ad hoc sin escribirlo automáticamente al curso. El comando arranca hasta la primera pregunta sin otra orden. Cambia nombre/estado y vincula una **nota nueva**, sin rellenarla con la historia previa ni pisar notas del mismo día. Tras `/curso-agregar`, reactivá el tema para tomar la nueva curación.
 
-Las tools `leer_paginas`, `buscar_material`, `leer_items` y `ver_pagina` requieren curso activo. Devuelven citas/texto acotado, sin rutas de derivados que el modelo deba recorrer; las soluciones se omiten por defecto. `ver_pagina` sólo renderiza localmente, con caché y protección de originales/renders. Los resultados de lectura no van al log. `teach` permanece intacto y se reinyecta junto a modo/dossier en cada arranque. Progreso existente se lee, **no se escribe**.
+Las tools `leer_paginas`, `buscar_material`, `leer_items` y `ver_pagina` requieren curso activo. Devuelven citas/texto acotado, sin rutas de derivados que el modelo deba recorrer; las soluciones se omiten por defecto. `ver_pagina` sólo renderiza localmente, con caché y protección de originales/renders. Los resultados de lectura no van al log. `teach` permanece intacto y se reinyecta junto a modo/dossier en cada arranque. Desde Fase 7 el progreso se valida y actualiza sólo mediante `registrar_progreso`; el modelo no edita el YAML.
 
-La sesión y el vínculo se restauran desde la rama activa. Para retomar una sesión real, cerrá pi y usá `pi --resume` o `/resume` en la próxima apertura; buscá el nombre `<Curso> · <Tema>`. `/compact` conserva el mecanismo de inyección y las entradas de estado. El log queda en `cursos/<curso>/sesiones/`. Si se inicia otra sesión sin progreso registrado, se señala el log anterior; la reconstrucción automática sigue en Fase 7.
+La sesión y el vínculo se restauran desde la rama activa. Para retomar una sesión real, cerrá pi y usá `pi --resume` o `/resume` en la próxima apertura; buscá el nombre `<Curso> · <Tema>`. `/compact` conserva el mecanismo de inyección y las entradas de estado. El log queda en `cursos/<curso>/sesiones/`. Si se inicia otra sesión sin registro final, se señala el log anterior y se ofrece reconstrucción con confirmación humana (ver Fase 7 abajo).
 
 Prueba opcional con el modelo principal real, en una sesión independiente:
 
@@ -258,7 +258,7 @@ node .pi/scripts/probar-sesion
 
 Consume LLM para la primera pregunta y compactación; se detiene sin responder por vos. Usa sólo seis tools de lectura/preguntas y crea su propio JSONL bajo `_procesado/fase4/`. Primera prueba completa correcta: quiz a los **20,08 s**, compactación real y reapertura del mismo archivo con curso/tema/log restaurados. Dossier 6296 bytes, lectura 0,45 ms, BM25 4,75 ms y render frío adicional 388,6 ms. No son garantías ni una clase completa. `informes/fase4.md` documenta también dos intentos previos fallidos del harness, sus correcciones y una descarga redundante a la caché global; el harness final conserva el scope de paquetes y no modifica settings personales.
 
-El modo incorpora fotos persistentes desde Fase 5 y researcher anclado/caché desde Fase 6. `/fin`, `/progreso` y `registrar_progreso` siguen reservados a Fase 7. Por ahora, un cierre se resume en chat/log sin editar YAML de progreso. El md-log manual ahora pide confirmación para rellenar una nota no vacía; el vínculo de curso nunca la reemplaza.
+El modo incorpora fotos persistentes desde Fase 5, researcher anclado/caché desde Fase 6 y progreso desde Fase 7. `/fin` guarda antes de cerrar; `/progreso [curso]` muestra estados y próximo paso. El md-log manual ahora pide confirmación para rellenar una nota no vacía; el vínculo de curso nunca la reemplaza.
 
 ## Fotos persistentes — Fase 5
 
@@ -266,7 +266,7 @@ Mismo `uv sync --locked`, sin dependencias nuevas ni comando propio de transfere
 
 La misma ruta se usa al recuperar historial; reutiliza sólo copias idénticas y preserva cambios manuales. No sigue symlinks en adjuntos ni reemplaza archivos. Los nuevos archivos tienen permisos `0600` y los directorios nuevos `0700`; no se cambian permisos preexistentes. Un fallo deja aviso en el log/UI, sin perder texto ni las demás fotos. No hay limpieza automática de copias parciales o temporales nativos de pi.
 
-El protocolo transcribe antes de corregir, conserva errores/unidades/tachaduras y espera aclaración de los datos necesarios ilegibles. Corrige con el contrato y sólo da puntaje con escala aplicable. No se escribe progreso todavía.
+El protocolo transcribe antes de corregir, conserva errores/unidades/tachaduras y espera aclaración de los datos necesarios ilegibles. Corrige con el contrato y sólo da puntaje con escala aplicable. Desde Fase 7 se registra sólo evidencia real observada del estudiante; los ensayos técnicos no cuentan.
 
 Prueba opcional, **dos turnos del modelo principal**, sin respuestas reales del alumno:
 
@@ -291,7 +291,7 @@ node --test .pi/tests/*.test.mjs
 
 El diagnóstico carga las extensiones locales con confianza solo para su propio proceso, sin modificar `trust.json`. No envía un prompt de enseñanza ni lee el portapapeles. Por defecto ejecuta dos pings de hasta 64 tokens (uno con un PNG sintético), una búsqueda y una lectura web. No envía material del curso a modelos o proveedores web. Desde Fase 5 prueba además el guardado/embed de un PNG sintético en una carpeta temporal propia, sin LLM y sin leer el portapapeles.
 
-Resultado automático actual, Fase 6: **71 tests Node sin LLM en verde**, incluida una suite de **56 tests Python**; **doctor completo en verde** con pi `1.4.0`. Comprueba ambas entradas de foto (ruta y bloque `image`), carga de investigar_tema, modelos y web. El diagnóstico comprueba la instalación de uso diario; no exige los entornos ML experimentales ni confunde la aprobación humana de calidad con una dependencia rota. El lanzador se comprobó además con un pseudoterminal real ejecutando `pi-learn --version`.
+Resultado automático actual, Fase 7: **83 tests Node sin LLM en verde**, incluida una suite de **67 tests Python**; **doctor completo en verde** con pi `1.4.0`. Comprueba ambas entradas de foto (ruta y bloque `image`), carga de tools/comandos de progreso, investigador, modelos y web. El diagnóstico comprueba la instalación de uso diario; no exige los entornos ML experimentales ni confunde la aprobación humana de calidad con una dependencia rota. El lanzador se comprobó además con un pseudoterminal real ejecutando `pi-learn --version`.
 
 ### Prueba del researcher real (opcional, con LLM y red)
 
@@ -316,7 +316,7 @@ El usuario aceptó la prueba técnica parcial para cerrar Fase 0. La lista sigui
 7. Verificar en Obsidian el log de texto y los quizzes; `/md-unlog` al terminar.
 8. Correr `doctor` desde otra terminal dentro de tmux, o pedir a pi que ejecute `.pi/scripts/doctor`.
 
-La Fase 0 se cierra con la aceptación explícita del smoke técnico, los tests y el doctor en verde, mediante un único commit en `.pi/`. La base de Fase 1 fue aprobada explícitamente y se cierra con un único commit. La Fase 2 fue aprobada explícitamente con «Fase 2 aprobada, continuá», aceptando el checkpoint con problemas escaneados reales externos y sus límites declarados; se cierra con un único commit tras repetir tests y doctor en verde. No se declara probado un parcial manuscrito ni se usó una muestra digital rasterizada como sustituto. Fase 3 aprobada con «Aprobado; continuá», propuesta aplicada y chequeos repetidos para su único commit. La aprobación no modifica la revisión humana pendiente de las transcripciones y no equivale a aprobar Fase 4 por adelantado. Fase 4 aprobada explícitamente con «Aprobado; continuá», sin convertir los mensajes repetidos en varias autorizaciones. Fase 5 aprobada con «Confirmado, avanzá» tras corregir y confirmar la foto del log. Fase 6 tiene checkpoint técnico listo; se espera su OK antes de Fase 7.
+La Fase 0 se cierra con la aceptación explícita del smoke técnico, los tests y el doctor en verde, mediante un único commit en `.pi/`. La base de Fase 1 fue aprobada explícitamente y se cierra con un único commit. La Fase 2 fue aprobada explícitamente con «Fase 2 aprobada, continuá», aceptando el checkpoint con problemas escaneados reales externos y sus límites declarados; se cierra con un único commit tras repetir tests y doctor en verde. No se declara probado un parcial manuscrito ni se usó una muestra digital rasterizada como sustituto. Fase 3 aprobada con «Aprobado; continuá», propuesta aplicada y chequeos repetidos para su único commit. La aprobación no modifica la revisión humana pendiente de las transcripciones y no equivale a aprobar Fase 4 por adelantado. Fase 4 aprobada explícitamente con «Aprobado; continuá», sin convertir los mensajes repetidos en varias autorizaciones. Fase 5 aprobada con «Confirmado, avanzá» tras corregir y confirmar la foto del log. Fase 6 aprobada con «Aprobado, continuá», autorizando sólo Fase 7. El checkpoint técnico de Fase 7 no autoriza iniciar Fase 8 sin otro OK.
 
 ## Researcher anclado y caché (Fase 6)
 
@@ -334,4 +334,34 @@ node .pi/scripts/probar-researcher-curso
 
 Requiere tmux. Comprueba arranque del probe, lectura local/web del hijo, entrega real, controles A1/A2/A3, caché en un segundo /estudiar y progreso intacto. La suite de tests usa fixtures y no consume modelos. El ensayo F4 `probar-sesion` sigue intencionalmente sin hijos para medir sólo ese recorrido.
 
-Evidencia final: `_procesado/fase6/prueba-1792630409914/resultado.json`. Probe en 20,62 s y siguiente en 7,42 s; alcance tardó 68 s en paralelo. A1/A3 discrepan y A2 concuerda; ninguna respuesta del estudiante. Hubo dos fallos de etiquetado en iteraciones anteriores: la calibración final no certifica fiabilidad general, atribuciones o exactitud del informe. Sigue la revisión humana; no se implementó progreso ni se hizo una clase completa. Resumen visible: `informes/fase6/resumen.md`.
+Evidencia final: `_procesado/fase6/prueba-1792630409914/resultado.json`. Probe en 20,62 s y siguiente en 7,42 s; alcance tardó 68 s en paralelo. A1/A3 discrepan y A2 concuerda; ninguna respuesta del estudiante. Hubo dos fallos de etiquetado en iteraciones anteriores: la calibración final no certifica fiabilidad general, atribuciones o exactitud del informe. Al cerrar Fase 6 aún no se había implementado progreso ni hecho una clase completa. La revisión humana sigue pendiente. Resumen histórico visible: `informes/fase6/resumen.md`.
+
+## Progreso persistente (Fase 7)
+
+Sin dependencias nuevas. Después de `/reload`:
+
+```text
+/progreso redes
+/estudiar redes retardos
+/fin
+```
+
+`registrar_progreso` fusiona estado, borde, conceptos, errores, intentos y discrepancias, sin duplicados exactos y sin tocar otros temas. El backend valida ids/fechas/rutas, usa el bloqueo del curso y guarda mediante temporal + fsync + rename. Antes conserva los bytes exactos previos en `progreso.yaml.bak`. El historial tiene una entrada por tema/log: `cierre:false` durante el probe/práctica y `cierre:true` al finalizar; es compatible con el historial anterior sin ese campo.
+
+`/fin` pide el guardado, luego el resumen y próximo paso. Sólo desvincula el log después de un mensaje final completo y del acuse de md-log; aborto, guardado fallido o vínculo cambiado dejan el curso abierto. Sin respuestas nuevas conserva la evidencia previa. Ad hoc puede cerrar su log, pero no crea progreso ni temas ficticios.
+
+Al retomar un tema, el dossier incluye borde y próximo paso; el probe intenta confirmarlos en hasta tres preguntas conceptuales. Si los contradice la nueva evidencia, amplía el mapeo. `/progreso [curso]` sugiere un tema pendiente con prerequisitos dominados, sin asignar dominio por contestar una pregunta aislada.
+
+Un log anterior sin registro final se ofrece para reconstrucción: `leer_sesion_anterior` devuelve texto acotado y SHA; `registrar_progreso` muestra la propuesta y exige confirmación real. Sin UI o si se cancela, no guarda. El log previo nunca se modifica. Preguntas sin respuesta y pruebas técnicas no se convierten en errores del alumno. La reconstrucción se identifica en historial y no cierra la sesión actual.
+
+Si el YAML es inválido y hay `.bak` válido, se restaura y avisa, conservando los bytes inválidos en `_procesado/progreso-invalido-<sha>.yaml`. Sin respaldo válido se continúa con material, sin guardar hasta reparar. Un `.bak` existente inválido tampoco se pisa a ciegas; requiere intervención. Son defensas contra cortes/ediciones accidentales, no contra un proceso externo que ignore los bloqueos y reemplace archivos en el último instante.
+
+Ensayo opcional, **consume Sol y usa respuestas programadas exclusivamente en una fixture aislada**:
+
+```bash
+node .pi/scripts/probar-progreso
+```
+
+Evidencia: `_procesado/fase7/prueba-1792672775843/resultado.json`. Dos sesiones nuevas del mismo tema, ambas con tres preguntas; la segunda recibió el borde previo y lo confirmó en tres. Ambos `/fin` guardaron y conservaron el resumen final. Esto prueba la integración con modelo real y alumno virtual; **no** mide tu comprensión ni sustituye el piloto humano. No escribe progreso de Redes ni lanza researcher. Reconstrucción/confirmación se prueban sin modelo. Resumen visible: `informes/fase7/resumen.md`.
+
+El cambio autorizado a `openai-codex` invalida por huella las cachés anteriores de alcance/visión: se preservan, pero el próximo alcance o una preparación de visión explícita pueden generar una nueva salida y consumir modelo. No se relanzó el researcher ni la ingesta para rellenarlas durante Fase 7; el primer estudio puede lanzar un nuevo alcance en paralelo.

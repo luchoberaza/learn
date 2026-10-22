@@ -1,6 +1,6 @@
 # Preparar cursos
 
-Backend local de `guardar_curso`, `/curso-check` y las skills de creación/ampliación. Usa el Python y PyYAML ya instalados. Contrato e índice son borradores editables por el usuario; `progreso.yaml` sólo se inicializa vacío por código al crear el curso. Su actualización se implementa en Fase 7.
+Backend local de `guardar_curso`, `/curso-check` y las skills de creación/ampliación. Usa el Python y PyYAML ya instalados. Contrato e índice son borradores editables por el usuario; `progreso.yaml` sólo se inicializa vacío al crear el curso. Su actualización usa `registrar_progreso` y el backend `progreso.py` desde Fase 7 (ver `../../SETUP.md`, sección Progreso persistente); nunca se reescribe desde la curación.
 
 ## Propuesta
 

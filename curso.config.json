@@ -1,7 +1,7 @@
 {
   "vault": "~/Projects/pi-learning",
-  "modelo_vision": "openai/gpt-6-luna",
-  "modelo_researcher": "openai/gpt-6-luna",
+  "modelo_vision": "openai-codex/gpt-6-luna",
+  "modelo_researcher": "openai-codex/gpt-6-luna",
   "umbral_calidad_pagina": 0.6,
   "max_paginas_vision_sin_confirmar": 50,
   "max_tokens_dossier": 3000,

@@ -1,6 +1,6 @@
 # Fase 6 — researcher anclado, modos y caché
 
-**Implementada y probada; checkpoint pendiente del usuario. Fase 7 no iniciada.** La Fase 5 quedó aprobada con «Confirmado, avanzá»: imagen recuperada confirmada en Obsidian. Se adoptó explícitamente la instalación existente de **pi 1.4.0**, sin reinstalarla ni modificar preferencias personales.
+**Aprobada por el usuario con «Aprobado, continuá», commit `f9aeea7`; autorizó sólo Fase 7.** Este informe conserva los resultados y proveedor históricos. En Fase 7 se autorizó pasar a `openai-codex`: la caché anterior se preserva, pero ya no tiene la huella vigente. La Fase 5 quedó aprobada con «Confirmado, avanzá»: imagen recuperada confirmada en Obsidian. Se adoptó explícitamente la instalación existente de **pi 1.4.0**, sin reinstalarla ni modificar preferencias personales.
 
 ## Qué cambia
 
@@ -35,7 +35,7 @@ Evidencia: `_procesado/fase6/prueba-1792630409914/resultado.json`, su JSONL y la
 
 Los tres controles son del script, no errores ni respuestas del estudiante. Se cotejó su correspondencia A1/A2/A3 en el informe real; los valores esperados no se pasaron al researcher. Los tiempos son un smoke, no garantía ni comparación causal aislada de rendimiento.
 
-Caché vigente:
+Caché vigente al cierre de Fase 6 (histórica tras cambiar de proveedor en Fase 7):
 [[cursos/redes/notas/verificaciones/retardos-d82cec69f080858c4efc921aab36b35c84bd5123d73186f99721eaddd2c5fdc7.md]]
 
 ## Fallos conservados y límite de confianza
@@ -63,8 +63,8 @@ Uso de los cinco ensayos, incluyendo diez hijos y todos los turnos del principal
 ## Cómo probar
 
 1. En una sesión de pi dentro de tmux: `/reload` y `/estudiar redes retardos`.
-2. Retardos ya tiene caché: debería iniciar el probe **sin otro researcher de alcance**. La generación vigente aparece enlazada en el dossier y arriba.
+2. Con el proveedor/config de este ensayo, Retardos reutilizaba su caché sin otro alcance. Tras el cambio autorizado a `openai-codex` en Fase 7, la próxima consulta puede lanzar un alcance nuevo; la generación anterior se conserva.
 3. Para contraste nuevo, pedí verificar 1–3 afirmaciones; el principal usa `modo: "verificar"` y recibe el informe asíncrono. Revisá etiquetas, fuentes y separación de extensiones.
 4. Ensayo repetible opcional: `node .pi/scripts/probar-researcher-curso` — consume modelos/web y genera notas técnicas nuevas, sin responder por vos.
 
-La reapertura se probó con alcance ya guardado; no se hizo un corte real del padre antes de la entrega del hijo. No se hizo una clase completa ni se implementaron `/fin`, `/progreso`, fusión/reconstrucción o escritura de progreso. Redes conserva **268 páginas referidas pendientes**. Falta la aprobación del checkpoint antes de avanzar a Fase 7.
+La reapertura se probó con alcance ya guardado; no se hizo un corte real del padre antes de la entrega del hijo. Al cerrar Fase 6 no se había hecho una clase completa ni implementado `/fin`, `/progreso`, fusión/reconstrucción o escritura de progreso. Redes conserva **268 páginas referidas pendientes**. La aprobación posterior autoriza Fase 7, no convierte los ensayos en progreso del usuario ni modifica las revisiones humanas pendientes.

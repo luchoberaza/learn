@@ -61,7 +61,7 @@ export function resolverTemas(temas: Tema[], consulta: string): Tema[] {
   })) })).filter(r => q && r.puntaje >= 0.65).sort((a, b) => b.puntaje - a.puntaje).slice(0, 5).map(r => r.t);
 }
 export function ordenarTemas(datos: DatosCurso): Tema[] {
-  const nivel = (t: Tema) => datos.progreso.temas[t.id]?.estado === "en_curso" ? 0 : (t.prerequisitos || []).every(p => datos.progreso.temas[p]?.estado === "dominado") ? 1 : 2;
+  const nivel = (t: Tema) => datos.progreso.temas[t.id]?.estado === "en_curso" ? 0 : datos.progreso.temas[t.id]?.estado === "repasar" ? 1 : datos.progreso.temas[t.id]?.estado === "dominado" ? 4 : (t.prerequisitos || []).every(p => datos.progreso.temas[p]?.estado === "dominado") ? 2 : 3;
   return [...datos.temas].sort((a, b) => nivel(a) - nivel(b) || a.unidad - b.unidad);
 }
 export function buscarMaterial(raiz: string, datos: DatosCurso, consulta: string, tipo?: string) {
@@ -115,7 +115,12 @@ export function dossier(raiz: string, datos: DatosCurso, tema: Tema, maxTokens: 
     const i = datos.items[ref.doc]?.find(i => i.id === id);
     lineas.push(`${clase}: ${ref.doc}/${id} · ${i?.enunciado.replace(/\s+/g, " ").slice(0, 140) || "sin preparar"}`);
   }
-  for (const id of [tema.id, ...(tema.prerequisitos || [])]) lineas.push(`Progreso ${id}: ${JSON.stringify(datos.progreso.temas[id] || "sin registro")}`);
+  for (const id of [tema.id, ...(tema.prerequisitos || [])]) {
+    const p = datos.progreso.temas[id];
+    // El borde y próximo paso preceden a listas largas para sobrevivir al presupuesto del dossier.
+    const { estado, borde, proximo_paso, ...evidencia } = p || {};
+    lineas.push(`Progreso ${id}: ${acotar(JSON.stringify(p ? { estado, borde, proximo_paso, ...evidencia } : "sin registro"), id === tema.id ? 3000 : 1500)}`);
+  }
   lineas.push("## Verificación previa", verificacion);
   if (datos.avisos.length || datos.validacion?.errores.length || datos.validacion?.avisos.length) lineas.push("Preparación incompleta: usá sólo referencias comprobables; los avisos no certifican fidelidad.");
   return acotar(lineas.join("\n\n"), maxTokens * 4);
