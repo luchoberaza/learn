@@ -86,7 +86,7 @@ const OptionSchema = Type.Object({
 	value: Type.Optional(
 		Type.String({ description: "Optional machine-readable value returned for the option. Defaults to the label." }),
 	),
-	description: Type.Optional(Type.String({ description: "Optional extra detail shown below the option." })),
+	description: Type.Optional(Type.String({ description: "Optional extra detail shown below the option. Give one to every option or to none; otherwise all are dropped." })),
 });
 
 const QuizParams = Type.Object({
@@ -94,11 +94,11 @@ const QuizParams = Type.Object({
 		description: "The single quiz question to ask. Ask exactly one question per tool call.",
 	}),
 	details: Type.Optional(
-		Type.String({ description: "Optional extra context or instructions shown under the question." }),
+		Type.String({ description: "Optional conditions of the problem, shown under the question BEFORE the answer: never links or citations (they are removed; cite in explanation)." }),
 	),
 	options: Type.Array(OptionSchema, {
 		description:
-			"The answer options (2 or more). Options only — there is no free-text mode. Give each option a stable `value`; you reference the correct one by that value in correctAnswer.",
+			"The real answer options: at least 3 for single-select (fewer is rejected), 2 or more for multi-select. Options only — there is no free-text mode. Give each option a stable `value`; you reference the correct one by that value in correctAnswer.",
 		minItems: 2,
 	}),
 	multiSelect: Type.Optional(
@@ -115,7 +115,7 @@ const QuizParams = Type.Object({
 	shuffle: Type.Optional(
 		Type.Boolean({
 			description:
-				"Defaults to true: options are randomly reordered before display so the correct answer isn't always in the same position. Set to false only when option order is meaningful (e.g. ordered numeric values, or an 'All/None of the above' option that must stay last).",
+				"Options are always randomly reordered before display. false is honored only when every option is a number (optionally with a unit, e.g. '1,2 ms'): they are then shown in ascending order.",
 		}),
 	),
 });
@@ -140,6 +140,30 @@ function textoPlano(texto: string): string {
 		.replace(/\^(?:\{([-+]?\d+)\}|(\d))/g, mapear(SUPERINDICES))
 		.replace(/_(?:\{([-+]?\d+)\}|(\d))/g, mapear(SUBINDICES))
 		.replace(/_\{([\p{L}]+)\}/gu, "_$1");
+}
+
+// D5: antes de responder no se muestran enlaces (la página citada puede traer la respuesta); se conserva
+// el texto visible de [[x|alias]] y [texto](url), y se descarta la línea que queda como rótulo vacío.
+function sinEnlaces(texto: string): string {
+	return texto
+		.split("\n")
+		.map((linea) => {
+			const limpia = linea
+				.replace(/\[\[[^\]|]*\|([^\]]*)\]\]|\[([^\]]*)\]\([^)]*\)/g, "$1$2")
+				.replace(/\[\[[^\]]*\]\]|https?:\/\/\S+/g, "")
+				.replace(/\s{2,}/g, " ")
+				.trim();
+			return limpia !== linea.trim() && /^[\p{L}\s]*:?$/u.test(limpia) ? null : limpia;
+		})
+		.filter((linea) => linea !== null)
+		.join("\n")
+		.trim();
+}
+
+// shortcut: "1.200" se lee 1,2 (sólo afecta el orden mostrado); si aparece, aceptar separador de miles.
+function valorNumerico(label: string): number | undefined {
+	const m = /^(-?\d+(?:[.,]\d+)?)(?:\s\D*)?$/.exec(label);
+	return m ? Number(m[1].replace(",", ".")) : undefined;
 }
 
 function normalizeOptions(
@@ -909,22 +933,22 @@ export default function quiz(pi: ExtensionAPI) {
 			"Always pass the option's `value` string as correctAnswer — it is self-checking and prevents miscounting positions. A value that matches no option is a hard error.",
 			"explanation is REQUIRED — always say why the correct answer is correct.",
 			"Multi-select is graded as an exact-set match: the user is correct only if they select every correct option and no incorrect ones.",
-			"There is no free-text mode. A 'No sé' (I don't know) choice is ALWAYS added automatically, always last — provide ONLY the real, gradable options (at least two). Never add your own uncertainty/opt-out option like 'No sé', 'No estoy seguro', or 'Ni idea'; that is handled for you and a manual one would be redundant or gradable-as-wrong.",
+			"There is no free-text mode. A 'No sé' (I don't know) choice is ALWAYS added automatically, always last — provide ONLY the real, gradable options (at least three for single-select). Never add your own uncertainty/opt-out option like 'No sé', 'No estoy seguro', or 'Ni idea'; that is handled for you and a manual one would be redundant or gradable-as-wrong.",
 			"If a result comes back as dontKnow, the user honestly did not know and did NOT guess — treat it as a genuine knowledge gap to teach into, not as a wrong answer.",
 			"Any answer (right, wrong, or 'No sé') may carry an optional free-text `note` the user typed in the always-present note field. When present it reflects what they were thinking or unsure about — read it and let it steer your follow-up. It is omitted entirely when empty.",
 			"Treat each wrong answer (distractor) as a diagnostic probe, not just filler: make it a specific, believable mistake the user might actually hold — a common misconception, or an adjacent/easily-confused concept — so that WHICH wrong answer they pick reveals WHICH nuance of their understanding is off. You learn far more from a targeted wrong choice than from a binary right/wrong, and the choice tells you exactly which gap to teach into next (and what the explanation should address).",
 			"Guardrail: every distractor must be unambiguously wrong on the intended reading — tempting, but a real error, not a defensible alternative. Don't drift into trick questions.",
 			"Anti-guessing hygiene: don't let the correct answer stand out by form (longest, most precise, most hedged, or the only one in the right format). Keep options similar in length, specificity, and phrasing so it can't be picked from shape alone.",
 			"Set multiSelect: true only when more than one option is correct.",
-			"Options are shuffled before display by default, so don't worry about which position you list the correct answer in. Set shuffle: false only when option order is meaningful (ordered values, or an 'All/None of the above' option that must stay last).",
+			"Options are always shuffled before display, so don't worry about which position you list the correct answer in; shuffle: false only puts all-numeric options in ascending order. Don't use 'All/None of the above' options.",
 			"To probe nuance, ask several quick quiz questions and adapt each one based on the previous answers, rather than writing one giant question.",
 			"Don't leak the answer through formatting: keep option phrasing/length even and don't hint which is correct.",
 		],
 		parameters: QuizParams,
 
 		async execute(_toolCallId, params, signal, onUpdate, ctx) {
-			const question = textoPlano(params.question);
-			const context = textoPlano(params.details?.trim() ?? "").trim() || undefined;
+			const question = sinEnlaces(textoPlano(params.question));
+			const context = sinEnlaces(textoPlano(params.details?.trim() ?? "")) || undefined;
 			const explanation = params.explanation.trim();
 			const mode: QuizMode = params.multiSelect ? "multi-select" : "single-select";
 
@@ -935,9 +959,25 @@ export default function quiz(pi: ExtensionAPI) {
 				return unavailableResult(question, mode, `quiz: ${(e as Error).message}`, [], context);
 			}
 
-			// Shuffle for display (default on) BEFORE resolving correct indices, so
-			// grading matches the order the user sees.
-			if (params.shuffle !== false) {
+			// D1, único rechazo: con 2 opciones se acierta al 50 % (las de rumbo van por ask_user_question).
+			if (mode === "single-select" && options.length < 3) {
+				return unavailableResult(
+					question,
+					mode,
+					"quiz: hacen falta al menos 3 opciones reales además de «No sé»; volvé a llamarlo con 3 o más.",
+					[],
+					context,
+				);
+			}
+
+			// D3: descriptions en todas o en ninguna; asimétricas delatan la correcta.
+			if (!options.every((o) => o.description)) options = options.map((o) => ({ ...o, description: undefined }));
+
+			// Shuffle for display BEFORE resolving correct indices, so grading matches
+			// the order the user sees. D2: shuffle:false sólo ordena opciones numéricas.
+			if (params.shuffle === false && options.every((o) => valorNumerico(o.label) !== undefined)) {
+				options = [...options].sort((a, b) => valorNumerico(a.label)! - valorNumerico(b.label)!);
+			} else {
 				options = shuffleOptions(options);
 			}
 
@@ -949,7 +989,7 @@ export default function quiz(pi: ExtensionAPI) {
 			// user has answered and must not leak the answer.
 			onUpdate?.({
 				content: [{ type: "text", text: "Esperando respuesta…" }],
-				details: { options: options.map((o, i) => ({ index: i + 1, label: o.label })) },
+				details: { question, context, options: options.map((o, i) => ({ index: i + 1, label: o.label })) },
 			});
 
 			const { indices: correctIndices, error: correctError } = resolveCorrect(
@@ -1001,7 +1041,7 @@ export default function quiz(pi: ExtensionAPI) {
 			const options = normalizeOptions(
 				args.options as Array<{ label: string; value?: string; description?: string }> | undefined,
 			);
-			let text = theme.fg("toolTitle", theme.bold("quiz ")) + theme.fg("muted", textoPlano(args.question || ""));
+			let text = theme.fg("toolTitle", theme.bold("quiz ")) + theme.fg("muted", sinEnlaces(textoPlano(args.question || "")));
 			if (args.multiSelect) {
 				text += theme.fg("dim", " [varias respuestas]");
 			}

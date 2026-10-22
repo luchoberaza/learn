@@ -78,3 +78,52 @@ test("H46: el popup y el render del quiz muestran texto plano en lugar de LaTeX"
   assert.match(quiz.description + JSON.stringify(quiz.parameters), /plain text|Unicode/i);
 });
 
+test("H47: single-select con 2 opciones se rechaza en español sin abrir el popup; con 3 o multi-select se acepta", async () => {
+  let abrio = false, logueo = false;
+  const ctx = { hasUI: true, ui: { custom: () => { abrio = true; return Promise.resolve(null); } } };
+  const dos = { ...base, options: base.options.slice(0, 2) };
+  const r = await quiz.execute("d1", dos, undefined, () => { logueo = true; }, ctx);
+  assert.equal(r.details.status, "unavailable");
+  assert.match(r.content[0].text, /3 opciones/);
+  assert.equal(abrio, false); assert.equal(logueo, false);
+  const multi = await quiz.execute("d2", { ...dos, multiSelect: true, correctAnswer: ["prop"] }, undefined, () => {}, ctx);
+  assert.equal(multi.details.status, "cancelled");
+  const tres = await quiz.execute("d3", base, undefined, () => {}, ctx);
+  assert.equal(tres.details.status, "cancelled");
+});
+
+test("H47: descriptions asimétricas se descartan; parejas se muestran", async () => {
+  const una = [], todas = [];
+  await quiz.execute("e1", { ...base, options: base.options.map((o, i) => i === 0 ? { ...o, description: "PISTA d/s" } : o) }, undefined, () => {}, ui(["esc"], una));
+  assert.ok(!una[0].includes("PISTA"), una[0]);
+  await quiz.execute("e2", { ...base, options: base.options.map((o, i) => ({ ...o, description: `DESC${i}` })) }, undefined, () => {}, ui(["esc"], todas));
+  for (const i of [0, 1, 2]) assert.ok(todas[0].includes(`DESC${i}`));
+});
+
+test("H49: details no muestra enlaces antes de responder", async () => {
+  const vistas = [];
+  await quiz.execute("f1", { ...base, question: "¿Cuál? ver https://x.org/a", details: "Datos: d = 100 km.\nReferencia: [[cursos/redes/fuentes/Redes.pdf#page=56]]\nMás en [Kurose](https://kurose.net) y [[nota|alias]]." },
+    undefined, () => {}, ui(["esc"], vistas));
+  const encabezado = vistas[0];
+  assert.doesNotMatch(encabezado, /\[\[|\]\]|\]\(|https?:|#page|Referencia|kurose\.net/);
+  assert.match(encabezado, /Datos: d = 100 km\.\n Más en Kurose y alias\./);
+  assert.doesNotMatch(render(quiz.renderCall({ ...base, question: "¿Cuál? [[x#page=5]]" }, theme)), /\[\[/);
+});
+
+test("H50: shuffle:false no fija la correcta salvo opciones numéricas, que se ordenan", async () => {
+  const posiciones = new Set();
+  for (let k = 0; k < 60; k++) {
+    let orden;
+    await quiz.execute("s" + k, { ...base, shuffle: false }, undefined, u => { orden ??= u.details.options; }, { hasUI: false });
+    posiciones.add(orden.findIndex(o => o.label === "Retardo de propagación"));
+  }
+  assert.ok(posiciones.size > 1, "la correcta quedó siempre en la misma posición");
+  const numericas = { ...base, shuffle: false, correctAnswer: "c", options: [
+    { label: "$1200\\,\\text{ms}$", value: "a" }, { label: "$0{,}15\\,\\text{ms}$", value: "b" }, { label: "$1{,}2\\,\\text{ms}$", value: "c" }, { label: "8 ms", value: "d" }] };
+  let orden;
+  await quiz.execute("n1", numericas, undefined, u => { orden = u.details.options.map(o => o.label); }, { hasUI: false });
+  assert.deepEqual(orden.map(l => l.split(" ")[0].split(" ")[0]), ["0,15", "1,2", "8", "1200"]);
+  const mezcladas = new Set();
+  for (let k = 0; k < 40; k++) await quiz.execute("m" + k, { ...numericas, shuffle: undefined }, undefined, u => { mezcladas.add(u.details.options[0].label); }, { hasUI: false });
+  assert.ok(mezcladas.size > 1, "sin shuffle:false las numéricas también se barajan");
+});
