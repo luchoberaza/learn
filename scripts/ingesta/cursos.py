@@ -249,6 +249,7 @@ def validar_progreso(p, temas, documentos, items):
         raise ValueError("progreso.yaml no cumple el esquema version/temas/historial.")
     def fecha(f):
         return date.fromisoformat(str(f))
+    huerfanos = []
     for nombre, t in p["temas"].items():
         if nombre not in temas or not isinstance(t, dict) or t.get("estado") not in {"sin_empezar", "en_curso", "dominado", "repasar"}:
             raise ValueError("Tema o estado inválido en progreso.yaml.")
@@ -270,9 +271,12 @@ def validar_progreso(p, temas, documentos, items):
                 raise ValueError("Error de concepto inválido en progreso.yaml.")
             fecha(e.get("detectado"))
         for e in t.get("ejercicios", []):
-            if not isinstance(e, dict) or e.get("item") not in items.get(e.get("doc"), {}) or e.get("resultado") not in {"correcto", "parcial", "incorrecto"} or not isinstance(e.get("puntaje", ""), str) or not isinstance(e.get("notas", ""), str):
+            if not isinstance(e, dict) or not isinstance(e.get("doc"), str) or not isinstance(e.get("item"), str) or e.get("resultado") not in {"correcto", "parcial", "incorrecto"} or not isinstance(e.get("puntaje", ""), str) or not isinstance(e.get("notas", ""), str):
                 raise ValueError("Ejercicio inválido en progreso.yaml.")
             fecha(e.get("fecha"))
+            # Re-segmentar un banco no invalida intentos previos: se conservan como huérfanos.
+            if e["item"] not in items.get(e["doc"], {}):
+                huerfanos.append(f"Ejercicio huérfano: {e['doc']}/{e['item']} ya no está en el banco; su intento se conserva en progreso.yaml.")
     for h in p["historial"]:
         if not isinstance(h, dict) or h.get("tema") not in temas or not isinstance(h.get("resumen"), str) or not isinstance(h.get("log"), str):
             raise ValueError("Historial inválido en progreso.yaml.")
@@ -282,6 +286,7 @@ def validar_progreso(p, temas, documentos, items):
         log = Path(h["log"])
         if log.is_absolute() or ".." in log.parts or log.parts[:1] != ("sesiones",) or log.suffix != ".md":
             raise ValueError("El log del historial debe estar en sesiones/.")
+    return huerfanos
 
 
 def vivo(pid: int) -> bool:

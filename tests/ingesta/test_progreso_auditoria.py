@@ -89,6 +89,20 @@ class ProgresoAuditoriaTest(unittest.TestCase):
         self.assertTrue(leer(self.vault, 'ejemplo')['disponible'])
         self.guardar()
 
+    def test_h31_item_resegmentado_queda_huerfano_sin_invalidar_progreso(self):
+        self.guardar()
+        self.guardar({**self.datos, 'resumen': 'Segundo guardado', 'ejercicios': []})
+        (self.raiz / '_procesado/practico/items.yaml').write_text('items:\n- {id: "1a", enunciado: Derivar}\n')
+        antes = (self.raiz / 'progreso.yaml').read_bytes()
+        r = leer(self.vault, 'ejemplo')
+        self.assertTrue(r['disponible'])
+        self.assertTrue(any('huérfano' in a and 'practico/1' in a for a in r['avisos']), r['avisos'])
+        self.assertEqual((self.raiz / 'progreso.yaml').read_bytes(), antes)
+        self.guardar({**self.datos, 'resumen': 'Tercer guardado', 'ejercicios': [], 'proximo_paso': 'Seguir'})
+        t = self.tema()
+        self.assertEqual(t['proximo_paso'], 'Seguir')
+        self.assertEqual(t['ejercicios'][0]['item'], '1')
+
 
 class SesionAuditoriaTest(unittest.TestCase):
     def setUp(self):

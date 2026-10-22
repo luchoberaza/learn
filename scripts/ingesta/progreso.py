@@ -80,11 +80,11 @@ def leer(vault: Path, curso: str):
     try:
         try:
             # progreso.yaml se publica atómico: leerlo no necesita bloqueo.
-            return {"progreso": comprobar(cargar_yaml(crudo(raiz, "progreso.yaml").decode("utf-8")), ctx), "avisos": [], "disponible": True}
+            p, avisos = comprobar(cargar_yaml(crudo(raiz, "progreso.yaml").decode("utf-8")), ctx), []
         except (OSError, ValueError, TypeError, KeyError):
             with bloqueo(raiz):
                 p, _, avisos = cargar(raiz, ctx)
-        return {"progreso": p, "avisos": avisos, "disponible": True}
+        return {"progreso": p, "avisos": avisos + validar_progreso(p, *ctx), "disponible": True}
     except ValueError as e:
         return {"progreso": {"version": 1, "temas": {}, "historial": []}, "avisos": [str(e)], "disponible": False}
 
@@ -145,6 +145,8 @@ def validar_datos(datos, tema, ctx):
             raise ValueError("Ejercicio fuera del esquema.")
         if ctx[1].get(e["doc"], {}).get("tipo") not in {"ejercicios", "evaluaciones"}:
             raise ValueError("El intento debe corresponder a un ejercicio o evaluación del curso.")
+        if e["item"] not in ctx[2].get(e["doc"], {}):
+            raise ValueError("Ejercicio inválido: el ítem no existe en el banco.")
     for f in [e.get("detectado") for e in datos["errores_de_concepto"]] + [e.get("fecha") for e in datos["ejercicios"]]:
         if not isinstance(f, str) or not re.fullmatch(r"\d{4}-\d{2}-\d{2}", f) or date.fromisoformat(f) > hoy:
             raise ValueError("Fecha de evidencia inválida o futura.")
