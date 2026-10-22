@@ -111,7 +111,8 @@ export function registrarPreparacion(pi: ExtensionAPI, sesion: Pick<ReturnType<t
       const config = JSON.parse(readFileSync(join(recursos, "curso.config.json"), "utf8"));
       const pedir = (): Promise<Trabajo> => python("trabajo", { vault, curso, tema: tema.id, maximo: TOPE }, signal, "preparacion.py");
       let t = await pedir();
-      const total = t.paginas.reduce((n, x) => n + x.paginas.length, 0), hubo = total || t.segmentar.length || t.clasificar.length;
+      // Un documento que espera la ingesta base no es trabajo: el tema queda incompleto sin aviso.
+      const total = t.paginas.reduce((n, x) => n + x.paginas.length, 0), hubo = total || t.segmentar.some(s => s.listo) || t.clasificar.length;
       if (hubo) {
         const vision = await modeloVision(ctx, config.modelo_vision);
         if ("motivo" in vision) throw new Error(vision.motivo);

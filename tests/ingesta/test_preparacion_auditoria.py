@@ -3,6 +3,7 @@ from contextlib import ExitStack
 import copy
 import json
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 import threading
@@ -140,6 +141,13 @@ class TrabajoTest(CursoPreparacion):
         self.assertEqual([(x["doc"], x["paginas"]) for x in t["paginas"]], [("libro", [1, 2]), ("parcial", [1, 2])])
         self.assertEqual(t["restantes"], 4)
         self.assertEqual(self.trabajo("integracion")["paginas"][0]["doc"], "parcial")  # la página 3 del libro ya es digital buena
+
+    def test_un_documento_sin_ingesta_base_no_se_segmenta_y_deja_el_tema_incompleto(self):
+        shutil.rmtree(self.raiz / "_procesado/parcial")
+        t = self.trabajo()
+        self.assertEqual([x["doc"] for x in t["paginas"]], ["libro", "practico"])
+        self.assertEqual([(s["doc"], s["listo"]) for s in t["segmentar"]], [("parcial", False), ("practico", False)])
+        self.assertEqual(t["restantes"], 3)
 
     def test_parcial_sin_soluciones_se_segmenta_otra_vez_y_se_clasifica_lo_que_el_indice_no_asigna(self):
         self.segmentar("parcial", [{"id": "1", "paginas": [1], "enunciado": "Derive."}])

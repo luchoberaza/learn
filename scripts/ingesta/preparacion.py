@@ -40,10 +40,13 @@ def trabajo(vault: Path, curso: str, tema: str, maximo: int) -> dict:
         raise ValueError("El tema ya no está en el índice.")
     hechos = leer(raiz, "_procesado/preparacion.json").get("documentos", {})
 
+    sin_base = set()
     def faltan(doc, paginas, todas):
         qs = leer(raiz, f"_procesado/{doc}/calidad.json").get("paginas", {})
+        # Sin registro base no hay qué transcribir todavía: la espera a la ingesta base deja el tema incompleto.
+        sin_base.update((doc, p) for p in paginas if str(p) not in qs)
         def falta(q):
-            # Sin registro base no hay qué transcribir (lo resuelve la ingesta base); una página manual o con visión ya está.
+            # Una página manual o con visión ya está.
             if not q or q.get("motor") == "manual" or (q.get("vision") and not q.get("error_vision")):
                 return False
             return bool(todas or q.get("error_vision") or q.get("requiere_vision") or q.get("ruta") == "pendiente")
@@ -63,9 +66,10 @@ def trabajo(vault: Path, curso: str, tema: str, maximo: int) -> dict:
             if items is None or (tipo == "evaluaciones" and not hechos.get(d["id"], {}).get("segmentado") and not any("solucion_de" in i for i in items)):
                 pendientes = faltan(d["id"], range(1, d["paginas"] + 1), True)
                 cola.append((d["id"], pendientes))
-                segmentar.append({"doc": d["id"], "tipo": tipo, "titulo": d["titulo"], "paginas": d["paginas"], "listo": not pendientes,
+                segmentar.append({"doc": d["id"], "tipo": tipo, "titulo": d["titulo"], "paginas": d["paginas"],
+                                  "listo": not pendientes and not any(doc == d["id"] for doc, _ in sin_base),
                                   "requeridos": sorted(i for doc, i in en_indice if doc == d["id"])})
-    paginas, vistas, restantes = [], set(), 0
+    paginas, vistas, restantes = [], set(), len(sin_base)
     for doc, numeros in cola:
         nuevas = [p for p in numeros if (doc, p) not in vistas]
         vistas.update((doc, p) for p in nuevas)

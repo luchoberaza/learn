@@ -276,6 +276,18 @@ test("preparación: un kill a mitad no rompe nada y la próxima vez sigue sin re
   assert.deepEqual(e.avisos, [["info", "Material de Derivación listo: 2 páginas transcriptas, 2 ítems nuevos."]]);
 });
 
+test("preparación: un parcial sin ingesta base espera, sin cortar lo demás ni mostrar un error en inglés", async t => {
+  const e = preparacion(t);
+  rmSync(join(e.raiz, "_procesado/parcial"), { recursive: true });
+  await e.turno();
+  assert.deepEqual(e.llamadas.map(l => l.tipo), ["vision", "vision", "vision", "segmentar", "clasificar"]);
+  assert.deepEqual(e.avisos, [["warning", "Material de Derivación preparado en parte: 3 páginas transcriptas, 1 ítems nuevos; quedan 1 páginas, sigue la próxima vez."]]);
+  assert.equal(e.json("preparacion.json").temas.derivacion.estado, "incompleta");
+  e.llamadas.length = 0;
+  await e.turno("cursos/ejemplo/sesiones/2.md");
+  assert.deepEqual([e.llamadas, e.avisos.length], [[], 1]);
+});
+
 test("skills y CURSOS.md describen la preparación automática por tema", () => {
   for (const skill of ["curso-nuevo", "curso-agregar"]) {
     const texto = readFileSync(join(piDir, `skills/${skill}/SKILL.md`), "utf8");
