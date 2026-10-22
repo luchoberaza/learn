@@ -309,3 +309,23 @@ test("X01: un disco lleno al anotar el curso se informa en español, sin el erro
   await e.estudiar("calculo derivacion");
   assert.deepEqual(e.avisos.at(-1), ["error", "Disco lleno: liberá espacio y repetí /estudiar."]);
 });
+test("H26: /estudiar con el agente ocupado corta el turno y sigue; con una pregunta abierta, antes confirma", async t => {
+  const e = entorno(t), orden = [];
+  let ocupado = true, acepta = false;
+  Object.assign(e.ctx, { isIdle: () => !ocupado, abort: () => orden.push("abort"), waitForIdle: async () => { orden.push("espera"); ocupado = false; } });
+  e.ctx.ui.confirm = async () => (orden.push("confirma"), acepta);
+  await e.estudiar("calculo derivacion");
+  assert.deepEqual(orden, ["abort", "espera"]);
+  assert.equal(e.ordenes.length, 1);
+  ocupado = true; orden.length = 0;
+  e.eventos.get("tool_execution_start")({ toolName: "quiz", toolCallId: "q1" });
+  await e.estudiar("calculo derivacion");
+  assert.deepEqual(orden, ["confirma"]); assert.equal(e.ordenes.length, 1);
+  acepta = true; orden.length = 0;
+  await e.estudiar("calculo derivacion");
+  assert.deepEqual(orden, ["confirma", "abort", "espera"]); assert.equal(e.ordenes.length, 2);
+  e.eventos.get("tool_execution_end")({ toolName: "quiz", toolCallId: "q1" });
+  ocupado = true; orden.length = 0;
+  await e.estudiar("calculo derivacion");
+  assert.deepEqual(orden, ["abort", "espera"]);
+});

@@ -136,7 +136,11 @@ export function registrarSesion(pi: ExtensionAPI, vault = vaultDir, recursos = p
     }
   });
   // pi muestra el error del proveedor en inglés: se suma una línea con la causa probable y qué hacer.
+  let preguntas = 0;
+  pi.on("tool_execution_start", event => { if (["quiz", "ask_user_question"].includes(event.toolName)) preguntas++; });
+  pi.on("tool_execution_end", event => { if (["quiz", "ask_user_question"].includes(event.toolName)) preguntas = Math.max(0, preguntas - 1); });
   pi.on("agent_settled", (event, ctx) => {
+    preguntas = 0;
     const ultimo = activo && !event.aborted ? ctx.sessionManager.getBranch().findLast(e => e.type === "message") : undefined;
     if (ultimo?.type !== "message" || ultimo.message.role !== "assistant" || ultimo.message.stopReason !== "error") return;
     const error = ultimo.message.errorMessage || "";
@@ -168,7 +172,6 @@ export function registrarSesion(pi: ExtensionAPI, vault = vaultDir, recursos = p
       } catch { return null; }
     },
     async handler(args, ctx) {
-      if (!ctx.isIdle()) { ctx.ui.notify("Esperá a que termine el turno antes de cambiar de tema.", "warning"); return; }
       try {
         const palabras = args.trim().split(/\s+/).filter(Boolean), lista = cursos();
         let curso = lista.find(c => normalizar(c) === normalizar(palabras[0] || ""));
@@ -187,6 +190,11 @@ export function registrarSesion(pi: ExtensionAPI, vault = vaultDir, recursos = p
         try { const disco = statfsSync(vault); libres = disco.bavail * disco.bsize; } catch { /* sin datos del disco */ }
         if (libres < 2e8) { ctx.ui.notify(`Disco casi lleno (${Math.floor(libres / 1e6)} MB libres): liberá espacio y repetí /estudiar.`, "error"); return; }
         if (libres < 1e9) ctx.ui.notify(`Queda poco disco (${Math.floor(libres / 1e6)} MB libres): liberá espacio pronto para no perder la sesión.`, "warning");
+        // pi ya vació el editor: como /fin, se corta el turno en vez de perder el comando; una pregunta abierta se confirma antes.
+        if (!ctx.isIdle()) {
+          if (preguntas && !(await ctx.ui.confirm("Cambiar de tema", "Hay una pregunta abierta: ¿la cortamos y cambiamos de tema?"))) return;
+          ctx.abort(); await ctx.waitForIdle();
+        }
         const d = await cargar(curso, true);
         for (const aviso of d.avisos.filter(a => a.startsWith("Progreso") || a === COPIA)) ctx.ui.notify(aviso, "warning");
         let candidatos = consulta ? resolverTemas(d.temas, consulta) : ordenarTemas(d), resultados: ReturnType<typeof buscarMaterial> = [];
