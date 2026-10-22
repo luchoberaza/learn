@@ -359,3 +359,21 @@ test("H25: con un tema activo, /estudiar ofrece guardar y cambiar, cambiar sin g
   await e.estudiar("calculo integracion");
   assert.equal(e.sesion.actual().pendiente, undefined, "lo abandonado a propósito no se ofrece reconstruir");
 });
+test("H63: si pi se cortó antes de responder al alumno, al reanudar se avisa y el tutor lo responde sin duplicarlo", async t => {
+  const e = entorno(t);
+  await e.estudiar("calculo derivacion");
+  e.entradas.push({ type: "message", id: "m1", message: { role: "user", content: [{ type: "text", text: "se me colgó todo, ¿seguimos?" }] } });
+  mock.timers.enable({ apis: ["setTimeout"] }); t.after(() => mock.timers.reset());
+  await e.eventos.get("session_start")({ type: "session_start", reason: "startup" }, e.ctx);
+  assert.deepEqual(e.avisos.at(-1), ["info", "La clase se cortó antes de responder tu último mensaje: el tutor lo responde ahora."]);
+  assert.equal(e.ordenes.length, 1, "en session_start la terminal todavía no escucha: el turno espera");
+  mock.timers.tick(1500);
+  assert.equal(e.ordenes.length, 2);
+  assert.deepEqual([e.ordenes[1].display, e.ordenes[1].triggerTurn], [false, true]);
+  assert.match(e.ordenes[1].content, /sin repetirlo/);
+  assert.deepEqual(e.usuario, []);
+  e.ctx.isIdle = () => false;
+  await e.eventos.get("session_start")({ type: "session_start", reason: "startup" }, e.ctx);
+  mock.timers.tick(1500);
+  assert.equal(e.ordenes.length, 2, "si el alumno ya escribió otra cosa, no se agrega nada");
+});

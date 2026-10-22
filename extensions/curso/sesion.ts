@@ -125,6 +125,17 @@ export function registrarSesion(pi: ExtensionAPI, vault = vaultDir, recursos = p
       sinLog = !!(a as { sinLog?: boolean }).sinLog;
       registrarActivo(ctx, a);
       ctx.ui.setStatus("curso", `📚 ${a.curso} › ${tema.nombre}`);
+      // pi -c no retoma un turno cortado: si la rama termina en un mensaje del alumno sin respuesta, el tutor lo responde.
+      const ultimoMensaje = () => ctx.sessionManager.getBranch().findLast(e => e.type === "message");
+      const pregunta = inicio && ctx.hasUI ? ultimoMensaje() : undefined;
+      if (pregunta?.type === "message" && pregunta.message.role === "user") {
+        ctx.ui.notify("La clase se cortó antes de responder tu último mensaje: el tutor lo responde ahora.", "info");
+        // Al arrancar pi, session_start corre antes de que la terminal escuche a la sesión (interactive-mode.js:787, 1598-1603): el turno se difiere.
+        setTimeout(() => {
+          try { if (activo && ctx.isIdle() && ultimoMensaje()?.id === pregunta.id) ordenar(pi, "La sesión se cortó antes de que respondieras el último mensaje del alumno. Respondelo ahora, sin repetirlo ni pedirle que lo reescriba."); }
+          catch { /* la sesión ya se reemplazó */ }
+        }, 1500).unref();
+      }
     } catch (e) { ctx.ui.notify(`No se restauró el curso: ${mensaje(e, "estado inválido")}`, "warning"); }
   }
   pi.on("session_start", (_event, ctx) => restaurar(ctx, true));
