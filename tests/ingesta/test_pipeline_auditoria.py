@@ -191,6 +191,13 @@ class SolucionesFueraDelIndiceTest(Base):
             self.assertIn(palabra, texto)
         self.assertNotIn("secreto", texto)
 
+    def test_respuestas_en_plural_y_rta_tambien_son_solucion(self):
+        self.pdf("parcial.pdf", ["Pregunta 1\nenunciadouno\nRespuestas:\nsecretouno\nPregunta 2\nenunciadodos\nRta.: secretodos"])
+        self.ejecutar(self.doc("parcial", "evaluaciones"))
+        texto = self.indexado("parcial")
+        self.assertIn("enunciadodos", texto)
+        self.assertNotIn("secreto", texto)
+
     @unittest.skipUnless((CURSO / "_procesado/sol-prc20240926/meta.json").exists(), "falta el parcial procesado de cursos/redes")
     def test_parcial_real_con_solucion_integrada(self):
         shutil.copytree(CURSO / "_procesado/sol-prc20240926", self.salida / "sol-prc20240926", ignore=shutil.ignore_patterns("render", "cache"))

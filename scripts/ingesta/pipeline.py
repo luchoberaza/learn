@@ -21,7 +21,7 @@ TIPOS = {"programa", "bibliografia", "ejercicios", "evaluaciones", "soluciones",
 MOTORES = {"digital": "pymupdf", "escaneada": "ocrmypdf", "mixta": "pymupdf"}
 # Encabezado con mayúscula: un renglón cortado de la solución («pregunta 2 …») no reabre el enunciado.
 PREGUNTA = re.compile(r"[\s#>*_]*(?:Pregunta|PREGUNTA|Ejercicio|EJERCICIO|Problema|PROBLEMA)\s+\d")
-SOLUCION = re.compile(r"[\s#>*_]*(?:soluci[oó]n|resoluci[oó]n)|[\s#>]*(?:[*_]+\s*respuesta|respuesta\s*(?::|$))", re.I)
+SOLUCION = re.compile(r"[\s#>*_]*(?:soluci[oó]n|resoluci[oó]n|rta\.?\s*:)|[\s#>]*(?:[*_]+\s*respuesta|respuestas?\s*(?::|$))", re.I)
 
 
 def ahora() -> str:
