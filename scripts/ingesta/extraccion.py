@@ -17,6 +17,11 @@ from wordfreq import zipf_frequency
 
 VERSION_ALGORITMO = 3
 SIMBOLOS = r"[∑∏∫√∀∃∈∉≤≥±∞α-ωΑ-Ω]|\w\s*\^\s*\w"
+# Restos de fórmulas tras el OCR: variables sueltas ('d d d d'), un operador junto a una letra ('o+d', 't =')
+# o una línea aislada de subíndices ('nodal proc cola trans prop').
+RESTOS_OCR = (r"(?<![\w.])[b-df-np-tv-xzA-Z](?:[^\w\n]{1,3}[b-df-np-tv-xzA-Z](?![\w.])){2,}"
+              r"|(?<!\w)[^\W\d_][ \t]*[=+]|[=+][ \t]*[^\W\d_](?!\w)"
+              r"|(?:^|\n)[ \t]*\n[ \t]*[a-z]{2,6}(?:[ \t—–’”'\",-]+[a-z]{1,6}){2,}[ \t]*(?=\n[ \t]*\n|\n?\Z)")
 
 
 def normalizar(texto: str) -> str:
@@ -71,6 +76,10 @@ def clasificar(pagina: pymupdf.Page) -> dict:
             # MathematicalPi codifica operadores como dígitos: PyMuPDF extrae '5' por '=', '1' por '+' y '2' por '−'.
             "operadores_cifrados": any(re.search(r"Math(?:ematical)?Pi", f) for f in fuentes),
             "dibujos_vectoriales": len(pagina.get_drawings())}
+
+
+def matematica_ocr(texto: str) -> bool:
+    return bool(re.search(f"{SIMBOLOS}|{RESTOS_OCR}", texto))
 
 
 def etiqueta_impresa(pagina: pymupdf.Page) -> tuple[str | None, str]:

@@ -14,7 +14,7 @@ import time
 import pymupdf
 
 from almacen import Conflicto, atomico, bloquear, guardar_json, leer_json, ruta_segura, salida_segura, sha256
-from extraccion import calidad, clasificar, encabezados, etiqueta_impresa, extraer, identidad_motor, tokens
+from extraccion import calidad, clasificar, encabezados, etiqueta_impresa, extraer, identidad_motor, matematica_ocr, tokens
 
 TIPOS = {"programa", "bibliografia", "ejercicios", "evaluaciones", "soluciones", "otros"}
 MOTORES = {"digital": "pymupdf", "escaneada": "ocrmypdf", "mixta": "pymupdf"}
@@ -282,6 +282,8 @@ def ejecutar(manifiesto: dict, vault: Path, salida: Path, *, limite_paginas: int
                                 resultado.update(clave=clave, clasificacion=clase, motor=motor, identidad_motor=identidades[motor],
                                                  impresa=impresa, metodo_etiqueta=metodo_etiqueta, encabezados=titulos[numero])
                                 texto = extractor(pdf, numero, motor, idiomas)
+                                if motor == "ocrmypdf":
+                                    clase["posible_matematica"] |= matematica_ocr(texto)
                                 resultado.update(calidad(texto, clase, umbral))
                                 if clase["operadores_cifrados"]:
                                     resultado["avisos"].append("En esta página «5» puede ser «=», «1» «+» y «2» «−»: verificá con la imagen.")

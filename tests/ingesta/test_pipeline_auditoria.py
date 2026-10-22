@@ -12,6 +12,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts/ingesta"))
 
 import pymupdf
 from almacen import bloquear
+import extraccion
 from extraccion import clasificar
 from pipeline import ejecutar
 import vision
@@ -95,6 +96,40 @@ class MatematicaDigitalTest(Base):
         self.assertEqual((q["ruta"], q["motor"], q["pendiente"]), ("vision", "vision", False))
         self.assertFalse(q["clasificacion"]["posible_matematica"])
         self.assertIn(texto, (self.salida / "libro/paginas/0001.md").read_text())
+
+
+class MatematicaOcrTest(Base):
+    def test_restos_de_formulas_de_tesseract(self):
+        # Salidas reales de tesseract sobre Kurose escaneado y sobre una fórmula con subíndices.
+        for texto in ["Sean d d d d los retardos de procesamiento, de cola, de transmisión y de",
+                      "d do o+d +d,  +d", "t = RTT/ + L/R = 15,008 milisegundos.",
+                      "parte del tiempo total.\n\nnodal proc cola trans prop", "dado por:\n\nnodal — proc cola trans prop\n\nLas"]:
+            self.assertTrue(extraccion.matematica_ocr(texto), texto)
+        self.assertFalse(extraccion.matematica_ocr("Los paquetes viajan por la red de un router a otro. El router recibe los datos\n"
+                                                   "por un enlace y los transmite por el siguiente, y a la vez se\nforman colas.\n\n"
+                                                   "Si una imagen vale más que mil palabras, A y B se comunican."))
+
+    def test_formula_escaneada_queda_pendiente_y_la_prosa_no(self):
+        with pymupdf.open() as digital, pymupdf.open() as escaneado:
+            formula = digital.new_page(width=500, height=700)
+            formula.insert_textbox(pymupdf.Rect(45, 60, 450, 250), PROSA, fontsize=12)
+            x = 60
+            for base, sub, op in [("d", "nodal", " = "), ("d", "proc", " + "), ("d", "cola", " + "), ("d", "trans", " + "), ("d", "prop", "")]:
+                formula.insert_text((x, 300), base, fontsize=16, fontname="tiit")
+                formula.insert_text((x + 9, 305), sub, fontsize=9, fontname="tiit")
+                x += 9 + pymupdf.get_text_length(sub, "tiit", 9)
+                formula.insert_text((x, 300), op, fontsize=16)
+                x += pymupdf.get_text_length(op, "helv", 16)
+            digital.new_page(width=500, height=700).insert_textbox(pymupdf.Rect(45, 60, 450, 400), PROSA, fontsize=12)
+            for pagina in digital:
+                escaneado.new_page(width=500, height=700).insert_image(pymupdf.Rect(0, 0, 500, 700), stream=pagina.get_pixmap(dpi=200).tobytes("png"))
+            escaneado.save(self.vault / "escaneado.pdf")
+        ejecutar({"version": 1, "documentos": [self.doc("escaneado")]}, self.vault, self.salida)
+        formula, prosa = self.q("escaneado", 1), self.q("escaneado", 2)
+        self.assertEqual((formula["motor"], formula["ruta"]), ("ocrmypdf", "pendiente"))
+        self.assertTrue(formula["requiere_vision"] and formula["clasificacion"]["posible_matematica"])
+        self.assertTrue(any("matemática" in aviso for aviso in formula["avisos"]))
+        self.assertEqual((prosa["ruta"], prosa["requiere_vision"]), ("ocr", False))
 
 
 if __name__ == "__main__":
