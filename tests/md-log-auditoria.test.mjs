@@ -62,6 +62,14 @@ test("H04: si la nota se borró, se recrea en su ruta con un solo aviso", async 
   assert.equal(e.avisos.length, 1); assert.match(e.avisos[0][0], /^La nota del log no estaba; la recreé en 2026-10-22-retardos\.md/);
 });
 
+test("H04: si se borró la carpeta de sesiones con la nota, se recrean con un solo aviso", async t => {
+  const e = entorno(t); await e.handlers.get("session_start")({}, e.ctx); await e.vincular();
+  rmSync(e.sesiones, { recursive: true });
+  await e.enviar("Uno"); await e.enviar("Dos");
+  assert.match(readFileSync(e.file, "utf8"), /Uno[\s\S]*Dos/);
+  assert.equal(e.avisos.length, 1); assert.match(e.avisos[0][0], /^La nota del log no estaba; la recreé/);
+});
+
 test("H04: tras /resume con la nota renombrada se sigue escribiendo en ella", async t => {
   const e = entorno(t); await e.handlers.get("session_start")({}, e.ctx); await e.vincular();
   const nueva = join(e.sesiones, "renombrada.md"); renameSync(e.file, nueva);

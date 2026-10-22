@@ -114,6 +114,8 @@ export default function mdLog(pi: ExtensionAPI) {
 		const nueva = nota && (buscar(nota, path.dirname(anterior), false) ?? (contexto?.cwd ? buscar(nota, contexto.cwd, true) : undefined));
 		if (nueva) logFile = nueva;
 		else {
+			// Si también se borró su carpeta, sin recrearla el aviso se repetiría en cada mensaje.
+			fs.mkdirSync(path.dirname(anterior), { recursive: true });
 			fs.writeFileSync(anterior, "", { flag: "wx" });
 			nota = identidad(anterior);
 			contexto?.ui.notify(`La nota del log no estaba; la recreé en ${path.basename(anterior)} y sigo escribiendo ahí.`, "warning");
