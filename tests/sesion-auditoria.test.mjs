@@ -30,6 +30,8 @@ function indice(raiz, textos) {
   writeFileSync(join(raiz, "_procesado/busqueda.json"), JSON.stringify({ version: 1, normalizacion: "NFD-sin-tildes-v1", k1: 1.2, b: 0.75,
     cantidad: fragmentos.length, largo_promedio: fragmentos.reduce((s, f) => s + f.largo, 0) / fragmentos.length, df, fragmentos }));
 }
+const TODAS = ["read", "bash", "edit", "write", "ask_user_question", "leer_sesion_anterior", "registrar_progreso", "investigar_tema", "leer_paginas", "buscar_material", "leer_items", "ver_pagina",
+  "guardar_curso", "transcribir_paginas", "guardar_items", "quiz", "subagent", "subagents_list", "web_search", "fetch_content"];
 function entorno(t, d = datos()) {
   const vault = mkdtempSync(join(tmpdir(), "pi-sesion-aud-")), recursos = join(vault, ".pi"), raiz = join(vault, "cursos/calculo");
   t.after(() => rmSync(vault, { recursive: true, force: true }));
@@ -39,15 +41,17 @@ function entorno(t, d = datos()) {
   writeFileSync(join(recursos, "modo-curso.md"), "MODO");
   writeFileSync(join(recursos, "curso.config.json"), JSON.stringify({ max_tokens_dossier: 3000, max_tokens_curso_md: 1500 }));
   const comandos = new Map(), eventos = new Map(), entradas = [], avisos = [], ordenes = [], usuario = [], estados = {};
+  let activas = [...TODAS];
   const pi = { on: (n, h) => eventos.set(n, h), registerCommand: (n, c) => comandos.set(n, c),
     appendEntry: (customType, data) => entradas.push({ type: "custom", customType, data }), setSessionName: () => {},
     sendUserMessage: m => usuario.push(m), sendMessage: (m, o) => ordenes.push({ ...m, ...o }),
+    getAllTools: () => TODAS.map(name => ({ name })), getActiveTools: () => [...activas], setActiveTools: n => { activas = n; },
     exec: async () => ({ code: 0, stdout: JSON.stringify(d), stderr: "", killed: false }),
     events: { emit: (_n, p) => p.onComplete?.() } };
   const ctx = { hasUI: true, isIdle: () => true, sessionManager: { getBranch: () => entradas, getEntries: () => entradas, getSessionId: () => "sesion-1" },
     model: { provider: "prueba", id: "modelo" }, modelRegistry: { hasConfiguredAuth: () => true },
     ui: { notify: (m, tipo) => avisos.push([tipo, m]), setStatus: (k, v) => { estados[k] = v; }, select: async (_t, o) => o.includes("Cambiar sin guardar") ? "Cambiar sin guardar" : o[0], confirm: async () => true } };
-  return { vault, raiz, pi, ctx, comandos, eventos, entradas, avisos, ordenes, usuario, estados, sesion: registrarSesion(pi, vault, recursos),
+  return { vault, raiz, pi, ctx, get activas() { return activas; }, set activas(v) { activas = v; }, comandos, eventos, entradas, avisos, ordenes, usuario, estados, sesion: registrarSesion(pi, vault, recursos),
     estudiar: args => comandos.get("estudiar").handler(args, ctx) };
 }
 
@@ -376,4 +380,25 @@ test("H63: si pi se cortó antes de responder al alumno, al reanudar se avisa y 
   await e.eventos.get("session_start")({ type: "session_start", reason: "startup" }, e.ctx);
   mock.timers.tick(1500);
   assert.equal(e.ordenes.length, 2, "si el alumno ya escribió otra cosa, no se agrega nada");
+});
+test("H44/H43: con un curso activo sólo quedan las tools del estudio, sin skills; al cerrar vuelve el set anterior", async t => {
+  const e = entorno(t);
+  await e.estudiar("calculo derivacion");
+  assert.deepEqual([...e.activas].sort(), ["ask_user_question", "buscar_material", "investigar_tema", "leer_items", "leer_paginas", "leer_sesion_anterior", "quiz", "read", "registrar_progreso", "ver_pagina"]);
+  assert.deepEqual(e.entradas.at(-1).data.herramientas, TODAS);
+  const evento = { systemPromptOptions: { sections: {}, skills: [{ name: "teach" }, { name: "visualize" }] } };
+  e.eventos.get("before_agent_start")(evento, e.ctx);
+  assert.deepEqual(evento.systemPromptOptions.skills, []);
+  const leer = path => e.eventos.get("tool_call")({ toolName: "read", input: { path } }, { cwd: e.vault });
+  assert.equal(leer("/tmp/pi-clipboard-1234.png"), undefined);
+  for (const p of ["cursos/calculo/_procesado/libro/render/0001.png", "~/../../" + e.vault.slice(1) + "/cursos/calculo/progreso.yaml", ".pi/skills/teach/SKILL.md"]) assert.equal(leer(p)?.block, true, p);
+  e.activas = [...TODAS];
+  await e.eventos.get("session_start")({ type: "session_start", reason: "resume" }, e.ctx);
+  assert.equal(e.activas.includes("bash"), false);
+  await e.sesion.cerrar(e.ctx);
+  assert.deepEqual(e.activas, TODAS);
+  assert.equal(leer(".pi/skills/teach/SKILL.md"), undefined);
+  const sinCurso = { systemPromptOptions: { sections: {}, skills: [{ name: "teach" }] } };
+  e.eventos.get("before_agent_start")(sinCurso, e.ctx);
+  assert.deepEqual(sinCurso.systemPromptOptions.skills, [{ name: "teach" }]);
 });

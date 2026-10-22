@@ -1,6 +1,7 @@
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { mkdirSync, openSync, closeSync, readdirSync, readFileSync, renameSync, rmSync, statfsSync, statSync, writeFileSync } from "node:fs";
-import { basename, join, relative } from "node:path";
+import { homedir } from "node:os";
+import { basename, join, resolve, sep } from "node:path";
 import { piDir, vaultDir } from "../../scripts/lib/pi-sdk.mjs";
 import { normalizar } from "../../scripts/ingesta/bm25.ts";
 import { buscarMaterial, cita, documento, dossier, esSlug, leer, leerItems, leerPaginas, ordenarTemas, resolverTemas, rutaSegura,
@@ -9,6 +10,8 @@ import { buscarMaterial, cita, documento, dossier, esSlug, leer, leerItems, leer
 import { verificacionPrevia } from "./researcher.ts";
 
 type Config = { max_tokens_dossier: number; max_tokens_curso_md: number };
+// Tools del estudio; read queda para las fotos del alumno, que pi 1.4.0 pega como ruta de texto (interactive-mode.js:2477-2483).
+const ESTUDIO = ["quiz", "ask_user_question", "buscar_material", "leer_paginas", "leer_items", "ver_pagina", "registrar_progreso", "leer_sesion_anterior", "investigar_tema", "read"];
 const COPIA = "Material desde la última carga; el entorno de ingesta no respondió: corré .pi/scripts/doctor.";
 // pi.exec devuelve code 0 cuando mata al proceso por tiempo (exec.js:63): manda killed. Un traceback no es un mensaje para el alumno.
 export function fallaPython(r: { stderr: string; killed: boolean }) {
@@ -35,7 +38,8 @@ export const ordenar = (pi: ExtensionAPI, content: string) => pi.sendMessage({ c
 export function registrarSesion(pi: ExtensionAPI, vault = vaultDir, recursos = piDir) {
   let activo: Activo | undefined;
   let datos: DatosCurso | undefined;
-  let resumen = "", teach = "", modo = "", pendiente: string | undefined, sinLog = false, religar = false;
+  let resumen = "", teach = "", modo = "", pendiente: string | undefined, sinLog = false, religar = false, herramientas: string[] | undefined;
+  const estudiar = () => { const todas = new Set(pi.getAllTools().map(t => t.name)); pi.setActiveTools(ESTUDIO.filter(n => todas.has(n))); };
   const cursos = () => readdirSync(rutaSegura(vault, "cursos"), { withFileTypes: true }).filter(d => d.isDirectory() && esSlug(d.name)).map(d => d.name);
   const raiz = (curso: string) => {
     if (!esSlug(curso)) throw new Error("Curso inválido: usá su slug.");
@@ -103,7 +107,7 @@ export function registrarSesion(pi: ExtensionAPI, vault = vaultDir, recursos = p
     return tema;
   }
   async function restaurar(ctx: ExtensionContext, inicio: boolean) {
-    activo = undefined; datos = undefined; resumen = ""; pendiente = undefined; sinLog = false; religar = false;
+    activo = undefined; datos = undefined; resumen = ""; pendiente = undefined; sinLog = false; religar = false; herramientas = undefined;
     ctx.ui.setStatus("curso", undefined);
     const ultimo = ctx.sessionManager.getBranch().findLast(e => e.type === "custom" && e.customType === "curso");
     let estado = ultimo?.type === "custom" ? ultimo.data : undefined;
@@ -123,6 +127,8 @@ export function registrarSesion(pi: ExtensionAPI, vault = vaultDir, recursos = p
       for (const aviso of d.avisos.filter(a => a.startsWith("Progreso") || a === COPIA)) ctx.ui.notify(aviso, "warning");
       const tema = preparar(a, d);
       sinLog = !!(a as { sinLog?: boolean }).sinLog;
+      herramientas = (a as { herramientas?: string[] }).herramientas ?? pi.getActiveTools();
+      estudiar();
       registrarActivo(ctx, a);
       ctx.ui.setStatus("curso", `📚 ${a.curso} › ${tema.nombre}`);
       // pi -c no retoma un turno cortado: si la rama termina en un mensaje del alumno sin respuesta, el tutor lo responde.
@@ -146,6 +152,8 @@ export function registrarSesion(pi: ExtensionAPI, vault = vaultDir, recursos = p
       return;
     }
     Object.assign(event.systemPromptOptions.sections, { teach, modo_curso: modo, curso: resumen });
+    // teach ya va como sección y read sólo abre fotos: ninguna skill se puede cargar durante el estudio.
+    event.systemPromptOptions.skills = [];
     if (religar) {
       religar = false;
       pi.events.emit("md-log:link", { file: rutaSegura(vault, activo.log), backfill: false,
@@ -153,6 +161,12 @@ export function registrarSesion(pi: ExtensionAPI, vault = vaultDir, recursos = p
     }
   });
   // pi muestra el error del proveedor en inglés: se suma una línea con la causa probable y qué hacer.
+  // Durante el estudio read no lee material ni notas del curso (saltearía el filtro de soluciones) ni otros textos.
+  pi.on("tool_call", (event, ctx) => {
+    if (!activo || event.toolName !== "read") return;
+    const ruta = resolve(ctx.cwd, String((event.input as { path?: unknown }).path ?? "").replace(/^@/, "").replace(/^~(?=\/|$)/, homedir()));
+    if (!/\.(png|jpe?g|webp|gif)$/i.test(ruta) || ruta.startsWith(join(vault, "cursos") + sep)) return { block: true, reason: "Durante el estudio read sólo abre fotos del alumno; el material se lee con leer_paginas, leer_items o ver_pagina." };
+  });
   let preguntas = 0;
   pi.on("tool_execution_start", event => { if (["quiz", "ask_user_question"].includes(event.toolName)) preguntas++; });
   pi.on("tool_execution_end", event => { if (["quiz", "ask_user_question"].includes(event.toolName)) preguntas = Math.max(0, preguntas - 1); });
@@ -281,9 +295,11 @@ export function registrarSesion(pi: ExtensionAPI, vault = vaultDir, recursos = p
           try { const file = rutaSegura(vault, a.log); if (statSync(file).size === 0) rmSync(file); } catch { /* no quedó archivo */ }
         }
         sinLog = !!sinNota;
-        const estado = sinLog ? { ...a, sinLog } : a;
+        herramientas ??= pi.getActiveTools();
+        const estado = { ...a, ...(sinLog ? { sinLog } : {}), herramientas };
         pi.appendEntry("curso", estado);
         registrarActivo(ctx, estado);
+        estudiar();
         if (previo && previo.curso !== curso) olvidarActivo(ctx, previo.curso);
         pi.setSessionName(`${d.nombre || curso} · ${tema.nombre}`);
         // Los avisos del curso van al dossier; la preparación por tema informa al alumno lo que le toca.
@@ -317,7 +333,8 @@ export function registrarSesion(pi: ExtensionAPI, vault = vaultDir, recursos = p
       });
       pi.appendEntry("curso", null);
       olvidarActivo(ctx, a.curso);
-      activo = undefined; datos = undefined; resumen = ""; pendiente = undefined; sinLog = false;
+      if (herramientas) pi.setActiveTools(herramientas);
+      activo = undefined; datos = undefined; resumen = ""; pendiente = undefined; sinLog = false; herramientas = undefined;
       ctx.ui.setStatus("curso", undefined);
     },
     refrescar: () => { if (activo && datos) preparar(activo, datos); return resumen; },

@@ -30,7 +30,7 @@ function entorno(t, d = datos(), entradas = []) {
   const comandos = new Map(), eventos = new Map(), mensajes = [], avisos = [], vinculos = [];
   const pi = { on: (n, h) => eventos.set(n, h), registerCommand: (n, d) => comandos.set(n, d),
     appendEntry: (customType, data) => entradas.push({ type: "custom", customType, data }), setSessionName: n => mensajes.push({ nombre: n }),
-    sendUserMessage: m => mensajes.push({ usuario: m }), sendMessage: m => mensajes.push({ orden: m.content }),
+    sendUserMessage: m => mensajes.push({ usuario: m }), sendMessage: m => mensajes.push({ orden: m.content }), getAllTools: () => [], getActiveTools: () => [], setActiveTools: () => {},
     exec: async () => ({ code: 0, stdout: JSON.stringify(d), stderr: "" }),
     events: { emit: (n, payload) => { vinculos.push([n, payload]); payload.onComplete?.(); } } };
   const ctx = { hasUI: true, isIdle: () => true, sessionManager: { getBranch: () => entradas, getEntries: assert.fail, getSessionId: () => "prueba" }, model: { provider: "prueba", id: "modelo" }, modelRegistry: { hasConfiguredAuth: () => true },
