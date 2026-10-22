@@ -120,15 +120,37 @@ const QuizParams = Type.Object({
 	),
 });
 
+const SUPERINDICES: Record<string, string> = { "0": "⁰", "1": "¹", "2": "²", "3": "³", "4": "⁴", "5": "⁵", "6": "⁶", "7": "⁷", "8": "⁸", "9": "⁹", "-": "⁻", "+": "⁺" };
+const SUBINDICES: Record<string, string> = { "0": "₀", "1": "₁", "2": "₂", "3": "₃", "4": "₄", "5": "₅", "6": "₆", "7": "₇", "8": "₈", "9": "₉", "-": "₋", "+": "₊" };
+const SIMBOLOS: Record<string, string> = { times: "×", cdot: "·", to: "→", rightarrow: "→", le: "≤", leq: "≤", ge: "≥", geq: "≥", approx: "≈", neq: "≠", pm: "±" };
+
+// El popup es texto plano: el LaTeX común pasa a Unicode y lo que no se reconoce queda como está.
+function textoPlano(texto: string): string {
+	const operando = (x: string) => (/^[\p{L}\p{N}.,]+$/u.test(x) ? x : `(${x})`);
+	const mapear = (tabla: Record<string, string>) => (_: string, llaves?: string, digito?: string) =>
+		[...(llaves ?? digito ?? "")].map((c) => tabla[c]).join("");
+	return texto
+		.replace(/\$\$?([^$]+?)\$\$?/g, "$1")
+		.replace(/\{,\}/g, ",")
+		.replace(/\s*\\([a-zA-Z]+)\s*/g, (m, c) => SIMBOLOS[c] ?? m)
+		.replace(/\\(?:text|mathrm)\{([^{}]*)\}/g, "$1")
+		.replace(/\\[dt]?frac\{([^{}]*)\}\{([^{}]*)\}/g, (_, a, b) => `${operando(a)}/${operando(b)}`)
+		.replace(/\\,/g, "\u2009")
+		.replace(/\\%/g, "%")
+		.replace(/\^(?:\{([-+]?\d+)\}|(\d))/g, mapear(SUPERINDICES))
+		.replace(/_(?:\{([-+]?\d+)\}|(\d))/g, mapear(SUBINDICES))
+		.replace(/_\{([\p{L}]+)\}/gu, "_$1");
+}
+
 function normalizeOptions(
 	options: Array<{ label: string; value?: string; description?: string }> | undefined,
 ): QuizOption[] {
 	const seen = new Set<string>();
 	return (options || [])
 		.map((option) => ({
-			label: option.label.trim(),
+			label: textoPlano(option.label.trim()).trim(),
 			value: option.value?.trim() || option.label.trim(),
-			description: option.description?.trim() || undefined,
+			description: textoPlano(option.description?.trim() ?? "").trim() || undefined,
 		}))
 		.filter((option) => {
 			if (option.label.length === 0) return false;
@@ -371,7 +393,7 @@ function renderFeedback(
 	}
 	if (explanation) {
 		lines.push("");
-		addWrapped(lines, theme.fg("text", explanation), width, " ");
+		addWrapped(lines, theme.fg("text", textoPlano(explanation)), width, " ");
 	}
 	lines.push("");
 	add(theme.fg("dim", " Enter o Esc para seguir"));
@@ -878,7 +900,7 @@ export default function quiz(pi: ExtensionAPI) {
 		name: "quiz",
 		label: "quiz",
 		description:
-			"Ask the user a GRADED question with a known correct answer, then instantly grade and give feedback. Unlike ask_user_question (which collects preferences/decisions with no right answer), quiz always has a correct answer supplied by you, marks the user's selection right/wrong (✓/✗), reveals the correct answer, and can show an explanation. Use it to (1) assess what the learner already understands before teaching, and (2) run tight practice/retrieval loops after explaining, or probe understanding whenever you're unsure they've got it. Options-only: single-select or multi-select, plus an automatic 'No sé' (I don't know) choice so the user can signal a genuine gap instead of guessing. An always-present optional note field (Tab to focus it) lets the user attach a free-text note to ANY answer; it reaches you only when non-empty. No free-text answers — for non-graded questions use ask_user_question instead.",
+			"Ask the user a GRADED question with a known correct answer, then instantly grade and give feedback. Unlike ask_user_question (which collects preferences/decisions with no right answer), quiz always has a correct answer supplied by you, marks the user's selection right/wrong (✓/✗), reveals the correct answer, and can show an explanation. Use it to (1) assess what the learner already understands before teaching, and (2) run tight practice/retrieval loops after explaining, or probe understanding whenever you're unsure they've got it. Options-only: single-select or multi-select, plus an automatic 'No sé' (I don't know) choice so the user can signal a genuine gap instead of guessing. An always-present optional note field (Tab to focus it) lets the user attach a free-text note to ANY answer; it reaches you only when non-empty. No free-text answers — for non-graded questions use ask_user_question instead. The popup is plain text: write question, details and options in plain text with Unicode (1,2 ms; 8×10⁶ bit/s; d_prop), never LaTeX; LaTeX goes only in explanation.",
 		promptSnippet:
 			"Use the quiz tool to test the user with a graded multiple-choice or multi-select question (required correct answer + required explanation). For non-graded questions, use ask_user_question.",
 		promptGuidelines: [
@@ -901,7 +923,8 @@ export default function quiz(pi: ExtensionAPI) {
 		parameters: QuizParams,
 
 		async execute(_toolCallId, params, signal, onUpdate, ctx) {
-			const context = params.details?.trim() || undefined;
+			const question = textoPlano(params.question);
+			const context = textoPlano(params.details?.trim() ?? "").trim() || undefined;
 			const explanation = params.explanation.trim();
 			const mode: QuizMode = params.multiSelect ? "multi-select" : "single-select";
 
@@ -909,7 +932,7 @@ export default function quiz(pi: ExtensionAPI) {
 			try {
 				options = normalizeOptions(params.options);
 			} catch (e) {
-				return unavailableResult(params.question, mode, `quiz: ${(e as Error).message}`, [], context);
+				return unavailableResult(question, mode, `quiz: ${(e as Error).message}`, [], context);
 			}
 
 			// Shuffle for display (default on) BEFORE resolving correct indices, so
@@ -935,12 +958,12 @@ export default function quiz(pi: ExtensionAPI) {
 			);
 
 			if (signal?.aborted) {
-				return cancelledResult(params.question, mode, correctIndices, context);
+				return cancelledResult(question, mode, correctIndices, context);
 			}
 
 			if (options.length < 2) {
 				return unavailableResult(
-					params.question,
+					question,
 					mode,
 					"quiz: hacen falta al menos dos opciones.",
 					correctIndices,
@@ -949,22 +972,22 @@ export default function quiz(pi: ExtensionAPI) {
 			}
 
 			if (correctError) {
-				return unavailableResult(params.question, mode, `quiz: ${correctError}`, correctIndices, context);
+				return unavailableResult(question, mode, `quiz: ${correctError}`, correctIndices, context);
 			}
 
 			if (!ctx.hasUI) {
-				return unavailableResult(params.question, mode, "quiz: hace falta la interfaz interactiva.", correctIndices, context);
+				return unavailableResult(question, mode, "quiz: hace falta la interfaz interactiva.", correctIndices, context);
 			}
 
 			return withUILock(async () => {
 				const response =
 					mode === "single-select"
-						? await askSingleChoice(ctx, params.question, context, options, correctIndices, explanation)
-						: await askMultiChoice(ctx, params.question, context, options, correctIndices, explanation);
+						? await askSingleChoice(ctx, question, context, options, correctIndices, explanation)
+						: await askMultiChoice(ctx, question, context, options, correctIndices, explanation);
 				if (!response) {
-					return cancelledResult(params.question, mode, correctIndices, context);
+					return cancelledResult(question, mode, correctIndices, context);
 				}
-				return buildResult(params.question, context, mode, options, response, correctIndices, explanation);
+				return buildResult(question, context, mode, options, response, correctIndices, explanation);
 			});
 		},
 
@@ -978,7 +1001,7 @@ export default function quiz(pi: ExtensionAPI) {
 			const options = normalizeOptions(
 				args.options as Array<{ label: string; value?: string; description?: string }> | undefined,
 			);
-			let text = theme.fg("toolTitle", theme.bold("quiz ")) + theme.fg("muted", args.question);
+			let text = theme.fg("toolTitle", theme.bold("quiz ")) + theme.fg("muted", textoPlano(args.question || ""));
 			if (args.multiSelect) {
 				text += theme.fg("dim", " [varias respuestas]");
 			}
@@ -1055,7 +1078,7 @@ export default function quiz(pi: ExtensionAPI) {
 			}
 
 			if (details.explanation) {
-				lines.push(theme.fg("muted", details.explanation));
+				lines.push(theme.fg("muted", textoPlano(details.explanation)));
 			}
 
 			return new Text(lines.join("\n"), 0, 0);
