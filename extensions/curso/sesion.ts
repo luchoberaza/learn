@@ -39,7 +39,7 @@ export function registrarSesion(pi: ExtensionAPI, vault = vaultDir, recursos = p
   let activo: Activo | undefined;
   let datos: DatosCurso | undefined;
   let resumen = "", teach = "", modo = "", pendiente: string | undefined, sinLog = false, religar = false, herramientas: string[] | undefined;
-  const estudiar = () => { const todas = new Set(pi.getAllTools().map(t => t.name)); pi.setActiveTools(ESTUDIO.filter(n => todas.has(n))); };
+  const activarEstudio = () => { const todas = new Set(pi.getAllTools().map(t => t.name)); pi.setActiveTools(ESTUDIO.filter(n => todas.has(n))); };
   const cursos = () => readdirSync(rutaSegura(vault, "cursos"), { withFileTypes: true }).filter(d => d.isDirectory() && esSlug(d.name)).map(d => d.name);
   const raiz = (curso: string) => {
     if (!esSlug(curso)) throw new Error("Curso inválido: usá su slug.");
@@ -128,7 +128,7 @@ export function registrarSesion(pi: ExtensionAPI, vault = vaultDir, recursos = p
       const tema = preparar(a, d);
       sinLog = !!(a as { sinLog?: boolean }).sinLog;
       herramientas = (a as { herramientas?: string[] }).herramientas ?? pi.getActiveTools();
-      estudiar();
+      activarEstudio();
       registrarActivo(ctx, a);
       ctx.ui.setStatus("curso", `📚 ${a.curso} › ${tema.nombre}`);
       // pi -c no retoma un turno cortado: si la rama termina en un mensaje del alumno sin respuesta, el tutor lo responde.
@@ -160,7 +160,6 @@ export function registrarSesion(pi: ExtensionAPI, vault = vaultDir, recursos = p
         onComplete(error?: string) { if (error) ctx.ui.notify("No se reabrió la nota del curso: seguimos sin nota de Obsidian.", "warning"); } });
     }
   });
-  // pi muestra el error del proveedor en inglés: se suma una línea con la causa probable y qué hacer.
   // Durante el estudio read no lee material ni notas del curso (saltearía el filtro de soluciones) ni otros textos.
   pi.on("tool_call", (event, ctx) => {
     if (!activo || event.toolName !== "read") return;
@@ -170,6 +169,7 @@ export function registrarSesion(pi: ExtensionAPI, vault = vaultDir, recursos = p
   let preguntas = 0;
   pi.on("tool_execution_start", event => { if (["quiz", "ask_user_question"].includes(event.toolName)) preguntas++; });
   pi.on("tool_execution_end", event => { if (["quiz", "ask_user_question"].includes(event.toolName)) preguntas = Math.max(0, preguntas - 1); });
+  // pi muestra el error del proveedor en inglés: se suma una línea con la causa probable y qué hacer.
   pi.on("agent_settled", (event, ctx) => {
     preguntas = 0;
     const ultimo = activo && !event.aborted ? ctx.sessionManager.getBranch().findLast(e => e.type === "message") : undefined;
@@ -299,7 +299,7 @@ export function registrarSesion(pi: ExtensionAPI, vault = vaultDir, recursos = p
         const estado = { ...a, ...(sinLog ? { sinLog } : {}), herramientas };
         pi.appendEntry("curso", estado);
         registrarActivo(ctx, estado);
-        estudiar();
+        activarEstudio();
         if (previo && previo.curso !== curso) olvidarActivo(ctx, previo.curso);
         pi.setSessionName(`${d.nombre || curso} · ${tema.nombre}`);
         // Los avisos del curso van al dossier; la preparación por tema informa al alumno lo que le toca.
