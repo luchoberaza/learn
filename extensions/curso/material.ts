@@ -101,7 +101,7 @@ export function leerItems(datos: DatosCurso, doc: string, ids: string[], incluir
     return t;
   }).join("\n\n"), 32000);
 }
-export function dossier(raiz: string, datos: DatosCurso, tema: Tema, maxTokens: number, maxContrato: number): string {
+export function dossier(raiz: string, datos: DatosCurso, tema: Tema, maxTokens: number, maxContrato: number, verificacion = "Sin caché validada; usá investigar_tema en modo alcance."): string {
   if (![maxTokens, maxContrato].every(n => Number.isSafeInteger(n) && n > 0)) throw new Error("Presupuestos de contexto inválidos.");
   const contrato = Buffer.byteLength(datos.contrato) <= Math.min(maxContrato, maxTokens) * 4 ? datos.contrato : "Contrato excede el presupuesto: revisalo antes de inferir objetivos o rúbrica.";
   const lineas = [`# ${datos.curso} · ${tema.nombre} (${tema.id})`, ...datos.avisos, "## Contrato del curso", contrato,
@@ -116,7 +116,7 @@ export function dossier(raiz: string, datos: DatosCurso, tema: Tema, maxTokens: 
     lineas.push(`${clase}: ${ref.doc}/${id} · ${i?.enunciado.replace(/\s+/g, " ").slice(0, 140) || "sin preparar"}`);
   }
   for (const id of [tema.id, ...(tema.prerequisitos || [])]) lineas.push(`Progreso ${id}: ${JSON.stringify(datos.progreso.temas[id] || "sin registro")}`);
-  try { lineas.push("## Verificación previa", leer(raiz, `notas/verificaciones/${tema.id}.md`, 50000)); } catch { lineas.push("Sin verificación previa en caché; researcher normal disponible (anclaje/caché automáticos: Fase 6)."); }
+  lineas.push("## Verificación previa", verificacion);
   if (datos.avisos.length || datos.validacion?.errores.length || datos.validacion?.avisos.length) lineas.push("Preparación incompleta: usá sólo referencias comprobables; los avisos no certifican fidelidad.");
   return acotar(lineas.join("\n\n"), maxTokens * 4);
 }

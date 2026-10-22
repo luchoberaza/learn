@@ -127,7 +127,7 @@ test("runtime instalado registra comandos y tools de sesión sin modificar teach
   const p = await loadProject();
   try {
     assert.deepEqual(p.errors, []);
-    for (const n of ["leer_paginas", "ver_pagina", "buscar_material", "leer_items"]) assert.ok(p.session.getActiveToolNames().includes(n));
+    for (const n of ["leer_paginas", "ver_pagina", "buscar_material", "leer_items", "investigar_tema"]) assert.ok(p.session.getActiveToolNames().includes(n));
     for (const n of ["estudiar", "cursos"]) assert.ok(p.session.extensionRunner.getRegisteredCommands().some(c => c.name === n));
   } finally { await p.close(); }
 });

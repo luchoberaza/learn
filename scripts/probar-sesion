@@ -18,6 +18,9 @@ let pregunta, inicio, recibido;
 const primera = new Promise(resolve => { recibido = resolve; });
 function crearLoader() { return new sdk.DefaultResourceLoader({ cwd: vaultDir, agentDir, settingsManager: settings,
   extensionFactories: [pi => {
+    pi.on("before_agent_start", event => {
+      event.systemPromptOptions.sections.ensayo_fase4 = "Ensayo técnico exclusivo de Fase 4: se omite investigar_tema y no se lanzan hijos. Continuá directamente con el probe; el researcher anclado se prueba con probar-researcher-curso.";
+    });
     pi.on("tool_call", (event, ctx) => {
       if (event.toolName !== "quiz" && event.toolName !== "ask_user_question") return;
       pregunta = { herramienta: event.toolName, pregunta: event.input.question, opciones: event.input.options?.map(o => o.label), ms: performance.now() - inicio };

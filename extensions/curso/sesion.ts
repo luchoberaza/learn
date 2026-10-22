@@ -6,6 +6,8 @@ import { normalizar } from "../../scripts/ingesta/bm25.ts";
 import { buscarMaterial, cita, documento, dossier, esSlug, leerItems, leerPaginas, ordenarTemas, resolverTemas, rutaSegura,
   type Activo, type DatosCurso, type Tema } from "./material.ts";
 
+import { verificacionPrevia } from "./researcher.ts";
+
 type Config = { max_tokens_dossier: number; max_tokens_curso_md: number };
 export function registrarSesion(pi: ExtensionAPI, vault = vaultDir, recursos = piDir) {
   let activo: Activo | undefined;
@@ -29,12 +31,12 @@ export function registrarSesion(pi: ExtensionAPI, vault = vaultDir, recursos = p
     let anterior = "";
     try {
       const carpeta = rutaSegura(vault, `cursos/${a.curso}/sesiones`);
-      const logs = readdirSync(carpeta).filter(n => n.endsWith(`-${tema.id}.md`) || new RegExp(`-${tema.id}-\\d+\\.md$`).test(n))
+      const logs = readdirSync(carpeta).filter(n => (n.endsWith(`-${tema.id}.md`) || new RegExp(`-${tema.id}-\\d+\\.md$`).test(n)) && relative(vault, join(carpeta, n)) !== a.log)
         .sort((a, b) => statSync(rutaSegura(carpeta, a)).mtimeMs - statSync(rutaSegura(carpeta, b)).mtimeMs || a.localeCompare(b, undefined, { numeric: true }));
       const ultimo = logs.at(-1);
       if (ultimo && !(d.progreso.historial || []).some(h => typeof h === "object" && h !== null && "log" in h && basename(String(h.log)) === ultimo)) anterior = `Última sesión sin registro de progreso: [[cursos/${a.curso}/sesiones/${ultimo}]]. No atribuyas ese log a progreso ya guardado; reconstrucción automática: Fase 7.`;
     } catch { /* Sin sesiones anteriores no hay nada para reconstruir. */ }
-    const nuevo = dossier(raiz(a.curso), { ...d, avisos: [...d.avisos, ...(anterior ? [anterior] : [])] }, tema, config.max_tokens_dossier, config.max_tokens_curso_md);
+    const nuevo = dossier(raiz(a.curso), { ...d, avisos: [...d.avisos, ...(anterior ? [anterior] : [])] }, tema, config.max_tokens_dossier, config.max_tokens_curso_md, verificacionPrevia(vault, recursos, d, tema));
     teach = readFileSync(join(recursos, "skills/teach/SKILL.md"), "utf8");
     modo = readFileSync(join(recursos, "modo-curso.md"), "utf8");
     activo = a; datos = d; resumen = nuevo;
@@ -149,6 +151,8 @@ export function registrarSesion(pi: ExtensionAPI, vault = vaultDir, recursos = p
     return { a: activo, d: datos, r: raiz(activo.curso) };
   }
   return {
+    actual: () => activo && datos ? actual() : undefined,
+    refrescar: () => { if (activo && datos) preparar(activo, datos); return resumen; },
     leer_paginas({ doc, desde, hasta }: { doc: string; desde: number; hasta: number }) { const { d, r } = actual(); return leerPaginas(r, d, doc, desde, hasta); },
     buscar_material({ consulta, tipo }: { consulta: string; tipo?: string }) { const { d, r } = actual(); return JSON.stringify(buscarMaterial(r, d, consulta, tipo)); },
     leer_items({ doc, ids, incluir_solucion = false }: { doc: string; ids: string[]; incluir_solucion?: boolean }) { return leerItems(actual().d, doc, ids, incluir_solucion); },

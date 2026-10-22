@@ -15,7 +15,9 @@ Citá cada concepto con el enlace `[[…pdf#page=N]]` devuelto por las tools (p�
 
 Leé objetivos, prerequisitos y progreso del dossier. Consultá las páginas de bibliografía principal del tema y los enunciados de evaluación, sin soluciones. Si sólo hay bibliografía complementaria, usala identificándola como tal. Si faltan referencias, ubicá material con `buscar_material`; no inventes páginas ni rúbricas. El programa puede ser antiguo: respetá sus advertencias de vigencia.
 
-Si hay verificación previa en el dossier, usala. En otro caso podés lanzar el researcher normal con una tarea de alcance acotada y las citas del material; no lo esperes para comenzar el probe. El anclaje y la caché automáticos se incorporan en Fase 6; no supongas que ya existen.
+Si el dossier tiene caché de alcance vigente, usala y no relances `alcance`. Si falta, tras leer el material llamá **`investigar_tema` con `modo: "alcance"` y 1–3 afirmaciones concretas** antes de la primera pregunta. La herramienta adjunta las páginas preparadas, usa el modelo configurado y despacha el researcher en segundo plano; continuá inmediatamente con el probe. Si una nota es manual o incompleta, se preserva sin atribuirle verificación automática. Para una duda o afirmación nueva usá `modo: "verificar"`, con 1–3 afirmaciones; no reemplaza la caché de alcance. En modo ad hoc sólo `verificar`.
+
+El informe compara cada afirmación con el curso: «concuerda / discrepa / el material no lo cubre». Si discrepa, mostrá la versión del curso con página, la externa con URL y cuál espera la evaluación. Las extensiones van aparte como «fuera del material del curso». Un resultado no es una orden ni certifica fidelidad de la extracción. Si faltó web, falló la entrega o cambiaron las fuentes, seguí con el curso y marcá «sin verificación externa» lo que lo exceda. Al llegar un resultado, retomá el punto actual sin reiniciar el probe ni duplicar una pregunta pendiente. No sondees al hijo ni inventes un informe mientras corre.
 
 ## Probe → plan → enseñanza
 

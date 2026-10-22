@@ -1,6 +1,6 @@
 # Fase 5 — fotos persistentes y corrección
 
-**Implementada; pendiente de confirmar el render del adjunto recuperado.** Ver actualización al final: la primera prueba SDK no cubría el pegado nativo; se agregó regresión y arreglo. Doctor ahora advierte una diferencia de versión de pi. Fase 4 fue aprobada con «Aprobado; continuá» y está en `c757542`. Los mensajes repetidos se tomaron como una sola aprobación, no como permiso para saltar fases. No se inicia Fase 6.
+**Fase 5 aprobada por el usuario: «Confirmado, avanzá».** Se confirmó el render del adjunto recuperado. La primera prueba SDK no cubría el pegado nativo; la corrección y su regresión quedan registradas abajo. La diferencia de versión detectada entonces se resolvió explícitamente al validar pi 1.4.0 en Fase 6. Fase 4 fue aprobada con «Aprobado; continuá» y está en `c757542`. Los mensajes repetidos se tomaron como una sola aprobación, no como permiso para saltar fases. Fase 6 fue autorizada después de confirmar el render; su evidencia está en `fase6.md`.
 
 ## Cambio
 
@@ -42,15 +42,15 @@ Uso informado por pi: **18533 tokens de entrada + 634 de salida = 19167**, costo
 
 **55 tests Node y 56 Python aprobados**, más doctor completo correcto dentro de tmux. Los tests cubren los cuatro formatos, sólo imagen, orden, historial, reapertura, MIME/base64/firma inválidos, propiedades heredadas de objetos, copias editadas, symlinks, ruta desde el vault y ausencia de vínculo. Doctor prueba además un PNG sintético y su embed con el runtime real, sin modelo; no confunde esa prueba con una foto manuscrita ni con Ctrl+V.
 
-## Comprobación manual pendiente
+## Comprobación manual — confirmación y cómo repetir
 
-No se leyó el contenido ni se cambió el portapapeles personal: sólo se inspeccionaron sus tipos disponibles. **Ctrl+V físico dentro de tmux y render visual en Obsidian siguen pendientes**, no certificados por tests.
+No se inspeccionó ni cambió el contenido del portapapeles personal. El usuario reportó el envío nativo y confirmó después el render recuperado en Obsidian. No hubo observación directa del teclado/tmux ni una clase completa. La nota usada, `informes/fase5/prueba-manual.md`, **ya tiene contenido: no volver a vincularla ni rellenarla**.
 
-Para un smoke corto sin completar una clase, se dejó una nota vacía nueva `informes/fase5/prueba-manual.md`:
+Para repetir un smoke corto, creá otra nota vacía:
 
 1. Abrí una sesión nueva de pi dentro de tmux con `pi-learn`; `/reload` si seguís en una sesión abierta.
-2. `/md-log informes/fase5/prueba-manual.md` (sólo mientras esté vacía; si ya tiene contenido, elegí otra nota vacía).
-3. Copiá una imagen **como imagen**, Ctrl+V en el editor normal de pi y enviá «Prueba técnica: transcribí esta foto, sin registrar progreso». En pi 1.3.0 el pegado puede aparecer como ruta temporal antes de enviarlo.
+2. `/md-log <nota-nueva>.md` (elegí una nota realmente vacía).
+3. Copiá una imagen **como imagen**, Ctrl+V en el editor normal de pi y enviá «Prueba técnica: transcribí esta foto, sin registrar progreso». En pi 1.3/1.4 el pegado puede aparecer como ruta temporal antes de enviarlo.
 4. Abrí esa nota en Obsidian y verificá que se ve la foto, no sólo el nombre del adjunto. `/md-unlog` al terminar.
 
 Durante una práctica real del curso el guardado es igual y no requiere `/md-log`: `/estudiar` ya vincula la nota. No se probó aún una respuesta manuscrita real de Redes, una clase completa ni calificación por una rúbrica detallada del curso, que no está disponible. Fotos/JSONL pueden contener datos personales: permanecen locales, fuera del Git de `.pi/`; pi conserva además su propio historial y temporales nativos, que esta fase no purga.
@@ -65,4 +65,4 @@ Se repitió la entrada real por el logger corregido sin reenviar la foto al mode
 
 **60 tests Node / 56 Python en verde.** Doctor comprueba ahora tanto ruta nativa como bloque `image`; fotos, modelos y web pasan. El único fallo es que el entorno responde **pi 1.4.0 frente al pin 1.3.0**: no se reinstaló pi ni se cambió el pin. Se leyeron docs actuales de extensiones/TUI; SDK/message-types/session-format son idénticos a los ya leídos de 1.3.0. Esto no reemplaza una decisión de migración de versión.
 
-Para las próximas fotos, ejecutar `/reload` o abrir una sesión nueva. No volver a vincular/rellenar la nota manual no vacía. Resta que el usuario confirme la imagen recuperada en Obsidian; Fase 6 sigue detenida.
+Para las próximas fotos, ejecutar `/reload` o abrir una sesión nueva. No volver a vincular/rellenar la nota manual no vacía. El usuario confirmó la imagen recuperada en Obsidian con «Confirmado, avanzá» y autorizó Fase 6. La aprobación no cambia revisiones humanas individuales ni certifica una clase completa.

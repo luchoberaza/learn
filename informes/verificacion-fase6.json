@@ -1,0 +1,65 @@
+{
+  "version": 1,
+  "estado": "fase6_implementada_checkpoint_usuario_pendiente",
+  "fase5_confirmada": "Confirmado, avanzá",
+  "pi_verificado": "1.4.0",
+  "reinstalaciones_o_cambios_personales": false,
+  "principal": "openai/gpt-6.1-sol",
+  "researcher": "openai/gpt-6-luna",
+  "pruebas": {
+    "node": 71,
+    "python_incluidas": 56,
+    "doctor": "completo correcto con pi 1.4.0; repetido al cierre",
+    "auditoria_reapertura_sdk_sin_modelos": { "cache_vigente": true, "tool_cache_true": true, "dossier_bytes": 11461, "limite_bytes": 12000 },
+    "sin_llm_en_suite": true
+  },
+  "ensayo_final": {
+    "evidencia": "_procesado/fase6/prueba-1792630409914/resultado.json",
+    "primera_pregunta_ms": 20618.239809,
+    "segunda_pregunta_ms": 7416.952216000005,
+    "alcance_segundo_plano_segundos": 68,
+    "verificar_segundos": 57,
+    "segunda_sesion_sin_nuevo_hijo": true,
+    "contrato_y_enunciados_adjuntos": true,
+    "lectura_local_y_web_reales": true,
+    "veredictos_cotejados_con_la_salida_real": {
+      "A1": "discrepa",
+      "A2": "concuerda",
+      "A3": "discrepa"
+    },
+    "cache": "cursos/redes/notas/verificaciones/retardos-d82cec69f080858c4efc921aab36b35c84bd5123d73186f99721eaddd2c5fdc7.md",
+    "revision_humana_informe": "pendiente",
+    "no_respuestas_del_estudiante": true,
+    "no_progreso_escrito": true
+  },
+  "iteraciones_conservadas": [
+    { "artefactos": "_procesado/fase6/prueba-1792629115851", "resultado": "fallo de veredicto: reinterpretó la afirmación falsa para llamarla concuerda" },
+    { "artefactos": "_procesado/fase6/prueba-1792629327914", "resultado": "criterio anterior correcto; contexto luego ampliado con enunciados curados" },
+    { "artefactos": "_procesado/fase6/prueba-1792629730023", "resultado": "criterio anterior correcto; contrato luego incluido completo, no sólo como ruta" },
+    { "artefactos": "_procesado/fase6/prueba-1792630057935", "resultado": "fallo de veredicto pese a afirmación explícita; no se aceptó como contraste correcto" },
+    { "artefactos": "_procesado/fase6/prueba-1792630409914", "resultado": "contexto final y controles A1/A2/A3 correctos" }
+  ],
+  "uso_catalogo_cinco_ensayos_sin_doctor": {
+    "principal": { "entrada": 119419, "salida": 3562, "cache_lectura": 426496, "costo": 0.3171076 },
+    "researcher": { "entrada": 405076, "salida": 19311, "cache_lectura": 1344000, "costo": 0.06360310000000001 },
+    "total_costo_reportado": 0.3807107,
+    "no_es_factura": true,
+    "hijos_reales": 10
+  },
+  "integridad": {
+    "originales_pdf": 18,
+    "copias_redes": 17,
+    "hashes_cotejados": true,
+    "contrato_indice_progreso_intactos": true,
+    "teach_sin_cambios": true,
+    "plan_sha256": "ba3ab49513e1fee2ec7c4e3ab60638fb28fb2e58460f3c24af785b987277b5fa"
+  },
+  "limites": [
+    "El código valida alcance de fuentes, integridad, formato y citas permitidas, no la verdad semántica de un informe generativo.",
+    "Los fallos previos impiden presentar tres controles correctos como una garantía o tasa de fiabilidad general.",
+    "Informes y materiales siguen con revisión humana pendiente; 268 páginas referidas de Redes aún no están preparadas.",
+    "No clase completa, reconstrucción de progreso ni Fase 7.",
+    "Reapertura probada con caché guardada; no se cortó realmente el padre antes de la entrega del hijo.",
+    "No limpieza automática de generaciones; despachos sin entrega tras reinicio se retoman explícitamente, sin duplicación ni sondeo."
+  ]
+}

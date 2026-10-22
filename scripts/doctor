@@ -7,7 +7,7 @@ import { loadProject, piDir, vaultDir, webConfigPath } from "./lib/pi-sdk.mjs";
 
 const sinRed = process.argv.includes("--sin-red");
 if (process.argv.some(arg => arg === "--help" || arg === "--ayuda")) {
-  console.log("Uso: .pi/scripts/doctor [--sin-red]\nVerifica instalación, ingesta, cursos y guardado local de imágenes (Fases 0–5). Por defecto hace dos pings breves a modelos y prueba búsqueda y lectura web.\n--sin-red omite esas llamadas y las marca como NO verificadas. No lee el portapapeles.");
+  console.log("Uso: .pi/scripts/doctor [--sin-red]\nVerifica instalación, ingesta, cursos y guardado local de imágenes (Fases 0–6). Por defecto hace dos pings breves a modelos y prueba búsqueda y lectura web.\n--sin-red omite esas llamadas y las marca como NO verificadas. No lee el portapapeles.");
   process.exit(0);
 }
 let fallos = 0;
@@ -22,7 +22,7 @@ function run(program, args = []) {
 function json(file) { return JSON.parse(readFileSync(file, "utf8")); }
 const config = json(join(piDir, "curso.config.json"));
 const version = run("pi", ["--version"]);
-check(version.ok && version.text === "1.3.0", "pi", `${version.text || "no encontrado"}; se requiere 1.3.0 (ver SETUP.md)`);
+check(version.ok && version.text === "1.4.0", "pi", `${version.text || "no encontrado"}; se requiere 1.4.0 (ver SETUP.md)`);
 check(process.version === "v26.1.0", "Node.js", `${process.version}; versión verificada: v26.1.0`);
 const fish = run("fish", ["--version"]);
 check(fish.ok && fish.text === "fish, version 4.9.3", "fish", `${fish.text || "ausente"}; versión verificada: 4.9.3`);
@@ -62,7 +62,7 @@ try {
   const tools = new Set(session.getActiveToolNames());
   check(project.errors.length === 0 && !(project.loader.getExtensions().warnings?.length),
     "Carga de extensiones / alias", project.errors.length ? "hay errores; abrí pi --verbose" : "API instalada compatible, sin errores de carga");
-  for (const name of ["quiz", "ask_user_question", "subagent", "web_search", "web_fetch", "transcribir_paginas", "guardar_items", "guardar_curso", "leer_paginas", "ver_pagina", "buscar_material", "leer_items"]) {
+  for (const name of ["quiz", "ask_user_question", "subagent", "web_search", "web_fetch", "transcribir_paginas", "guardar_items", "guardar_curso", "leer_paginas", "ver_pagina", "buscar_material", "leer_items", "investigar_tema"]) {
     check(tools.has(name), `Herramienta ${name}`, tools.has(name) ? "cargada y activa" : "revisá la confianza del proyecto y SETUP.md");
   }
   const commands = new Set(session.extensionRunner.getRegisteredCommands().map(c => c.name));

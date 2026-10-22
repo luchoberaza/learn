@@ -6,6 +6,7 @@ import { piDir, vaultDir } from "../../scripts/lib/pi-sdk.mjs";
 import { python, transcribir } from "./ingesta.ts";
 import { guardarCurso, registrarCuracion } from "./curacion.ts";
 import { registrarSesion } from "./sesion.ts";
+import { registrarResearcher } from "./researcher.ts";
 
 const slug = Type.String({ pattern: "^[a-z0-9]+(?:-[a-z0-9]+)*$" });
 const paginas = Type.Array(Type.Integer({ minimum: 1 }), { minItems: 1 });
@@ -20,6 +21,13 @@ function salida(curso: string): string {
 export default function (pi: ExtensionAPI) {
   registrarCuracion(pi);
   const sesion = registrarSesion(pi);
+  const investigar = registrarResearcher(pi, sesion.actual, sesion.refrescar, vaultDir, piDir);
+  pi.registerTool({
+    name: "investigar_tema", label: "Verificar material del curso",
+    description: "Researcher asíncrono anclado al curso activo. alcance: mapa/primeros principios con caché; verificar: 1–3 afirmaciones sin reemplazar el mapa. Adjunta páginas preparadas y citas; seguí con el probe sin esperar al hijo. Si falla, continuá con el material sin atribuir verificación externa.",
+    parameters: Type.Object({ modo: Type.Union([Type.Literal("alcance"), Type.Literal("verificar")]), afirmaciones: Type.Array(Type.String({ minLength: 1, maxLength: 1500 }), { minItems: 1, maxItems: 3 }) }),
+    executionMode: "sequential", reachesTools: () => ["subagent"], execute: investigar,
+  });
   pi.registerTool({
     name: "leer_paginas", label: "Leer páginas", description: "Leer transcripciones del curso activo por páginas PDF (base 1). Devuelve citas y texto acotado; si falta o es dudoso, consultá ver_pagina.",
     parameters: Type.Object({ doc: slug, desde: Type.Integer({ minimum: 1 }), hasta: Type.Integer({ minimum: 1 }) }), executionMode: "sequential",
