@@ -4,6 +4,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, readdirSync, rmSync } from "node
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { registrarSesion } from "../extensions/curso/sesion.ts";
+import { registrarProgreso } from "../extensions/curso/progreso.ts";
 
 // Regresiones de la auditoría de sesión: vault sintético, pi simulado, sin modelos.
 function datos() {
@@ -41,4 +42,22 @@ test("H53: de noche el log lleva la fecha local, no la de UTC", async t => {
   const e = entorno(t);
   await e.estudiar("calculo derivacion");
   assert.deepEqual(readdirSync(join(e.raiz, "sesiones")), ["2026-10-22-derivacion.md"]);
+});
+
+test("H54: /estudiar y /fin mandan sus órdenes ocultas, que disparan el turno y no quedan como mensaje del alumno", async t => {
+  const e = entorno(t);
+  registrarProgreso(e.pi, e.sesion, e.vault);
+  await e.estudiar("calculo derivacion");
+  await e.comandos.get("fin").handler("", e.ctx);
+  assert.deepEqual(e.usuario, []);
+  assert.equal(e.ordenes.length, 2);
+  for (const o of e.ordenes) { assert.equal(o.display, false); assert.equal(o.triggerTurn, true); }
+  assert.match(e.ordenes[0].content, /primera pregunta/); assert.doesNotMatch(e.ordenes[0].content, /dónde quedamos/);
+  assert.match(e.ordenes[1].content, /registrar_progreso con cierre:true/);
+});
+test("H54: con progreso previo, el arranque pide una línea de dónde quedamos antes de la primera pregunta", async t => {
+  const d = datos(); d.progreso.temas.derivacion = { estado: "en_curso", borde: { domina: ["Regla de la potencia"], falla: ["Cadena"] }, proximo_paso: "Regla de la cadena" };
+  const e = entorno(t, d);
+  await e.estudiar("calculo derivacion");
+  assert.match(e.ordenes[0].content, /dónde quedamos/);
 });

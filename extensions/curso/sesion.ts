@@ -9,6 +9,8 @@ import { buscarMaterial, cita, documento, dossier, esSlug, leerItems, leerPagina
 import { verificacionPrevia } from "./researcher.ts";
 
 type Config = { max_tokens_dossier: number; max_tokens_curso_md: number };
+// Las órdenes internas van ocultas: llegan al modelo como mensaje custom y md-log no las anota como del alumno.
+export const ordenar = (pi: ExtensionAPI, content: string) => pi.sendMessage({ customType: "curso-orden", content, display: false }, { triggerTurn: true, deliverAs: "followUp" });
 export function registrarSesion(pi: ExtensionAPI, vault = vaultDir, recursos = piDir) {
   let activo: Activo | undefined;
   let datos: DatosCurso | undefined;
@@ -142,7 +144,8 @@ export function registrarSesion(pi: ExtensionAPI, vault = vaultDir, recursos = p
         const parcial = d.avisos.length || d.validacion?.errores.length || d.validacion?.avisos.length;
         ctx.ui.setStatus("curso", `📚 ${curso} › ${tema.nombre}${parcial ? " · preparación parcial" : ""}`);
         if (parcial) ctx.ui.notify("Preparación parcial: seguimos con el material disponible, cotejando sus páginas dudosas.", "warning");
-        pi.sendUserMessage(`Empecemos con «${tema.nombre}» (${curso}). Iniciá el probe con la primera pregunta, sin preámbulo ni una nueva orden del estudiante.`, { deliverAs: "followUp" });
+        const previo = d.progreso.temas[tema.id]?.estado;
+        ordenar(pi, `Empecemos con «${tema.nombre}» (${curso}). ${previo && previo !== "sin_empezar" ? "Abrí con una línea de dónde quedamos (borde y próximo paso del dossier) y enseguida la primera pregunta" : "Iniciá el probe con la primera pregunta, sin preámbulo"}, sin esperar una nueva orden del estudiante.`);
       } catch (e) { ctx.ui.notify(e instanceof Error ? e.message : "No se pudo activar el curso.", "error"); }
     },
   });

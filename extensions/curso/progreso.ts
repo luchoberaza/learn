@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import { join, relative } from "node:path";
 import { python } from "./ingesta.ts";
 import { acotar, leer, ordenarTemas, type DatosCurso } from "./material.ts";
-import type { registrarSesion } from "./sesion.ts";
+import { ordenar, type registrarSesion } from "./sesion.ts";
 import { vaultDir } from "../../scripts/lib/pi-sdk.mjs";
 
 export function proximoTema(d: DatosCurso) {
@@ -61,7 +61,7 @@ export function registrarProgreso(pi: ExtensionAPI, sesion: ReturnType<typeof re
       // pi ya vació el editor: rechazar /fin perdería el comando; se corta el turno (p. ej. un quiz abierto) y se cierra.
       if (!ctx.isIdle()) { ctx.abort(); await ctx.waitForIdle(); }
       pi.appendEntry("curso-cierre", { log: e.a.log, adHoc: !!e.a.adHoc });
-      pi.sendUserMessage(e.a.adHoc ? "Terminemos esta sesión ad hoc. Resumí lo observado y ofrecé curar el tema con /curso-agregar, sin escribir progreso de un tema inexistente ni hacer más preguntas." : "Terminemos la sesión. Llamá registrar_progreso con cierre:true, resumen y sólo la evidencia observada desde el último guardado; lo omitido se conserva, así que sin respuestas nuevas alcanza con resumen y cierre. Después mostrá un resumen breve y el próximo paso. El log se cerrará automáticamente al terminar tu mensaje, sólo si el guardado tuvo éxito. No hagas más preguntas.", { deliverAs: "followUp" });
+      ordenar(pi, e.a.adHoc ? "Terminemos esta sesión ad hoc. Resumí lo observado y ofrecé curar el tema con /curso-agregar, sin escribir progreso de un tema inexistente ni hacer más preguntas." : "Terminemos la sesión. Llamá registrar_progreso con cierre:true, resumen y sólo la evidencia observada desde el último guardado; lo omitido se conserva, así que sin respuestas nuevas alcanza con resumen y cierre. Después mostrá un resumen breve y el próximo paso. El log se cerrará automáticamente al terminar tu mensaje, sólo si el guardado tuvo éxito. No hagas más preguntas.");
     },
   });
   pi.on("agent_settled", async (event, ctx) => {

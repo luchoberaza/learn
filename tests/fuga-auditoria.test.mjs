@@ -53,7 +53,7 @@ function curso(t, d = datos(), paginas = PAGINAS) {
   writeFileSync(join(recursos, "modo-curso.md"), "MODO");
   writeFileSync(join(recursos, "curso.config.json"), JSON.stringify({ max_tokens_dossier: 3000, max_tokens_curso_md: 1500 }));
   const comandos = new Map();
-  const pi = { on: () => {}, registerCommand: (n, c) => comandos.set(n, c), appendEntry: () => {}, setSessionName: () => {}, sendUserMessage: () => {},
+  const pi = { on: () => {}, registerCommand: (n, c) => comandos.set(n, c), appendEntry: () => {}, setSessionName: () => {}, sendUserMessage: () => {}, sendMessage: () => {},
     exec: async () => ({ code: 0, stdout: JSON.stringify(d), stderr: "" }), events: { emit: (_n, payload) => payload.onComplete?.() } };
   const ctx = { hasUI: true, isIdle: () => true, sessionManager: { getBranch: () => [] },
     ui: { notify: () => {}, setStatus: () => {}, select: async (_t, opciones) => opciones[0] } };

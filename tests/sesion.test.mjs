@@ -30,7 +30,7 @@ function entorno(t, d = datos(), entradas = []) {
   const comandos = new Map(), eventos = new Map(), mensajes = [], avisos = [], vinculos = [];
   const pi = { on: (n, h) => eventos.set(n, h), registerCommand: (n, d) => comandos.set(n, d),
     appendEntry: (customType, data) => entradas.push({ type: "custom", customType, data }), setSessionName: n => mensajes.push({ nombre: n }),
-    sendUserMessage: m => mensajes.push({ usuario: m }),
+    sendUserMessage: m => mensajes.push({ usuario: m }), sendMessage: m => mensajes.push({ orden: m.content }),
     exec: async () => ({ code: 0, stdout: JSON.stringify(d), stderr: "" }),
     events: { emit: (n, payload) => { vinculos.push([n, payload]); payload.onComplete?.(); } } };
   const ctx = { hasUI: true, isIdle: () => true, sessionManager: { getBranch: () => entradas, getEntries: assert.fail },
@@ -82,7 +82,7 @@ test("activar enlaza un log nuevo sin historial anterior y arranca solo", async 
   assert.equal(readFileSync(viejo, "utf8"), "NOTA DEL USUARIO");
   assert.equal(e.vinculos[0][1].backfill, false);
   assert.match(e.entradas.at(-1).data.log, /-2\.md$/);
-  assert.equal(e.mensajes.filter(m => m.usuario).length, 1);
+  assert.equal(e.mensajes.filter(m => m.orden).length, 1);
   assert.match(e.mensajes[0].nombre, /Cálculo/);
   const evento = { systemPromptOptions: { sections: { ajena: "conservar" } } };
   e.eventos.get("before_agent_start")(evento);
