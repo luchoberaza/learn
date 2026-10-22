@@ -50,12 +50,12 @@ Viven fuera de `.pi/` y el proyecto no las instala. El doctor comprueba todas sa
 | pi `1.4.0` en `~/.pi/agent` | todo | doctor falla; con otra versión avisa con «!» y no lo cuenta como falla |
 | Node.js `26.1.0` | doctor, tests y ensayos | no corren |
 | fish | `pi-learn` y el shell de tmux (`config/tmux.conf`) | no hay lanzador |
-| tmux | `pi-learn` (una sesión por carpeta) y los paneles de los subagentes de `visualize` | `pi-learn` dice «Falta tmux. Instalalo antes de usar pi-learn.» |
+| tmux | `pi-learn` (una sesión por carpeta) y los paneles de los subagentes: los de `visualize` y el researcher de `teach` fuera de un curso | `pi-learn` dice «Falta tmux. Instalalo antes de usar pi-learn.» |
 | `wl-paste` (Wayland) o `xclip` (X11) | pegar fotos con Ctrl+V | Ctrl+V no pega la foto: guardala y escribí su ruta en el mensaje |
 | `timeout` de coreutils | cortar al researcher a los 180 s | el researcher no corre |
-| uv y su Python `3.13.13` | `.pi/.venv` | ingesta, sesión y progreso fallan; receta abajo |
+| uv y su Python `3.13.13` | `.pi/.venv` | sin ese Python el venv no arranca: fallan la ingesta, la preparación por tema y el progreso, y la clase sigue con la última carga del curso (ver Fase 4); receta abajo |
 | Tesseract con `spa` y `eng` | OCR de páginas escaneadas | sólo esas páginas fallan y quedan pendientes |
-| ImageMagick (`magick`, con libheif) | fotos HEIC y BMP en la nota | la nota avisa en una línea: mandá la foto en JPEG o PNG |
+| ImageMagick (`magick`, con libheif) | fotos HEIC y BMP en la nota | pi avisa en una línea que la mandes en JPEG o PNG, y la nota marca «Imagen N no guardada» |
 
 **El venv.** `.pi/.venv` usa el Python `3.13.13` que gestiona uv (`~/.local/share/uv/python/cpython-3.13.13-linux-x86_64-gnu`), no el de Conda; el entorno anterior, ligado a Conda, quedó en `.pi/.venv.conda-bak`. Para recrearlo, desde la raíz del vault (bash o fish):
 
@@ -182,7 +182,15 @@ pi-learn -c
 - Da 300 ms al shell de cada subagente de pi-interactive-subagents antes de enviarle la orden (`PI_SUBAGENT_SHELL_READY_DELAY_MS`, que respeta si ya está definido). No afecta al researcher del curso.
 - Si faltan los paquetes fijados, avisa y abre pi con `PI_OFFLINE=1`, sin investigador ni web.
 
-Para tomar una versión nueva del lanzador: copiá `config/fish/pi-learn.fish` a `~/.config/fish/functions/` (`instalar-config` no pisa una copia distinta) y, sin clase en curso, cerrá el servidor viejo con `tmux -L pi-learn kill-server`. Si esa shell ya conocía otra definición, abrí una shell nueva o ejecutá `source ~/.config/fish/functions/pi-learn.fish`.
+Para tomar una versión nueva del lanzador (`instalar-config` no pisa una copia distinta), sin clase en curso y desde la raíz del vault:
+
+```fish
+cp .pi/config/fish/pi-learn.fish ~/.config/fish/functions/pi-learn.fish
+tmux -L pi-learn kill-server
+source ~/.config/fish/functions/pi-learn.fish
+```
+
+`kill-server` cierra el servidor viejo (si no hay ninguno, da un «error connecting» inofensivo); `source` hace falta sólo si esa shell ya conocía otra definición.
 
 ## Obsidian e imágenes
 
@@ -287,7 +295,7 @@ La caché saltea lo ya preparado. Mientras corre, la salida del curso queda bloq
 
 Apenas están las páginas de la bibliografía del tema, el dossier se refresca. Formato y casos borde (ingesta base en curso, parcial editado a mano, marcador de solución) en [`scripts/ingesta/CURSOS.md`](scripts/ingesta/CURSOS.md), sección «Preparación por tema».
 
-*Qué gasta.* Todo va a `modelo_vision`: una llamada por página (imagen + prompt, hasta 8000 tokens de salida), una por documento a segmentar (hasta 32000) y una por cada 40 ítems a clasificar (hasta 8000). Una respuesta inválida se reintenta una vez. Tope: 150 páginas por corrida; lo que queda sigue la próxima vez que se estudie un tema. Las páginas en caché o `manual` no se mandan. Un documento de tipo `soluciones` no se segmenta solo: se prepara con `/curso-agregar`. En el e2e de la rama `fix/preparacion` (49 páginas), la corrida tardó unos 12 min y el dossier dejó de decir «sin texto confiable» a las 9 páginas.
+*Qué gasta.* Todo va a `modelo_vision`: una llamada por página (imagen + prompt, hasta 8000 tokens de salida), una por documento a segmentar (hasta 32000) y una por cada 40 ítems a clasificar (hasta 8000). Una segmentación o una clasificación inválida se reintenta una vez; la visión de una página, no. Tope: 150 páginas por corrida; lo que queda sigue la próxima vez que se estudie un tema. Las páginas en caché o `manual` no se mandan. Un documento de tipo `soluciones` no se segmenta solo: se prepara con `/curso-agregar`. En el e2e de la rama `fix/preparacion` (49 páginas), la corrida tardó unos 12 min y el dossier dejó de decir «sin texto confiable» a las 9 páginas.
 
 *Dónde se ve.* En la barra, «⏳ Preparando material de <tema>: N/M páginas»; al terminar, «Material de <tema> listo: N páginas transcriptas, M ítems nuevos.» o «… preparado en parte: …». Una falla es una línea «Preparación del material no disponible: <motivo>; seguimos con lo que hay.» y la clase sigue. `cursos/<c>/_procesado/preparacion.json` guarda por tema el estado (`completa`/`incompleta`), las páginas pendientes y la huella del índice. El uso de visión de cada página queda en `cursos/<c>/_procesado/<doc>/calidad.json` (`vision.uso`); el de segmentar y clasificar no se registra en ningún archivo.
 
@@ -313,7 +321,7 @@ No agrega dependencias. Después de `/reload` o de abrir una sesión nueva con `
 /estudiar retardos
 ```
 
-**Elegir el tema.** El curso se reconoce sin mayúsculas ni tildes, y con un solo curso alcanza con el tema. El tema se busca por id, nombre o alias sin tildes, y después por parecido; ante varios candidatos aparece un selector. Si no coincide, BM25 busca la consulta en la bibliografía y propone los temas cuyo rango la contiene: si es uno solo, lo activa; si son varios, el selector suma la opción ad hoc. Si no cae en ningún rango, pasa a un modo ad hoc que no escribe nada al curso. Sin tema, el selector lista primero los temas en curso y para repasar, después los que tienen los prerequisitos dominados y al final los dominados. El autocompletado lista cursos y temas. Sin la carpeta `cursos/`, remite a `/curso-nuevo`.
+**Elegir el tema.** El curso se reconoce sin mayúsculas ni tildes, y con un solo curso alcanza con el tema. El tema se busca por id, nombre o alias sin tildes, y después por parecido; ante varios candidatos aparece un selector. Si no coincide, BM25 busca la consulta en la bibliografía y propone los temas cuyo rango la contiene: si es uno solo, lo activa; si son varios, el selector suma la opción ad hoc. Si no cae en ningún rango, pasa a un modo ad hoc: elegís una de las secciones que encontró BM25 (o ninguna) y la clase no toca el índice ni el progreso; sólo crea su nota. Sin tema, el selector lista primero los temas en curso y para repasar, después los que tienen los prerequisitos dominados y al final los dominados. El autocompletado lista cursos y temas. Sin la carpeta `cursos/`, remite a `/curso-nuevo`.
 
 **Antes de arrancar**, `/estudiar` comprueba que haya modelo elegido y credenciales («Sin credenciales para <proveedor>/<modelo>: ejecutá /login y repetí /estudiar.») y el disco: con menos de 200 MB libres no arranca y con menos de 1 GB avisa.
 
@@ -345,7 +353,7 @@ El modo incorpora fotos persistentes desde Fase 5, researcher anclado/caché des
 
 ## Fotos persistentes — Fase 5
 
-Mismo venv, sin comando propio de transferencia. El pegado real de pi puede enviar sólo una **ruta en un bloque de texto**, que el modelo abre con `read`, no un bloque `image`: el logger admite ambos. Copia rutas explícitas de imagen por línea (absolutas, `./`, `../`, `~/` o `@`, con comillas si hay espacios) y las rutas nativas `pi-clipboard-<UUID>` insertadas dentro de una respuesta; no captura menciones genéricas en prosa ni imágenes de resultados de herramientas. La fuente se abre sólo para lectura, sin seguir symlinks y verificando archivo regular. Cualquier imagen del usuario recibida con un log vinculado se copia a `adjuntos/` junto a la nota, incluidos mensajes sin texto. En el curso es `cursos/<curso>/sesiones/adjuntos/`. El formato sale de la firma del archivo, no de la extensión: PNG, JPEG, WebP y GIF se conservan; HEIC pasa a JPEG y BMP a PNG con ImageMagick (`magick`), y sin él la nota avisa en una línea. Nombre con timestamp, posición y SHA-256. Los embeds dentro del vault usan su ruta desde el vault.
+Mismo venv, sin comando propio de transferencia. El pegado real de pi puede enviar sólo una **ruta en un bloque de texto**, que el modelo abre con `read`, no un bloque `image`: el logger admite ambos. Copia rutas explícitas de imagen por línea (absolutas, `./`, `../`, `~/` o `@`, con comillas si hay espacios) y las rutas nativas `pi-clipboard-<UUID>` insertadas dentro de una respuesta; no captura menciones genéricas en prosa ni imágenes de resultados de herramientas. La fuente se abre sólo para lectura, sin seguir symlinks y verificando archivo regular. Cualquier imagen del usuario recibida con un log vinculado se copia a `adjuntos/` junto a la nota, incluidos mensajes sin texto. En el curso es `cursos/<curso>/sesiones/adjuntos/`. El formato sale de la firma del archivo, no de la extensión: PNG, JPEG, WebP y GIF se conservan; HEIC pasa a JPEG y BMP a PNG con ImageMagick (`magick`); sin él, pi avisa en una línea y la nota marca la imagen como no guardada. Nombre con timestamp, posición y SHA-256. Los embeds dentro del vault usan su ruta desde el vault.
 
 La misma ruta se usa al recuperar historial; reutiliza sólo copias idénticas y preserva cambios manuales. No sigue symlinks en adjuntos ni reemplaza archivos. Los nuevos archivos tienen permisos `0600` y los directorios nuevos `0700`; no se cambian permisos preexistentes. Un fallo deja aviso en el log/UI, sin perder texto ni las demás fotos. No hay limpieza automática de copias parciales o temporales nativos de pi.
 
@@ -397,7 +405,7 @@ node --test .pi/tests/*.test.mjs
 .pi/.venv/bin/python -m unittest discover -s .pi/tests/ingesta
 ```
 
-La suite Node incluye la Python: `tests/ingesta.test.mjs` corre el mismo `unittest discover` con un plazo de 90 s. El 2026-10-22, sobre la rama `cursos`, la suite Python dio 132 tests OK en 36 s, y la Node 204 tests, de los cuales falló uno: ese plazo de 90 s venció con la máquina cargada (la suite Python aislada pasa; `node --test .pi/tests/ingesta.test.mjs` dio 7/7). Si ves `actual: null` en «ingesta Python», es ese plazo: repetí ese archivo solo. Los tests de OCR real (`test_ocr_real_local_sin_llm`, `test_formula_escaneada_queda_pendiente_y_la_prosa_no`) necesitan un Tesseract con `spa` en el `PATH`; algunos tests se saltean si faltan los PDFs reales de `cursos/redes`.
+El 2026-10-22, sobre la rama `cursos`, la suite Python dio 132 tests OK en unos 36 s y la Node, 204 en verde en unos 100 s. La suite Node incluye la Python: `tests/ingesta.test.mjs` corre el mismo `unittest discover` con un plazo de 90 s, que en una corrida con la máquina cargada venció y dejó la suite en 203/204. Si ves `actual: null` en «ingesta Python», es ese plazo: repetí `node --test .pi/tests/ingesta.test.mjs` solo (esa vez dio 7/7). Los tests de OCR real (`test_ocr_real_local_sin_llm`, `test_formula_escaneada_queda_pendiente_y_la_prosa_no`) necesitan un Tesseract con `spa` en el `PATH`; algunos tests se saltean si faltan los PDFs reales de `cursos/redes`.
 
 ### Prueba del researcher con subagentes (opcional, con LLM y red)
 
@@ -464,7 +472,7 @@ Al retomar un tema, el dossier incluye borde y próximo paso. `/progreso [curso]
 
 Un log anterior sin registro final se ofrece una sola vez para reconstrucción: `leer_sesion_anterior` devuelve texto acotado y SHA; `registrar_progreso` muestra la propuesta y exige confirmación real. Sin UI o si se cancela, no guarda. El log previo nunca se modifica. Preguntas sin respuesta y pruebas técnicas no se convierten en errores del alumno. La reconstrucción se identifica en historial y no cierra la sesión actual.
 
-Los ids de ítem se normalizan («2(a–c)» → `2`, el inciso va en notas). Un ítem que desaparece al volver a segmentar queda «huérfano» con aviso, sin invalidar `progreso.yaml`. Si el YAML es inválido y hay `.bak` válido, se restaura y avisa, conservando los bytes inválidos en `_procesado/progreso-invalido-<sha>.yaml`. Sin respaldo válido se continúa con material, sin guardar hasta reparar. Un `.bak` existente inválido tampoco se pisa a ciegas; requiere intervención. Son defensas contra cortes/ediciones accidentales, no contra un proceso externo que ignore los bloqueos y reemplace archivos en el último instante.
+Los ids de ítem se normalizan («2(a–c)» → `2`, el inciso va en notas). Un ítem que desaparece al volver a segmentar queda «huérfano» con aviso, sin invalidar `progreso.yaml`. Si el YAML es inválido y hay `.bak` válido, se restaura y avisa, conservando los bytes inválidos en `cursos/<c>/_procesado/progreso-invalido-<sha>.yaml`. Sin respaldo válido se continúa con material, sin guardar hasta reparar. Un `.bak` existente inválido tampoco se pisa a ciegas; requiere intervención. Son defensas contra cortes/ediciones accidentales, no contra un proceso externo que ignore los bloqueos y reemplace archivos en el último instante.
 
 Ensayo opcional, **consume Sol y usa respuestas programadas exclusivamente en una fixture aislada**:
 
@@ -480,4 +488,4 @@ El cambio autorizado a `openai-codex` invalidó por huella las cachés anteriore
 
 Seguimiento en `../fricciones.md`, visible en Obsidian. Se requieren 3–5 sesiones reales, sin sustituirlas por scripts o respuestas simuladas. Empezá con `pi-learn` en la carpeta del vault y `/estudiar redes retardos`, estudiá y terminá con `/fin`. En la segunda sesión retomá el mismo tema para comprobar el borde. Anotá las trabas, su impacto y el log; se priorizarán las tres principales para corregir y reprobar. Si aparecen menos, se acuerda el cierre, no se inventan problemas.
 
-Los logs técnicos de las pruebas de Redes se movieron a `_procesado/archivo-pruebas/redes/`, fuera de las notas del curso. El commit único y el checkpoint de Fase 8 quedan pendientes de sesiones y arreglos; no se declara la fase terminada.
+Los logs técnicos de las pruebas de Redes se movieron a `_procesado/archivo-pruebas/redes/`, fuera de las notas del curso. `probar-sesion` y `probar-researcher-curso` todavía crean sus notas en `cursos/redes/sesiones/` (y el segundo, su verificación en `cursos/redes/notas/verificaciones/`): después de correrlos, movelas también a `_procesado/archivo-pruebas/redes/`. El commit único y el checkpoint de Fase 8 quedan pendientes de sesiones y arreglos; no se declara la fase terminada.
