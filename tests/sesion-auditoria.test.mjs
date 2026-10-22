@@ -436,3 +436,11 @@ test("H16: una sesión sin nota no deja su nombre libre: la siguiente no hereda 
   assert.equal(e.sesion.actual()?.a.tema, "derivacion", "la primera pregunta no cierra la sesión nueva");
   assert.deepEqual(e.avisos, []);
 });
+test("H44: una tool que se registra tarde (reanudar sin el registro de pi, web, MCP) no queda activa durante el estudio", async t => {
+  const e = entorno(t);
+  await e.estudiar("calculo derivacion");
+  const estudio = [...e.activas];
+  e.activas = [...e.activas, "web_search", "fetch_content"];
+  e.eventos.get("before_agent_start")({ systemPromptOptions: { sections: {}, skills: [] } }, e.ctx);
+  assert.deepEqual(e.activas, estudio);
+});

@@ -154,6 +154,8 @@ export function registrarSesion(pi: ExtensionAPI, vault = vaultDir, recursos = p
     Object.assign(event.systemPromptOptions.sections, { teach, modo_curso: modo, curso: resumen });
     // teach ya va como sección y read sólo abre fotos: ninguna skill se puede cargar durante el estudio.
     event.systemPromptOptions.skills = [];
+    // pi activa las tools que se registran tarde (web, MCP, o al reanudar sin el set en el archivo de sesión): el set se reafirma en cada turno.
+    activarEstudio();
     if (religar) {
       religar = false;
       pi.events.emit("md-log:link", { file: rutaSegura(vault, activo.log), backfill: false,
