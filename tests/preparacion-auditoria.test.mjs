@@ -76,3 +76,15 @@ test("H28, H61: el dossier conserva el dónde quedamos y resume la verificación
   assert.doesNotThrow(() => JSON.parse(bloque.trim().split("\n").at(-1)));
   assert.ok(r.indexOf("## Verificación previa") < r.indexOf("Progreso conmutacion (prerequisito)"));
 });
+
+test("el dossier nunca lista ítems de solución aunque el índice los referencie", t => {
+  const c = curso(t);
+  c.d.documentos.push({ id: "parcial", titulo: "Parcial", tipo: "evaluaciones", archivo: "fuentes/evaluaciones/parcial.pdf", paginas: 2 },
+    { id: "soluciones", titulo: "Soluciones", tipo: "soluciones", archivo: "fuentes/soluciones/sol.pdf", paginas: 1 });
+  c.d.items = { parcial: [{ id: "1", paginas: [1], enunciado: "ENUNCIADO 1" }, { id: "1-solucion", paginas: [2], enunciado: "SOLUCION INTEGRADA", solucion_de: "1" }],
+    soluciones: [{ id: "1", paginas: [1], enunciado: "SOLUCION SEPARADA" }] };
+  c.tema.evaluaciones = [{ doc: "parcial", items: ["1", "1-solucion"] }, { doc: "soluciones", items: ["1", "2"] }];
+  const r = dossier(c.raiz, c.d, c.tema, 3000, 1500);
+  assert.match(r, /evaluaciones: parcial\/1 · ENUNCIADO 1/);
+  assert.doesNotMatch(r, /SOLUCION|1-solucion|soluciones\//);
+});

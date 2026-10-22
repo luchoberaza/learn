@@ -177,7 +177,9 @@ export function dossier(raiz: string, datos: DatosCurso, tema: Tema, maxTokens: 
     catch { lineas.push("Referencia bibliográfica no disponible; no reconstruirla desde memoria."); }
   }
   for (const clase of ["ejercicios", "evaluaciones"] as const) for (const ref of tema[clase] || []) for (const id of ref.items) {
-    const i = datos.items[ref.doc]?.find(i => i.id === id);
+    const i = datos.items[ref.doc]?.find(i => i.id === id), d = datos.documentos.find(d => d.id === ref.doc);
+    // Una solución nunca entra al prompt antes del intento, aunque el índice la referencie.
+    if (d && i ? esSolucion(d, i) : d?.tipo === "soluciones") continue;
     lineas.push(`${clase}: ${ref.doc}/${id} · ${i?.enunciado.replace(/\s+/g, " ").slice(0, 140) || "sin preparar"}`);
   }
   if (datos.avisos.length || datos.validacion?.errores.length || datos.validacion?.avisos.length) lineas.push("Preparación incompleta: usá sólo referencias comprobables; los avisos no certifican fidelidad.");
