@@ -55,7 +55,7 @@ export default function (pi: ExtensionAPI) {
   pi.registerTool({
     name: "investigar_tema", label: "Verificar material del curso",
     description: "Researcher asíncrono anclado al curso activo. alcance: mapa/primeros principios con caché, afirmaciones opcionales; verificar: 1–3 afirmaciones sin reemplazar el mapa. Adjunta páginas preparadas y citas; seguí con el probe sin esperar al hijo. Si falla, continuá con el material sin atribuir verificación externa.",
-    parameters: Type.Object({ modo: Type.Union([Type.Literal("alcance"), Type.Literal("verificar")]), afirmaciones: Type.Optional(Type.Array(Type.String({ minLength: 1, maxLength: 1500 }), { minItems: 1, maxItems: 3 })) }),
+    parameters: Type.Object({ modo: Type.Union([Type.Literal("alcance"), Type.Literal("verificar")]), afirmaciones: Type.Optional(Type.Array(Type.String({ minLength: 1, maxLength: 1500 }), { maxItems: 3 })) }),
     executionMode: "sequential", execute: investigar,
   });
   pi.registerTool({

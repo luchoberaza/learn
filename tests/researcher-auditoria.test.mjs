@@ -5,7 +5,7 @@ import { existsSync, mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { prepararInvestigacion, registrarResearcher, verificacionPrevia } from '../extensions/curso/researcher.ts';
-import { loadProject } from '../scripts/lib/pi-sdk.mjs';
+import { agentDir, loadProject } from '../scripts/lib/pi-sdk.mjs';
 
 const agente = (modelo, cuerpo = 'PROMPT ESPAÑOL') => `---\nname: researcher\ntools: web_search, web_fetch, read\nmodel: ${modelo}\nthinking: medium\n---\n\n${cuerpo}\n`;
 function entorno(t) {
@@ -200,4 +200,13 @@ test('H08: alcance acepta afirmaciones omitidas y guarda un mapa sin veredictos;
   const p = await loadProject();
   try { assert.ok(!p.session.getAllTools().find(x => x.name === 'investigar_tema').parameters.required.includes('afirmaciones')); }
   finally { await p.close(); }
+});
+
+test('H08: alcance con afirmaciones vacías pasa el validador de pi, sin «Validation failed» ni argumentos a la vista', async () => {
+  const p = await loadProject(), raiz = process.env.PI_MANAGED_INSTALL_ROOT || join(agentDir, 'install');
+  try {
+    const { validateToolArguments } = await import(join(raiz, 'releases', readFileSync(join(raiz, 'current-version'), 'utf8').trim(), 'node_modules/@earendil-works/pi-ai/dist/index.js'));
+    const tool = p.session.getAllTools().find(x => x.name === 'investigar_tema');
+    assert.deepEqual(validateToolArguments(tool, { name: 'investigar_tema', arguments: { modo: 'alcance', afirmaciones: [] } }), { modo: 'alcance', afirmaciones: [] });
+  } finally { await p.close(); }
 });
