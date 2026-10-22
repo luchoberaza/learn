@@ -242,6 +242,21 @@ test("preparación: JSON inválido se reintenta una vez y queda para la próxima
   assert.equal(e.json("preparacion.json").temas.derivacion.estado, "completa");
 });
 
+test("preparación: un enunciado con su solución adentro se rechaza y nunca llega al dossier", async t => {
+  const e = preparacion(t), filtrada = { id: "1", paginas: [1], enunciado: "Pregunta 1 (8 puntos) Calcule la derivada.\n\n**Solución**\nDos equis.", puntos: 8 };
+  let intentos = 0;
+  e.ctx.modelRegistry.streamSimple = modeloSimulado(e.llamadas, { segmentar: texto => texto.includes("Documento parcial") && intentos++ === 0 && respuesta(JSON.stringify({ items: [filtrada] })) });
+  await e.turno();
+  const parcial = e.llamadas.filter(l => l.tipo === "segmentar" && l.texto.includes("Documento parcial"));
+  assert.match(parcial[1].texto, /Tu respuesta anterior se rechazó: el enunciado de 1 trae una solución/);
+  assert.deepEqual(e.yaml("parcial/items.yaml").items.map(i => [i.id, i.solucion_de]), [["1", undefined], ["1-solucion", "1"]]);
+  e.ctx.modelRegistry.streamSimple = modeloSimulado(e.llamadas, { segmentar: texto => texto.includes("Documento parcial") && respuesta(JSON.stringify({ items: [filtrada] })) });
+  rmSync(join(e.raiz, "_procesado/parcial/items.yaml"));
+  await e.turno("cursos/ejemplo/sesiones/2.md");
+  assert.ok(!existsSync(join(e.raiz, "_procesado/parcial/items.yaml")));
+  assert.doesNotMatch(dossier(e.raiz, e.activo.d, e.activo.d.temas[0], 3000, 1500), /Dos equis/);
+});
+
 test("preparación: con la ingesta base corriendo u otro pi preparando espera sin avisos y retoma un lock de un pi muerto", async t => {
   const e = preparacion(t), estado = join(e.raiz, "_procesado/estado-ingesta.json"), lock = join(e.raiz, "_procesado/.preparacion.lock");
   const original = readFileSync(estado, "utf8");

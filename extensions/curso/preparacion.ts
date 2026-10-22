@@ -12,6 +12,8 @@ import type { registrarSesion } from "./sesion.ts";
 const TOPE = 150;
 const VIEJO = 6 * 3600_000;
 const OCUPADA = /Ya hay una ingesta escribiendo/;
+// El marcador de pipeline.SOLUCION: un enunciado que lo trae mostraría la solución antes del intento.
+const SOLUCION = /^(?:[\s#>*_]*(?:soluci[oó]n|resoluci[oó]n|rta\.?\s*:)|[\s#>]*(?:[*_]+\s*respuesta|respuestas?\s*(?::|$)))/im;
 type Segmento = { doc: string; tipo: string; titulo: string; paginas: number; listo: boolean; requeridos: string[] };
 type Pendiente = { doc: string; id: string; enunciado: string; huella: string };
 type Trabajo = { indice: string; paginas: { doc: string; paginas: number[] }[]; restantes: number; segmentar: Segmento[]; clasificar: Pendiente[] };
@@ -76,6 +78,7 @@ function validarItems(r: any, s: Segmento) {
   const items = r.items.map((i: any) => {
     if (typeof i?.id !== "string" || !i.id.trim() || typeof i.enunciado !== "string" || !i.enunciado.trim() || !Array.isArray(i.paginas) || !i.paginas.length
       || i.paginas.some((p: unknown) => !Number.isInteger(p) || (p as number) < 1 || (p as number) > s.paginas)) throw new Error(`ítem inválido: ${JSON.stringify(i).slice(0, 120)}`);
+    if (i.solucion_de == null && SOLUCION.test(i.enunciado)) throw new Error(`el enunciado de ${i.id} trae una solución o un encabezado de solución: la solución va aparte, en otro ítem con solucion_de`);
     return { id: i.id, paginas: i.paginas, enunciado: i.enunciado, ...(i.solucion_de == null ? {} : { solucion_de: i.solucion_de }), ...(i.puntos == null ? {} : { puntos: i.puntos }) };
   });
   const faltan = s.requeridos.filter(id => !items.some((i: any) => i.id === id && i.solucion_de === undefined));
