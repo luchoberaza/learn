@@ -113,7 +113,7 @@ export function leerPaginas(raiz: string, datos: DatosCurso, doc: string, desde:
     catch { salida += `\nPágina PDF ${p} sin transcripción utilizable; consultá ver_pagina. ${cita(datos, doc, p)}\n`; }
     try {
       const q = JSON.parse(leer(raiz, `_procesado/${doc}/calidad.json`)).paginas?.[String(p)];
-      if (!q || q.pendiente) salida += "[Calidad pendiente: cotejá el original antes de usarlo.]\n";
+      if (!q || q.pendiente) salida += `[Calidad pendiente: cotejá el original con ver_pagina antes de usarlo.${q?.avisos?.length ? ` ${q.avisos.join(" ")}` : ""}]\n`;
     } catch { salida += "[Calidad no disponible.]\n"; }
   }
   if (Buffer.byteLength(salida) >= 30000) salida += "\n[Rango incompleto; pedí menos páginas o ver_pagina para una página extensa.]";
