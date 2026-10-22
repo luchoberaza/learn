@@ -121,8 +121,8 @@ def guardar(raiz: Path, vault: Path, datos: dict, *, fallo: bool = False) -> dic
             or datos["clave_vision"] != clave):
         raise Conflicto("Cambió el documento o la página mientras se transcribía; no se sobrescribió.")
     q = dict(previo)
-    if fallo and previo.get("ruta") in {"digital", "ocr"} and previo.get("puntaje", 0) >= datos["umbral"]:
-        # La transcripción base ya era buena: el fallo sólo habilita reintentar.
+    if fallo and previo.get("ruta") in {"digital", "ocr", "vision"} and previo.get("puntaje", 0) >= datos["umbral"]:
+        # La transcripción previa ya era buena (también la de otro modelo): el fallo sólo habilita reintentar.
         q.update(error_vision=True)
     elif fallo:
         q.update(pendiente=True, ruta="pendiente", requiere_vision=True, error_vision=True,

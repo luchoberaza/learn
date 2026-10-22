@@ -252,6 +252,15 @@ class VisionAuditoriaTest(unittest.TestCase):
         self.assertEqual((q["ruta"], q["pendiente"], q["error_vision"]), ("digital", False, True))
         self.assertFalse(self.preparar(doc="libro", pagina=3)["cache"])
 
+    def test_h39_fallo_al_retranscribir_con_otro_modelo_no_degrada_la_vision_buena(self):
+        self.guardar()
+        self.assertEqual(self.q()["ruta"], "vision")
+        datos = self.preparar(modelo="otro/modelo")
+        with bloquear(self.raiz, self.vault):
+            vision.guardar(self.raiz, self.vault, datos, fallo=True)
+        q = self.q()
+        self.assertEqual((q["ruta"], q["pendiente"], q["error_vision"]), ("vision", False, True))
+
 
 if __name__ == "__main__":
     unittest.main()
