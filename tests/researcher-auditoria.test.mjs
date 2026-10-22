@@ -5,6 +5,7 @@ import { existsSync, mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { prepararInvestigacion, registrarResearcher, verificacionPrevia } from '../extensions/curso/researcher.ts';
+import { loadProject } from '../scripts/lib/pi-sdk.mjs';
 
 const agente = (modelo, cuerpo = 'PROMPT ESPAÑOL') => `---\nname: researcher\ntools: web_search, web_fetch, read\nmodel: ${modelo}\nthinking: medium\n---\n\n${cuerpo}\n`;
 function entorno(t) {
@@ -161,4 +162,18 @@ test('H34: sin credenciales del modelo del researcher no se lanza nada', async t
   const res = await r.alcance();
   assert.equal(res.isError, true); assert.match(res.content[0].text, /^Verificación externa no disponible: [^\n]+$/);
   assert.equal(r.entradas.length, 0); assert.ok(!existsSync(join(e.raiz, 'notas/verificaciones/.trabajos')));
+});
+
+test('H08: alcance acepta afirmaciones omitidas y guarda un mapa sin veredictos; verificar las sigue exigiendo', async t => {
+  const e = entorno(t), r = runtime(e, falso(e, informe.replace("concuerda ' + cita", "' + cita")));
+  const sin = await r.investigar('1', { modo: 'verificar' }, undefined, undefined, r.ctx);
+  assert.equal(sin.isError, true); assert.equal(r.entradas.length, 0);
+  const res = await r.investigar('2', { modo: 'alcance' }, undefined, undefined, r.ctx);
+  assert.equal(res.isError, undefined); assert.equal(res.content[0].text, 'Verificación en segundo plano; seguí con el material.');
+  assert.match(r.entradas[0].data.pedido.tarea, /Afirmaciones recibidas[^\n]*\nNinguna/);
+  await esperar(() => existsSync(join(carpeta(e, res.details.nombre), 'codigo')));
+  await r.turno(); assert.equal(r.entradas.at(-1).data.estado, 'guardada');
+  const p = await loadProject();
+  try { assert.ok(!p.session.getAllTools().find(x => x.name === 'investigar_tema').parameters.required.includes('afirmaciones')); }
+  finally { await p.close(); }
 });
