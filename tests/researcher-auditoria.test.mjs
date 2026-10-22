@@ -108,3 +108,33 @@ test('H07: tras /fin el informe se guarda en silencio, sin avisos ni mensajes', 
   assert.equal(r.entradas.at(-1).data.estado, 'guardada');
   assert.match(verificacionPrevia(e.vault, e.recursos, e.d, e.tema), /vigente/);
 });
+
+const eterno = `setInterval(() => {}, 1000);`;
+const matar = dir => { try { process.kill(-JSON.parse(readFileSync(join(dir, 'trabajo.json'), 'utf8')).pid, 'SIGKILL'); } catch { /* Ya terminó. */ } };
+test('H33: un researcher muerto sin informe no bloquea el alcance tras /reload y no sugiere subagent_message', async t => {
+  const e = entorno(t), r = runtime(e, falso(e, eterno));
+  const res = await r.alcance(), dir = carpeta(e, res.details.nombre);
+  t.after(() => matar(dir));
+  const repetido = await r.alcance();
+  assert.match(repetido.content[0].text, /en curso/); assert.equal(r.entradas.filter(x => x.data.tipo === 'inicio').length, 1);
+  await esperar(() => existsSync(join(dir, 'error.txt'))); matar(dir);
+  await esperar(() => { try { process.kill(JSON.parse(readFileSync(join(dir, 'trabajo.json'), 'utf8')).pid, 0); return false; } catch { return true; } });
+  r.investigar = r.construir();
+  await r.turno();
+  assert.equal(r.entradas.at(-1).data.estado, 'interrumpida'); assert.equal(r.avisos.length, 1);
+  r.investigar = r.construir();
+  const relanzado = await r.alcance();
+  assert.equal(relanzado.isError, undefined); assert.doesNotMatch(JSON.stringify([res, repetido, relanzado, r.mensajes]), /subagent_message|despachada/);
+  assert.equal(r.entradas.filter(x => x.data.tipo === 'inicio').length, 2);
+});
+
+test('H33: un informe terminado se recupera por huella desde otra sesión, sin relanzar', async t => {
+  const e = entorno(t), r = runtime(e, falso(e, informe));
+  const res = await r.alcance();
+  await esperar(() => existsSync(join(carpeta(e, res.details.nombre), 'codigo')));
+  const otra = runtime(e, falso(e, informe));
+  assert.match(verificacionPrevia(e.vault, e.recursos, e.d, e.tema), /vigente/);
+  const cache = await otra.alcance();
+  assert.equal(cache.details.cache, true); assert.equal(otra.entradas.length, 0);
+  await r.turno(); assert.equal(r.entradas.at(-1).data.tipo, 'fin'); assert.deepEqual(r.avisos, []);
+});
