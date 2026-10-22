@@ -1040,16 +1040,15 @@ export default function quiz(pi: ExtensionAPI) {
 			// order shown during streaming would be stale/misleading. The full option
 			// list is rendered — in its true display order — by renderResult after the
 			// user answers.
-			const options = normalizeOptions(
-				args.options as Array<{ label: string; value?: string; description?: string }> | undefined,
-			);
+			// Los args llegan a medias durante el streaming ({} en la opción en curso): si esto lanzara, pi
+			// mostraría los args crudos (LaTeX, enlaces y, expandido, la respuesta).
+			const n = Array.isArray(args.options) ? args.options.filter((o: any) => o?.label?.trim?.()).length : 0;
 			let text = theme.fg("toolTitle", theme.bold("quiz ")) + theme.fg("muted", sinEnlaces(textoPlano(args.question || "")));
 			if (args.multiSelect) {
 				text += theme.fg("dim", " [varias respuestas]");
 			}
-			if (options.length > 0) {
-				const noun = options.length === 1 ? "opción" : "opciones";
-				text += theme.fg("dim", ` (${options.length} ${noun})`);
+			if (n > 0) {
+				text += theme.fg("dim", ` (${n} ${n === 1 ? "opción" : "opciones"})`);
 			}
 			return new Text(text, 0, 0);
 		},

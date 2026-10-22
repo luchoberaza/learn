@@ -626,8 +626,9 @@ export default function askUserQuestion(pi: ExtensionAPI) {
 		},
 
 		renderCall(args, theme) {
-			const options = normalizeOptions(args.options as Array<{ label: string; value?: string; description?: string }> | undefined);
-			let text = theme.fg("toolTitle", theme.bold("pregunta ")) + theme.fg("muted", args.question);
+			// Los args llegan a medias durante el streaming ({} en la opción en curso).
+			const options = normalizeOptions(Array.isArray(args.options) ? args.options.filter((o: any) => typeof o?.label === "string") : []);
+			let text = theme.fg("toolTitle", theme.bold("pregunta ")) + theme.fg("muted", args.question || "");
 			if (args.multiSelect) {
 				text += theme.fg("dim", " [varias respuestas]");
 			}

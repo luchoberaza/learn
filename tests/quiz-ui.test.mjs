@@ -149,3 +149,12 @@ test("H46: fracciones con potencias y \\displaystyle quedan legibles", async () 
     undefined, u => { parcial ??= u; }, { hasUI: false });
   assert.equal(parcial.details.question, "¿2¹⁰/8 y dy/du=12u² si h≠0 y (a+b)?");
 });
+
+test("H45+H49: renderCall con args a medio llegar no lanza (pi mostraría los args crudos)", () => {
+  const parciales = [{}, { question: "¿Q?", options: [{ label: "A" }, {}] }, { question: "¿Q?", options: [{ value: "b" }] },
+    { question: "¿Q?", options: [{ label: "A", value: "x" }, { label: "B", value: "x" }], correctAnswer: "x" }];
+  for (const tool of [quiz, ask]) for (const args of parciales) {
+    const texto = render(tool.renderCall(args, theme, { argsComplete: false }));
+    assert.doesNotMatch(texto, /undefined/, texto);
+  }
+});
