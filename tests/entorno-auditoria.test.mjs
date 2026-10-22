@@ -70,3 +70,9 @@ test("H14: pi-learn abre el tutor sin ponytail ni skills globales y con las skil
   assert.ok(!nombres.includes("ponytail"));
   assert.ok(skills.skills.find(s => s.name === "teach").filePath.endsWith("Projects/pi-learning/.pi/skills/teach/SKILL.md"));
 });
+
+test("H09: el thinking del tutor queda oculto como setting de proyecto", async t => {
+  const { agente } = hogar(t), sdk = await importPi();
+  writeFileSync(join(agente, "settings.json"), JSON.stringify({ hideThinkingBlock: false }));
+  assert.equal(sdk.SettingsManager.create(vaultDir, agente, { projectTrusted: true }).getHideThinkingBlock(), true);
+});
