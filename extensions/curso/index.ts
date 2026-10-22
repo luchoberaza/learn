@@ -28,7 +28,7 @@ export default function (pi: ExtensionAPI) {
   const fecha = Type.String({ pattern: "^\\d{4}-\\d{2}-\\d{2}$" });
   pi.registerTool({
     name: "leer_sesion_anterior", label: "Leer sesión sin cierre",
-    description: "Lee el último log del tema sin registro final. Devuelve texto acotado y SHA para reconstruir sin inventar respuestas. No modifica notas ni progreso.",
+    description: "Lee el último log del tema sin registro final. Devuelve su principio y su final (práctica y cierre) y el SHA para reconstruir sin inventar respuestas. No modifica notas ni progreso.",
     parameters: Type.Object({}), executionMode: "sequential", execute: progreso.leerAnterior,
   });
   pi.registerTool({

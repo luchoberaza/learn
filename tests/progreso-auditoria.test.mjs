@@ -49,3 +49,10 @@ test('H04: con el log renombrado en Obsidian, /fin guarda igual y cierra',async 
   await e.comandos.get('fin').handler('',e.ctx);const r=await e.guardar({cierre:true});assert.equal(r.details.guardado,true);assert.match(r.content[0].text,/se guardó igual/);
   e.final();await e.eventos.get('agent_settled')({},e.ctx);assert.equal(e.sesion.actual(),undefined);
 });
+test('H30: leer_sesion_anterior devuelve el principio y el final de un log largo, con el SHA del archivo completo',async t=>{
+  const e=await entorno(t),{createHash}=await import('node:crypto'),{readFileSync}=await import('node:fs');
+  const log='sesiones/2026-01-01-derivacion.md',contenido=`INICIO DEL LOG\n${'relleno ñ '.repeat(6000)}\nRESPUESTA FINAL: 42\n`;writeFileSync(join(e.raiz,log),contenido);e.sesion.refrescar();assert.equal(e.sesion.actual().pendiente,log);
+  const texto=(await e.progreso.leerAnterior()).content[0].text;
+  assert.match(texto,/INICIO DEL LOG/);assert.match(texto,/RESPUESTA FINAL: 42/);assert.ok(Buffer.byteLength(texto)<24500);assert.ok(!texto.includes('�'));
+  assert.equal(texto.match(/SHA-256: ([a-f0-9]{64})/)[1],createHash('sha256').update(readFileSync(join(e.raiz,log))).digest('hex'));
+});
