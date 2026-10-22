@@ -1,6 +1,6 @@
 import { test, mock } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, writeFileSync, readdirSync, rmSync } from "node:fs";
+import { chmodSync, mkdtempSync, mkdirSync, writeFileSync, readdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { registrarSesion } from "../extensions/curso/sesion.ts";
@@ -219,4 +219,22 @@ test("H15: no se ofrece el ad hoc, el log vivo de otra sesión ni el de otro tem
   writeFileSync(join(e.raiz, ".sesion-activa.json"), JSON.stringify({ sesion: "otra", pid: 2 ** 22 + 1, curso: "calculo", tema: "derivacion", log: "cursos/calculo/sesiones/2026-01-02-derivacion.md" }));
   await e.estudiar("calculo derivacion");
   assert.equal(e.sesion.actual().pendiente, "sesiones/2026-01-02-derivacion.md");
+});
+test("H16: si md-log no confirma o sesiones/ no se puede escribir, la clase sigue sin nota y sin .md vacío", async t => {
+  const e = entorno(t), eventos = [];
+  e.pi.events.emit = (n, p) => eventos.push([n, p]);
+  await e.estudiar("calculo derivacion");
+  assert.deepEqual(readdirSync(join(e.raiz, "sesiones")), []);
+  assert.equal(e.entradas.at(-1).data.sinLog, true);
+  assert.equal(e.ordenes.length, 1);
+  assert.deepEqual(e.avisos.at(-1), ["warning", "md-log no confirmó la nota: seguimos sin nota de Obsidian."]);
+  assert.ok(eventos.some(([n, p]) => n === "md-log:unlink" && !p.file));
+  await e.sesion.cerrar(e.ctx);
+  assert.equal(e.sesion.actual(), undefined);
+  const f = entorno(t);
+  chmodSync(join(f.raiz, "sesiones"), 0o555);
+  await f.estudiar("calculo derivacion");
+  chmodSync(join(f.raiz, "sesiones"), 0o755);
+  assert.equal(f.sesion.actual().a.tema, "derivacion");
+  assert.deepEqual(f.avisos.at(-1), ["warning", "Sin permiso para escribir en sesiones/: seguimos sin nota de Obsidian."]);
 });

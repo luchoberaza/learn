@@ -30,7 +30,7 @@ export const ordenar = (pi: ExtensionAPI, content: string) => pi.sendMessage({ c
 export function registrarSesion(pi: ExtensionAPI, vault = vaultDir, recursos = piDir) {
   let activo: Activo | undefined;
   let datos: DatosCurso | undefined;
-  let resumen = "", teach = "", modo = "", pendiente: string | undefined;
+  let resumen = "", teach = "", modo = "", pendiente: string | undefined, sinLog = false;
   const cursos = () => readdirSync(rutaSegura(vault, "cursos"), { withFileTypes: true }).filter(d => d.isDirectory() && esSlug(d.name)).map(d => d.name);
   const raiz = (curso: string) => {
     if (!esSlug(curso)) throw new Error("Curso inválido: usá su slug.");
@@ -83,7 +83,7 @@ export function registrarSesion(pi: ExtensionAPI, vault = vaultDir, recursos = p
     return tema;
   }
   async function restaurar(_event: unknown, ctx: ExtensionContext) {
-    activo = undefined; datos = undefined; resumen = ""; pendiente = undefined;
+    activo = undefined; datos = undefined; resumen = ""; pendiente = undefined; sinLog = false;
     ctx.ui.setStatus("curso", undefined);
     const entradas = ctx.sessionManager.getBranch();
     const ultimo = [...entradas].reverse().find(e => e.type === "custom" && e.customType === "curso");
@@ -95,6 +95,7 @@ export function registrarSesion(pi: ExtensionAPI, vault = vaultDir, recursos = p
       const d = await cargar(a.curso, false, undefined, 30000);
       for (const aviso of d.avisos.filter(a => a.startsWith("Progreso") || a === COPIA)) ctx.ui.notify(aviso, "warning");
       const tema = preparar(a, d);
+      sinLog = !!(a as { sinLog?: boolean }).sinLog;
       ctx.ui.setStatus("curso", `📚 ${a.curso} › ${tema.nombre}`);
     } catch (e) { ctx.ui.notify(`No se restauró el curso: ${e instanceof Error ? e.message : "estado inválido"}`, "warning"); }
   }
@@ -167,29 +168,37 @@ export function registrarSesion(pi: ExtensionAPI, vault = vaultDir, recursos = p
         }
         if (!esSlug(tema.id)) throw new Error("Id del tema inválido; revisá el índice.");
         const a: Activo = { curso, tema: tema.id, log: "", ...(tema.id === "ad-hoc" ? { adHoc: tema } : {}) };
-        // Preparar antes de crear archivos evita dejar un log vacío por configuración inválida.
-        const anterior = { activo, datos, resumen, teach, modo, pendiente };
         pendiente = undefined;
         preparar(a, d);
+        // La nota es deseable, no imprescindible: sin ella la clase sigue y no queda un .md vacío.
+        let sinNota = "";
+        const base = `cursos/${curso}/sesiones/${new Date().toLocaleDateString("sv-SE")}-${tema.id}`;
+        a.log = `${base}.md`;
         try {
-          const carpeta = rutaSegura(vault, `cursos/${curso}/sesiones`);
-          mkdirSync(carpeta, { recursive: true });
-          const fecha = new Date().toLocaleDateString("sv-SE");
+          mkdirSync(rutaSegura(vault, `cursos/${curso}/sesiones`), { recursive: true });
           for (let n = 1; ; n++) {
-            const file = rutaSegura(vault, `cursos/${curso}/sesiones/${fecha}-${tema.id}${n === 1 ? "" : `-${n}`}.md`);
-            try { closeSync(openSync(file, "wx")); a.log = relative(vault, file); break; }
+            a.log = `${base}${n === 1 ? "" : `-${n}`}.md`;
+            try { closeSync(openSync(rutaSegura(vault, a.log), "wx")); break; }
             catch (e) { if ((e as NodeJS.ErrnoException).code !== "EEXIST") throw e; }
           }
           await new Promise<void>((resolve, reject) => {
-            const timer = setTimeout(() => reject(new Error("md-log no confirmó el vínculo; ejecutá /reload y reintentá.")), 2000);
+            const timer = setTimeout(() => reject(new Error("md-log no confirmó la nota")), 2000);
             pi.events.emit("md-log:link", { file: rutaSegura(vault, a.log), backfill: false,
               onComplete(error?: string) { clearTimeout(timer); error ? reject(new Error(error)) : resolve(); } });
           });
-        } catch (e) { ({ activo, datos, resumen, teach, modo, pendiente } = anterior); throw e; }
-        pi.appendEntry("curso", a);
+        } catch (e) {
+          const codigo = (e as NodeJS.ErrnoException).code;
+          sinNota = codigo === "ENOSPC" ? "Disco lleno" : ["EACCES", "EPERM", "EROFS"].includes(codigo || "") ? "Sin permiso para escribir en sesiones/" : codigo || !(e instanceof Error) ? "No se pudo crear la nota" : e.message;
+          // Que la nota anterior no reciba este tema.
+          pi.events.emit("md-log:unlink", {});
+          try { const file = rutaSegura(vault, a.log); if (statSync(file).size === 0) rmSync(file); } catch { /* no quedó archivo */ }
+        }
+        sinLog = !!sinNota;
+        pi.appendEntry("curso", sinLog ? { ...a, sinLog } : a);
         pi.setSessionName(`${d.nombre || curso} · ${tema.nombre}`);
         // Los avisos del curso van al dossier; la preparación por tema informa al alumno lo que le toca.
         ctx.ui.setStatus("curso", `📚 ${curso} › ${tema.nombre}`);
+        if (sinNota) ctx.ui.notify(`${sinNota.replace(/[.;]\s*$/, "")}: seguimos sin nota de Obsidian.`, "warning");
         const previo = d.progreso.temas[tema.id]?.estado;
         ordenar(pi, `Empecemos con «${tema.nombre}» (${curso}). ${previo && previo !== "sin_empezar" ? "Abrí con una línea de dónde quedamos (borde y próximo paso del dossier) y enseguida la primera pregunta" : "Iniciá el probe con la primera pregunta, sin preámbulo"}, sin esperar una nueva orden del estudiante.`);
       } catch (e) { ctx.ui.notify(e instanceof Error ? e.message : "No se pudo activar el curso.", "error"); }
@@ -212,12 +221,12 @@ export function registrarSesion(pi: ExtensionAPI, vault = vaultDir, recursos = p
     actualizarProgreso: (progreso: DatosCurso["progreso"]) => { if (datos) datos.progreso = progreso; },
     async cerrar(ctx: ExtensionContext) {
       const { a } = actual();
-      await new Promise<void>((resolve, reject) => {
+      if (!sinLog) await new Promise<void>((resolve, reject) => {
         const timer = setTimeout(() => reject(new Error("md-log no confirmó el cierre; el curso sigue activo.")), 2000);
         pi.events.emit("md-log:unlink", { file: rutaSegura(vault, a.log), onComplete(error?: string) { clearTimeout(timer); error ? reject(new Error(error)) : resolve(); } });
       });
       pi.appendEntry("curso", null);
-      activo = undefined; datos = undefined; resumen = ""; pendiente = undefined;
+      activo = undefined; datos = undefined; resumen = ""; pendiente = undefined; sinLog = false;
       ctx.ui.setStatus("curso", undefined);
     },
     refrescar: () => { if (activo && datos) preparar(activo, datos); return resumen; },
