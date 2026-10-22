@@ -181,6 +181,16 @@ class SolucionesFueraDelIndiceTest(Base):
         self.assertIn("enunciadodos", texto)
         self.assertNotIn("secreto", texto)
 
+    def test_renglon_cortado_dentro_de_la_solucion_y_practicos_resueltos(self):
+        # Un renglón de la solución que empieza con «pregunta 2» no es un encabezado.
+        self.pdf("parcial.pdf", ["Pregunta 1 (10 puntos)\nenunciadouno\nSolución\nsecretouno, como en la\npregunta 2 secretodos\nPregunta 2\nenunciadodos"])
+        self.pdf("practico.pdf", ["Ejercicio 1\nenunciadotres\nSolución: secretotres\nEjercicio 2\nenunciadocuatro"])
+        self.ejecutar(self.doc("parcial", "evaluaciones"), self.doc("practico", "ejercicios"))
+        texto = self.indexado("parcial") + " " + self.indexado("practico")
+        for palabra in ["enunciadouno", "enunciadodos", "enunciadotres", "enunciadocuatro"]:
+            self.assertIn(palabra, texto)
+        self.assertNotIn("secreto", texto)
+
     @unittest.skipUnless((CURSO / "_procesado/sol-prc20240926/meta.json").exists(), "falta el parcial procesado de cursos/redes")
     def test_parcial_real_con_solucion_integrada(self):
         shutil.copytree(CURSO / "_procesado/sol-prc20240926", self.salida / "sol-prc20240926", ignore=shutil.ignore_patterns("render", "cache"))

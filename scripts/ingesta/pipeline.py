@@ -19,7 +19,8 @@ from extraccion import calidad, clasificar, encabezados, etiqueta_impresa, extra
 
 TIPOS = {"programa", "bibliografia", "ejercicios", "evaluaciones", "soluciones", "otros"}
 MOTORES = {"digital": "pymupdf", "escaneada": "ocrmypdf", "mixta": "pymupdf"}
-PREGUNTA = re.compile(r"[\s#>*_]*(?:pregunta|ejercicio|problema)\s+\d", re.I)
+# Encabezado con mayúscula: un renglón cortado de la solución («pregunta 2 …») no reabre el enunciado.
+PREGUNTA = re.compile(r"[\s#>*_]*(?:Pregunta|PREGUNTA|Ejercicio|EJERCICIO|Problema|PROBLEMA)\s+\d")
 SOLUCION = re.compile(r"[\s#>*_]*(?:soluci[oó]n|resoluci[oó]n)|[\s#>]*(?:[*_]+\s*respuesta|respuesta\s*(?::|$))", re.I)
 
 
@@ -182,7 +183,7 @@ def construir_busqueda(raiz: Path) -> dict:
             if markdown is None:
                 continue
             texto = contenido_pagina(markdown)
-            if meta["tipo"] == "evaluaciones":
+            if meta["tipo"] in {"evaluaciones", "ejercicios"}:
                 # Tras una página faltante puede seguir una solución: no se indexa hasta la próxima pregunta.
                 texto, en_solucion = enunciados(texto, en_solucion or int(p) != siguiente)
                 siguiente = int(p) + 1
