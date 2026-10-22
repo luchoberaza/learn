@@ -90,7 +90,7 @@ test('rama activa y despacho pendiente evitan duplicados; un resultado ajeno se 
   const e=entorno(t);e.entradas.push({type:'custom',customType:'curso-researcher',data:{tipo:'inicio',nombre:'entrada-incompleta'}});
   await e.investigar('1',args,undefined,undefined,e.ctx);await e.investigar('2',args,undefined,undefined,e.ctx);assert.equal(e.llamadas,1);
   const antes=e.entradas.length;await e.eventos.get('message_end')({message:{customType:'subagent_result',details:{name:'otro'}}},e.ctx);assert.equal(e.entradas.length,antes);
-  e.entradas.length=0;await e.investigar('3',args,undefined,undefined,e.ctx);assert.equal(e.llamadas,1);
+  e.entradas.length=0;assert.match((await e.investigar('3',args,undefined,undefined,e.ctx)).content[0].text,/en curso/);
 });
 test('informe sin contraste o con cita inventada no se guarda como caché válida',async t=>{
   const e=entorno(t);await e.investigar('1',args,undefined,undefined,e.ctx);await e.responder({},'## Resumen\nNo alcanza https://openstax.org/');assert.match(e.entregas.at(-1)[1].error,/incompleto/);

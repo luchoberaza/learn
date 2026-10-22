@@ -219,6 +219,8 @@ export function registrarResearcher(pi: ExtensionAPI, actual: () => Estado | und
           if (cache.texto && !cache.previa) return { content: [{ type: "text", text: `${cache.manual ? "Nota manual preservada; no relanzamos ni sobrescribimos alcance. Para afirmaciones nuevas usá verificar." : "Caché de alcance: no se lanzó otro researcher. Las afirmaciones nuevas requieren modo verificar."}\n${acotar(cache.texto, 16000)}` }], details: { cache: !cache.manual, manual: cache.manual } };
         }
         const st = estadoTrabajo(dir);
+        // Si lo lanzó otra sesión (o un pi ya cerrado), esta también lo recoge al terminar.
+        if (st === "corriendo" && !pendientes(ctx).some(i => i.nombre === clave(p))) pi.appendEntry("curso-researcher", { tipo: "inicio", nombre: clave(p), pedido: p } satisfies Inicio);
         if (st === "corriendo") return { content: [{ type: "text", text: "La verificación ya está en curso en segundo plano; seguí con el material." }], details: { pendiente: clave(p) } };
         if (st === "espera") throw new Error("Verificación externa no disponible por ahora (la última superó el plazo); seguí con el material.");
         const a = agente(recursos), barra = a.modelo.indexOf("/"), modelo = ctx.modelRegistry.find(a.modelo.slice(0, barra), a.modelo.slice(barra + 1));

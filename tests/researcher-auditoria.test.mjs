@@ -111,6 +111,17 @@ test('H07: tras /fin el informe se guarda en silencio, sin avisos ni mensajes', 
   assert.match(verificacionPrevia(e.vault, e.recursos, e.d, e.tema), /vigente/);
 });
 
+test('H33: la sesión que encuentra en curso el trabajo de otra (pi cerrado) recibe el informe al terminar', async t => {
+  const e = entorno(t), lento = falso(e, `await new Promise(r => setTimeout(r, 500));\n${informe}`);
+  const r = runtime(e, lento), otra = runtime(e, lento);
+  const res = await r.alcance();
+  assert.match((await otra.alcance()).content[0].text, /en curso/);
+  await esperar(() => existsSync(join(carpeta(e, res.details.nombre), 'codigo')));
+  await otra.turno();
+  assert.deepEqual(otra.avisos, [['Verificación del material lista.', 'info']]); assert.equal(otra.mensajes.length, 1);
+  await r.turno(); assert.deepEqual(r.avisos, []);
+});
+
 // Nunca entrega; termina solo cuando el test borra el vault.
 const eterno = `setInterval(() => { if (!existsSync(vault)) process.exit(0); }, 100);`;
 const matar = dir => { try { process.kill(-JSON.parse(readFileSync(join(dir, 'trabajo.json'), 'utf8')).pid, 'SIGKILL'); } catch { /* Ya terminó. */ } };
