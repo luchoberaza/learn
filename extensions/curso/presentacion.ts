@@ -29,20 +29,21 @@ export function registrarPresentacion(pi: ExtensionAPI, actual: () => { a: Activ
     ctx.ui.setHiddenThinkingLabel("Pensando…");
   });
   pi.on("session_before_compact", async ({ preparation: p, customInstructions, signal }, ctx) => {
-    const modelo = ctx.model, e = actual();
+    const modelo = ctx.model;
     if (!modelo) return;
-    const pedido = [
-      `<conversation>\n${serializeConversation(convertToLlm([...p.messagesToSummarize, ...p.turnPrefixMessages]))}\n</conversation>`,
-      p.previousSummary && `<previous-summary>\n${p.previousSummary}\n</previous-summary>\nIntegrá el resumen anterior sin perder nada de él.`,
-      e && `Sesión activa: curso ${e.a.curso}, tema ${e.a.tema}, log ${e.a.log}.`,
-      INSTRUCCIONES,
-      customInstructions && `Además: ${customInstructions}`,
-    ].filter(Boolean).join("\n\n");
+    // Si algo falla, pi sigue con su propio resumen: compactar nunca corta la sesión.
     try {
+      const e = actual();
+      const pedido = [
+        `<conversation>\n${serializeConversation(convertToLlm([...p.messagesToSummarize, ...p.turnPrefixMessages]))}\n</conversation>`,
+        p.previousSummary && `<previous-summary>\n${p.previousSummary}\n</previous-summary>\nIntegrá el resumen anterior sin perder nada de él.`,
+        e && `Sesión activa: curso ${e.a.curso}, tema ${e.a.tema}, log ${e.a.log}.`,
+        INSTRUCCIONES,
+        customInstructions && `Además: ${customInstructions}`,
+      ].filter(Boolean).join("\n\n");
       const r = await ctx.modelRegistry.streamSimple(modelo, { systemPrompt: SISTEMA, messages: [{ role: "user", content: [{ type: "text", text: pedido }], timestamp: Date.now() }] },
         { signal, ...(modelo.reasoning && ctx.thinkingLevel && ctx.thinkingLevel !== "off" ? { reasoning: ctx.thinkingLevel } : {}) }).result();
       const summary = r.content.flatMap(c => c.type === "text" ? [c.text] : []).join("\n").trim();
-      // Si falla, pi sigue con su propio resumen: compactar nunca corta la sesión.
       if (r.stopReason !== "stop" || !summary) return;
       return { compaction: { summary, firstKeptEntryId: p.firstKeptEntryId, tokensBefore: p.tokensBefore, usage: r.usage } };
     } catch { return; }
