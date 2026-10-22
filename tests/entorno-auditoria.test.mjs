@@ -181,5 +181,9 @@ test("comprobar: respeta ruta_tesseract y dice cómo recrear el venv con Python 
 
 test("H14: los argumentos de pi-learn van primero y no tapan los subcomandos de pi", t => {
   const { home } = hogar(t);
-  assert.deepEqual(piLearn(t, { home, args: ["update", "--self"] }).llamadas[0].slice(1, 3), ["update", "--self"]);
+  // pi 1.4.0 rechaza -ns en sus subcomandos («Unknown option -ns for "update"»).
+  for (const sub of [["update", "--self"], ["config"], ["auth", "check", "--provider", "openai-codex"]]) {
+    assert.deepEqual(piLearn(t, { home, args: sub }).llamadas[0].slice(1, -2), sub);
+  }
+  assert.deepEqual(piLearn(t, { home, args: ["--resume"] }).llamadas[0].slice(1, 4), ["--resume", "-ns", "--skill"]);
 });
