@@ -109,11 +109,13 @@ export default function (pi: ExtensionAPI) {
   });
   pi.registerTool({
     name: "guardar_items", label: "Guardar ítems del documento",
-    description: "Solo preparación: guarda en items.yaml la segmentación hecha por el agente tras leer las transcripciones con visión. Conservá los ids originales y no inventes enunciados ni soluciones. Valida páginas y referencias, y preserva ediciones manuales. Devuelve ids y cantidades, no soluciones.",
+    description: "Solo preparación: guarda en items.yaml la segmentación hecha por el agente tras leer las transcripciones con visión. Conservá los ids originales («Pregunta 3» → '3') y no inventes enunciados ni soluciones. Una solución integrada en el mismo documento es otro ítem con solucion_de: '<id del enunciado>'; puntos es el puntaje oficial si consta («(8 puntos)» → 8). Valida páginas y referencias, y preserva ediciones manuales. Devuelve ids y cantidades, no soluciones.",
     parameters: Type.Object({ curso: slug, doc: slug,
       items: Type.Array(Type.Object({ id: Type.String({ minLength: 1, maxLength: 80 }), paginas,
         enunciado: Type.String({ minLength: 1, maxLength: 50000 }),
         solucion: Type.Optional(Type.Object({ doc: slug, id: Type.String({ minLength: 1, maxLength: 80 }) })),
+        solucion_de: Type.Optional(Type.String({ minLength: 1, maxLength: 80 })),
+        puntos: Type.Optional(Type.Union([Type.Number({ minimum: 0 }), Type.String({ minLength: 1, maxLength: 40 })])),
       }), { minItems: 1, maxItems: 1000 }),
     }), executionMode: "sequential",
     async execute(_id, args, signal) {
