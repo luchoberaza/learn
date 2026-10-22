@@ -8,6 +8,13 @@ function pi-learn --description 'Abre pi en la carpeta actual, dentro de tmux'
     if not set -q PI_SUBAGENT_SHELL_READY_DELAY_MS
         set -fx PI_SUBAGENT_SHELL_READY_DELAY_MS 300
     end
+    set -l entorno
+    # Los paquetes fijados no se versionan: si faltan, pi intenta instalarlos al arrancar y sin red no abre.
+    if not test -d "$recursos/git/github.com/amosblomqvist/pi-interactive-subagents"; or not test -d "$recursos/npm/node_modules/pi-web-access"
+        printf 'Faltan paquetes de .pi (subagentes o web): abro pi sin ellos, sin investigador ni búsqueda web; reinstalalos según .pi/SETUP.md.\n' >&2
+        set -fx PI_OFFLINE 1
+        set entorno -e PI_OFFLINE=1
+    end
     # Sólo las skills del proyecto: las globales no son del tutor y una choca con teach.
     set -l opciones -ns --skill "$recursos/skills" $argv
     if set -q TMUX; and test -n "$TMUX"
@@ -29,5 +36,5 @@ function pi-learn --description 'Abre pi en la carpeta actual, dentro de tmux'
     if set -q argv[1]; and command tmux -L pi-learn has-session -t "=$sesion" 2>/dev/null
         printf 'Ya hay un pi abierto en esta carpeta: vuelvo a ese y no uso «%s»; para usarlo, cerralo antes.\n' "$argv" >&2
     end
-    command tmux -L pi-learn -f "$configuracion" new-session -A -s "$sesion" -c "$PWD" -- pi $opciones
+    command tmux -L pi-learn -f "$configuracion" new-session -A -s "$sesion" -c "$PWD" $entorno -- pi $opciones
 end

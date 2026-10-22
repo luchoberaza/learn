@@ -104,3 +104,19 @@ test("X03: pi-learn reutiliza la sesión de tmux de la carpeta y avisa si no pue
   assert.equal(piLearn(t, { home, dentro: false, args: ["--resume"] }).stderr, "");
   assert.ok(!piLearn(t, { home, dentro: false }).llamadas.some(l => l.includes("has-session")));
 });
+
+test("H41: sin los paquetes fijados pi-learn avisa en una línea y arranca pi sin red de inicio", t => {
+  const { home } = hogar(t), sin = mkdtempSync(join(tmpdir(), "pi-sinpaquetes-")), recursos = join(sin, "Projects/pi-learning/.pi");
+  t.after(() => rmSync(sin, { recursive: true, force: true }));
+  mkdirSync(join(recursos, "config"), { recursive: true });
+  mkdirSync(join(recursos, "git/github.com/amosblomqvist/pi-interactive-subagents"), { recursive: true });
+  writeFileSync(join(recursos, "config/tmux.conf"), "");
+  const dentro = piLearn(t, { home: sin }), fuera = piLearn(t, { home: sin, dentro: false });
+  assert.match(dentro.stderr, /^Faltan paquetes de \.pi .*SETUP\.md\.\n$/);
+  assert.equal(dentro.llamadas[0].at(-2), "OFFLINE=1");
+  const nueva = fuera.llamadas.at(-1);
+  assert.deepEqual(nueva.slice(nueva.indexOf("-e"), nueva.indexOf("--")), ["-e", "PI_OFFLINE=1"]);
+  const completo = piLearn(t, { home });
+  assert.equal(completo.stderr, "");
+  assert.equal(completo.llamadas[0].at(-2), "OFFLINE=");
+});
