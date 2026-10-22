@@ -174,6 +174,14 @@ class TrabajoTest(CursoPreparacion):
         self.segmentar("practico", [practico[0], {**practico[1], "enunciado": "Grafique la derivada."}])
         self.assertEqual([(c["doc"], c["id"]) for c in self.trabajo()["clasificar"]], [("practico", "2")])
 
+    def test_un_parcial_editado_a_mano_no_se_vuelve_a_segmentar(self):
+        self.segmentar("parcial", [{"id": "1", "paginas": [1], "enunciado": "Derive."}])
+        items = self.raiz / "_procesado/parcial/items.yaml"
+        items.write_text(items.read_text() + "# Revisado por la cátedra.\n")
+        t = self.trabajo()
+        self.assertEqual([s["doc"] for s in t["segmentar"]], ["practico"])
+        self.assertEqual([(c["doc"], c["id"]) for c in t["clasificar"]], [("parcial", "1")])
+
     def test_asignar_valida_y_nunca_toca_el_indice(self):
         self.segmentar("parcial", [{"id": "1", "paginas": [1], "enunciado": "Derive."}, {"id": "1-solucion", "paginas": [2], "enunciado": "R.", "solucion_de": "1"}])
         antes = (self.raiz / "indice.yaml").read_bytes()

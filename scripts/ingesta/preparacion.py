@@ -31,6 +31,12 @@ def banco(raiz: Path, doc: str) -> list | None:
     return cargar_yaml(texto(raiz, nombre)).get("items", []) if ruta_segura(raiz, nombre).exists() else None
 
 
+def editado(raiz: Path, doc: str) -> bool:
+    """Un items.yaml con cambios ajenos a su registro lo curó una persona: vision.py no lo pisa."""
+    registro = leer(raiz, f"_procesado/{doc}/items-registro.json")
+    return sha256(ruta_segura(raiz, f"_procesado/{doc}/items.yaml")) not in {registro.get("sha256"), registro.get("sha256_anterior")}
+
+
 def trabajo(vault: Path, curso: str, tema: str, maximo: int) -> dict:
     """Páginas a transcribir en orden de prioridad (bibliografía del tema, parciales, prácticos), documentos a segmentar e ítems a clasificar."""
     raiz = carpeta(vault, curso)
@@ -62,8 +68,9 @@ def trabajo(vault: Path, curso: str, tema: str, maximo: int) -> dict:
                 continue
             items = banco(raiz, d["id"])
             bancos[d["id"]] = items or []
-            # Un parcial segmentado antes de H18 no separa sus soluciones integradas: se segmenta otra vez, una sola.
-            if items is None or (tipo == "evaluaciones" and not hechos.get(d["id"], {}).get("segmentado") and not any("solucion_de" in i for i in items)):
+            # Un parcial segmentado antes de H18 no separa sus soluciones integradas: se segmenta otra vez, una sola, si nadie lo editó a mano.
+            if items is None or (tipo == "evaluaciones" and not hechos.get(d["id"], {}).get("segmentado") and not any("solucion_de" in i for i in items)
+                                 and not editado(raiz, d["id"])):
                 pendientes = faltan(d["id"], range(1, d["paginas"] + 1), True)
                 cola.append((d["id"], pendientes))
                 segmentar.append({"doc": d["id"], "tipo": tipo, "titulo": d["titulo"], "paginas": d["paginas"],
