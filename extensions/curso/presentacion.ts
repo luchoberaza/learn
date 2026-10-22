@@ -33,11 +33,13 @@ export function registrarPresentacion(pi: ExtensionAPI, actual: () => { a: Activ
     if (!modelo) return;
     // Si algo falla, pi sigue con su propio resumen: compactar nunca corta la sesión.
     try {
+      // Sin clase activa (preparar un curso, después de /fin) sirve más la plantilla de pi, que conserva rutas y decisiones.
       const e = actual();
+      if (!e) return;
       const pedido = [
         `<conversation>\n${serializeConversation(convertToLlm([...p.messagesToSummarize, ...p.turnPrefixMessages]))}\n</conversation>`,
         p.previousSummary && `<previous-summary>\n${p.previousSummary}\n</previous-summary>\nIntegrá el resumen anterior sin perder nada de él.`,
-        e && `Sesión activa: curso ${e.a.curso}, tema ${e.a.tema}, log ${e.a.log}.`,
+        `Sesión activa: curso ${e.a.curso}, tema ${e.a.tema}, log ${e.a.log}.`,
         INSTRUCCIONES,
         customInstructions && `Además: ${customInstructions}`,
       ].filter(Boolean).join("\n\n");

@@ -117,7 +117,7 @@ test("H09/X04: «Working» y «Thinking...» quedan en español desde el arranqu
 });
 
 // Sesión con un proveedor falso (sin red ni modelo) y el curso activo restaurado de la rama.
-async function conFaux(t, entradas) {
+async function conFaux(t, entradas, activo = true) {
   const raiz = process.env.PI_MANAGED_INSTALL_ROOT || join(agentDir, "install"), { sdk } = p;
   const ai = await import(pathToFileURL(join(raiz, "releases", readFileSync(join(raiz, "current-version"), "utf8").trim(), "node_modules/@earendil-works/pi-ai/dist/index.js")).href);
   const faux = ai.fauxProvider({ provider: "faux", models: [{ id: "faux-1", contextWindow: 200000, maxTokens: 8000 }] });
@@ -125,7 +125,7 @@ async function conFaux(t, entradas) {
   const loader = new sdk.DefaultResourceLoader({ cwd: vaultDir, agentDir, settingsManager, extensionFactories: [pi => pi.registerProvider(faux.provider)] });
   await loader.reload();
   const sessionManager = sdk.SessionManager.inMemory();
-  sessionManager.appendCustomEntry("curso", { curso: "redes", tema: "retardos", log: "cursos/redes/sesiones/2026-10-22-retardos.md" });
+  if (activo) sessionManager.appendCustomEntry("curso", { curso: "redes", tema: "retardos", log: "cursos/redes/sesiones/2026-10-22-retardos.md" });
   const uso = { input: 1, output: 1, cacheRead: 0, cacheWrite: 0, totalTokens: 2, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } };
   const { session } = await sdk.createAgentSession({ cwd: vaultDir, agentDir, settingsManager, resourceLoader: loader, sessionManager, model: faux.getModel(), thinkingLevel: "off" });
   t.after(async () => { await session.extensionRunner.emit({ type: "session_shutdown" }); session.dispose(); });
@@ -159,6 +159,15 @@ test("H62: si el resumen en español falla, pi sigue con el suyo y la sesión no
   const { ai, faux, session } = await conFaux(t, charla);
   faux.setResponses([ai.fauxAssistantMessage("", { stopReason: "error", errorMessage: "sin red" }), ai.fauxAssistantMessage("resumen de pi"), ai.fauxAssistantMessage("resumen de pi")]);
   assert.match((await session.compact()).summary, /resumen de pi/);
+});
+
+test("H62: sin clase activa (preparando un curso o tras /fin) /compact usa la plantilla de pi, que conserva rutas y decisiones", async t => {
+  const { ai, faux, session } = await conFaux(t, charla, false), pedidos = [];
+  faux.setResponses([c => { pedidos.push(c); return ai.fauxAssistantMessage("resumen de pi"); }, c => { pedidos.push(c); return ai.fauxAssistantMessage("prefijo de pi"); }]);
+  await session.compact();
+  const pedido = JSON.stringify(pedidos[0].messages);
+  assert.match(pedido, /## Goal/);
+  assert.doesNotMatch(pedido, /## Borde|pendiente, sin responder/);
 });
 
 test("H80: el doctor revisa timeout, la web del researcher y el renombre a web_fetch en vez de safe_bash", t => {
