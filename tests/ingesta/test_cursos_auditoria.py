@@ -119,6 +119,29 @@ class CursosAuditoriaTest(unittest.TestCase):
             with self.subTest(puntos=puntos):
                 self.assertIn("Puntaje inválido", " ".join(self.evaluacion([{**item, "puntos": puntos}], ["5"])["errores"]))
 
+    def test_h19_avisa_por_tema_sin_evaluaciones_y_por_documento_sin_segmentar(self):
+        self.crear()
+        i = copy.deepcopy(self.indice)
+        for doc, tipo in [("parcial", "evaluaciones"), ("practico", "ejercicios")]:
+            destino = self.raiz / f"fuentes/{tipo}/{doc}.pdf"
+            destino.parent.mkdir(parents=True)
+            destino.write_bytes(self.fuente.read_bytes())
+            i["documentos"].append({"id": doc, "titulo": doc, "tipo": tipo, "archivo": f"fuentes/{tipo}/{doc}.pdf", "paginas": 3})
+        otro = copy.deepcopy(i["temas"][0])
+        otro.update(id="integracion", nombre="Integración")
+        i["temas"][0]["evaluaciones"] = [{"doc": "parcial", "items": ["1"]}]
+        i["temas"].append(otro)
+        carpeta = self.raiz / "_procesado/parcial"
+        carpeta.mkdir(parents=True)
+        (carpeta / "items.yaml").write_text(yaml.safe_dump({"doc": "parcial", "items": [{"id": "1", "paginas": [1], "enunciado": "Derive."}]}))
+        r = self.guardar_indice(i)
+        avisos = "\n".join(r["avisos"])
+        self.assertIn("Tema integracion sin preguntas de evaluaciones", avisos)
+        self.assertNotIn("Tema derivacion sin preguntas", avisos)
+        self.assertRegex(avisos, "Documento practico .*sin segmentar")
+        self.assertNotIn("Documento parcial", avisos)
+        self.assertFalse(r["listo_estudio"])
+
 
 class VisionAuditoriaTest(unittest.TestCase):
     setUp, tearDown = test_vision.VisionTest.setUp, test_vision.VisionTest.tearDown

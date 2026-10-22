@@ -160,10 +160,11 @@ def validar(raiz: Path, slug: str, *, indice=None, contrato=None, origenes=None,
                     pendientes.add((doc, p))
                 elif q.get("sha256_markdown") and sha256(archivo) != q["sha256_markdown"]:
                     errores.append(f"Transcripción editada fuera de la ingesta: {doc}/{p}.")
+        hay_evaluaciones = any(d["tipo"] == "evaluaciones" for d in documentos.values())
         for t in temas.values():
             if set(t["prerequisitos"]) - temas.keys():
                 errores.append(f"Tema {t['id']}: prerequisito inexistente.")
-            tiene_material = False
+            tiene_material = evaluado = False
             for clase, tipo in [("bibliografia", "bibliografia"), ("ejercicios", "ejercicios"), ("evaluaciones", "evaluaciones")]:
                 refs = t.get(clase, [])
                 if not isinstance(refs, list):
@@ -194,8 +195,11 @@ def validar(raiz: Path, slug: str, *, indice=None, contrato=None, origenes=None,
                                 usados.add((doc, i))
                                 revisar_paginas(doc, items[doc][i]["paginas"])
                                 tiene_material = True
+                                evaluado = evaluado or clase == "evaluaciones"
             if not tiene_material:
                 avisos.append(f"Tema sin material: {t['id']}.")
+            if hay_evaluaciones and not evaluado:
+                avisos.append(f"Tema {t['id']} sin preguntas de evaluaciones: segmentá los parciales y asignale las suyas con /curso-agregar.")
         # DFS con colores: un nodo gris indica un ciclo, incluso en componentes desconectados.
         colores = {}
         def visitar(n):
@@ -224,7 +228,7 @@ def validar(raiz: Path, slug: str, *, indice=None, contrato=None, origenes=None,
         resultado["items_sin_asignar"] = sin_asignar
         for d in documentos.values():
             if d["tipo"] in {"ejercicios", "evaluaciones", "soluciones"} and d["id"] not in items:
-                avisos.append(f"Sin segmentación todavía: {d['id']}.")
+                avisos.append(f"Documento {d['id']} ({d['tipo']}) sin segmentar: transcribilo con transcribir_paginas y guardá sus ítems con guardar_items.")
         resultado.update(documentos=len(documentos), temas=len(temas))
     except (OSError, ValueError, KeyError, TypeError, RecursionError, RuntimeError) as e:
         errores.append(f"No se pudo validar: {e}")

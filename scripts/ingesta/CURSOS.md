@@ -36,7 +36,7 @@ Desde la raíz del vault:
 
 `aplicar --base <huella devuelta> --huella <huella propuesta>` es la operación interna usada por `guardar_curso` tras la confirmación. No es un atajo del agente para eludirla. El CLI sirve también al usuario local, que ya tiene permisos de edición del vault.
 
-El validador es de sólo lectura. `ok` significa estructura/referencias válidas; `listo_estudio` exige además cero avisos. Páginas referidas sin preparar o pendientes de calidad son avisos explícitos, no errores de instalación. Un informe puede decir «estructura válida, preparación incompleta» sin certificar fidelidad ni ocultar esos pendientes. Los errores de esquema, rangos, ids, ciclos o referencias a ítems inexistentes sí hacen fallar la validación. El tamaño de `curso.md` usa la estimación conservadora bytes UTF-8 / 4 y se avisa si supera el presupuesto; no se instala un tokenizer.
+El validador es de sólo lectura. `ok` significa estructura/referencias válidas; `listo_estudio` exige además cero avisos. Páginas referidas sin preparar o pendientes de calidad son avisos explícitos, no errores de instalación; también lo son cada documento de ejercicios/evaluaciones/soluciones sin segmentar y, si el curso tiene evaluaciones, cada tema sin preguntas de evaluaciones asignadas. Un informe puede decir «estructura válida, preparación incompleta» sin certificar fidelidad ni ocultar esos pendientes. Los errores de esquema, rangos, ids, ciclos o referencias a ítems inexistentes sí hacen fallar la validación. El tamaño de `curso.md` usa la estimación conservadora bytes UTF-8 / 4 y se avisa si supera el presupuesto; no se instala un tokenizer.
 
 ## Ingesta en segundo plano
 
