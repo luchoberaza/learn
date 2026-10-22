@@ -39,7 +39,7 @@ Desde la raíz del vault:
 
 `aplicar --base <huella devuelta> --huella <huella propuesta>` es la operación interna usada por `guardar_curso` tras la confirmación. No es un atajo del agente para eludirla. El CLI sirve también al usuario local, que ya tiene permisos de edición del vault.
 
-El validador es de sólo lectura. `ok` significa estructura/referencias válidas; `listo_estudio` exige además cero avisos. Páginas referidas sin preparar o pendientes de calidad son avisos explícitos, no errores de instalación; también lo son cada documento de ejercicios/evaluaciones/soluciones sin segmentar y, si el curso tiene evaluaciones, cada tema sin preguntas de evaluaciones asignadas. Un informe puede decir «estructura válida, preparación incompleta» sin certificar fidelidad ni ocultar esos pendientes. Los errores de esquema, rangos, ids, ciclos o referencias a ítems inexistentes sí hacen fallar la validación. El tamaño de `curso.md` usa la estimación conservadora bytes UTF-8 / 4 y se avisa si supera el presupuesto; no se instala un tokenizer.
+El validador es de sólo lectura. `ok` significa estructura/referencias válidas; `listo_estudio` exige además cero avisos. Páginas referidas sin preparar o pendientes de calidad son avisos explícitos, no errores de instalación; también lo son cada documento de ejercicios/evaluaciones/soluciones sin segmentar y, si el curso tiene evaluaciones, cada tema sin preguntas de evaluaciones asignadas (en el índice o en `_procesado/asignaciones.json`); los dos se resuelven solos con la preparación por tema. Un informe puede decir «estructura válida, preparación incompleta» sin certificar fidelidad ni ocultar esos pendientes. Los errores de esquema, rangos, ids, ciclos o referencias a ítems inexistentes sí hacen fallar la validación. El tamaño de `curso.md` usa la estimación conservadora bytes UTF-8 / 4 y se avisa si supera el presupuesto; no se instala un tokenizer.
 
 ## Ingesta en segundo plano
 
@@ -49,12 +49,22 @@ El manifiesto JSON también va en `_procesado/` de la raíz del vault, nunca den
 {"version":1,"documentos":[{"id":"programa","titulo":"Programa","tipo":"programa","archivo":"cursos/ejemplo/fuentes/programa/programa.pdf","paginas":[1,2]}]}
 ```
 
-`manifiesto` lo arma desde el índice en `_procesado/manifiesto-<slug>.json`: el `id` de cada documento es el del índice, que es como lo encuentran `validar` y las tools. Al crear o ampliar un curso se ingiere sin modelo todo (`--todo`); la caché saltea lo ya preparado. `--pendientes` (predeterminado) toma sólo las páginas referidas por el índice que no tienen transcripción. La visión queda para ejercicios, evaluaciones, soluciones y páginas dudosas.
+`manifiesto` lo arma desde el índice en `_procesado/manifiesto-<slug>.json`: el `id` de cada documento es el del índice, que es como lo encuentran `validar` y las tools. Al crear o ampliar un curso se ingiere sin modelo todo (`--todo`); la caché saltea lo ya preparado. `--pendientes` (predeterminado) toma sólo las páginas referidas por el índice que no tienen transcripción. La visión queda para ejercicios, evaluaciones, soluciones y páginas dudosas, y la hace sola la preparación por tema.
 
 ```bash
 .pi/.venv/bin/python .pi/scripts/ingesta/cursos.py manifiesto --curso ejemplo --todo
 .pi/.venv/bin/python .pi/scripts/ingesta/ingestar.py iniciar --manifiesto _procesado/manifiesto-ejemplo.json --salida cursos/ejemplo/_procesado
 .pi/.venv/bin/python .pi/scripts/ingesta/ingestar.py estado --salida cursos/ejemplo/_procesado
 ```
+
+## Preparación por tema
+
+La ingesta base no usa modelo. El resto se prepara solo la primera vez que se estudia cada tema (o si su preparación quedó incompleta), en segundo plano, sin pedir confirmación ni disparar turnos: la primera pregunta no espera.
+
+1. Transcribe con `modelo_vision` las páginas de la bibliografía del tema que siguen pendientes (`ruta: pendiente`, `requiere_vision` o `error_vision`); después las de parciales y prácticos sin segmentar (todas, porque sus preguntas pueden ser de cualquier tema). Tope de 150 páginas por corrida, con el tema primero; lo que queda sigue la próxima vez. Las páginas en caché o adoptadas a mano (`manual`) no van al modelo.
+2. Segmenta cada parcial y práctico transcripto en `items.yaml` con el contrato de arriba (`solucion_de`, `puntos`, ids como los numera el documento). Un parcial segmentado sin sus soluciones integradas se segmenta otra vez, una sola. Conserva los ids que ya usa el índice.
+3. Clasifica con el mismo modelo cada enunciado que el índice no asigna y lo guarda en `_procesado/asignaciones.json` (`automatico: true`, versión y huella del enunciado por ítem; se reclasifica si cambia). `indice.yaml` no se toca y manda: lo que asigna el índice no se clasifica. El dossier marca esos ítems «asignado automáticamente».
+
+Una respuesta inválida del modelo se reintenta una vez; si vuelve a fallar, ese documento queda para la próxima. `_procesado/preparacion.json` registra por tema `estado` (completa/incompleta), fecha, páginas pendientes y la huella del índice (si el índice cambia, se revisa otra vez), y por documento si quedó segmentado. `_procesado/.preparacion.lock` (pid) evita dos preparaciones del mismo curso; el de un proceso muerto se reemplaza. Si la ingesta base está corriendo, espera al próximo turno sin avisar. Un kill no corrompe nada: cada escritura es atómica y la próxima vez sigue desde la caché. En la barra se ve «⏳ Preparando material de <tema>: 12/40 páginas»; al terminar, «Material de <tema> listo: N páginas transcriptas, M ítems nuevos.». Una falla (sin credenciales, red) es una línea «Preparación del material no disponible: …; seguimos con lo que hay.» y la clase sigue.
 
 En pi, `/curso-estado ejemplo` consulta el mismo estado y actualiza su indicador en la barra. Sin daemon ni sondeo permanente. Una selección parcial nunca se presenta como un PDF completo procesado. Tras preparar o agregar ítems, regenerá el informe visible con `informe`; conserva cualquier informe editado manualmente y pide intervención en vez de pisarlo.

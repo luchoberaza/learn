@@ -275,3 +275,14 @@ test("preparación: un kill a mitad no rompe nada y la próxima vez sigue sin re
   assert.deepEqual(e.llamadas.map(l => l.tipo), ["vision", "vision", "segmentar", "segmentar", "clasificar"]);
   assert.deepEqual(e.avisos, [["info", "Material de Derivación listo: 2 páginas transcriptas, 2 ítems nuevos."]]);
 });
+
+test("skills y CURSOS.md describen la preparación automática por tema", () => {
+  for (const skill of ["curso-nuevo", "curso-agregar"]) {
+    const texto = readFileSync(join(piDir, `skills/${skill}/SKILL.md`), "utf8");
+    assert.match(texto, /preparación (automática|por tema)/, skill);
+    assert.match(texto, /asignaciones\.json/, skill);
+    assert.doesNotMatch(texto, /Usá `transcribir_paginas` en todo ejercicio/, skill);
+  }
+  const cursos = readFileSync(join(piDir, "scripts/ingesta/CURSOS.md"), "utf8");
+  for (const clave of ["## Preparación por tema", "preparacion.json", ".preparacion.lock", "150 páginas", "asignado automáticamente"]) assert.ok(cursos.includes(clave), clave);
+});
