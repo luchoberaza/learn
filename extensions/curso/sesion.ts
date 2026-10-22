@@ -275,10 +275,14 @@ export function registrarSesion(pi: ExtensionAPI, vault = vaultDir, recursos = p
         let sinNota = "";
         const base = `cursos/${curso}/sesiones/${new Date().toLocaleDateString("sv-SE")}-${tema.id}`;
         a.log = `${base}.md`;
+        // El nombre de una sesión sin nota (su .md vacío se borró) o de una nota movida sigue ocupado: reusarlo mezclaría su cierre y su historial.
+        const usados = new Set([...ctx.sessionManager.getBranch().map(e => e.type === "custom" && (e.data as { log?: unknown } | null)?.log),
+          ...(d.progreso.historial || []).map(h => typeof h === "object" && h !== null && "log" in h && `cursos/${curso}/${h.log}`)]);
         try {
           mkdirSync(rutaSegura(vault, `cursos/${curso}/sesiones`), { recursive: true });
           for (let n = 1; ; n++) {
             a.log = `${base}${n === 1 ? "" : `-${n}`}.md`;
+            if (usados.has(a.log)) continue;
             try { closeSync(openSync(rutaSegura(vault, a.log), "wx")); break; }
             catch (e) { if ((e as NodeJS.ErrnoException).code !== "EEXIST") throw e; }
           }

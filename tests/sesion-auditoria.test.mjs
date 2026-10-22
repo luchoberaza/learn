@@ -402,3 +402,23 @@ test("H44/H43: con un curso activo sólo quedan las tools del estudio, sin skill
   e.eventos.get("before_agent_start")(sinCurso, e.ctx);
   assert.deepEqual(sinCurso.systemPromptOptions.skills, [{ name: "teach" }]);
 });
+test("H16: una sesión sin nota no deja su nombre libre: la siguiente no hereda su cierre ni su historial", async t => {
+  const d = datos(), e = entorno(t, d), confirma = e.pi.events.emit, fecha = new Date().toLocaleDateString("sv-SE");
+  registrarProgreso(e.pi, e.sesion, e.vault);
+  e.pi.events.emit = () => {};
+  await e.estudiar("calculo derivacion");
+  const sinNota = e.sesion.actual().a.log;
+  e.entradas.push({ type: "custom", customType: "curso-cierre", data: { log: sinNota, adHoc: false } }, { type: "custom", customType: "curso-progreso", data: { log: sinNota, cierre: true } },
+    { type: "message", message: { role: "assistant", stopReason: "stop", content: [{ type: "text", text: "Resumen final." }] } });
+  await e.eventos.get("agent_settled")({ type: "agent_settled", aborted: false }, e.ctx);
+  assert.equal(e.sesion.actual(), undefined);
+  e.pi.events.emit = confirma;
+  d.progreso.historial = [{ log: `sesiones/${fecha}-derivacion-2.md`, tema: "derivacion", cierre: true }];
+  await e.estudiar("calculo derivacion");
+  assert.equal(e.sesion.actual().a.log, `cursos/calculo/sesiones/${fecha}-derivacion-3.md`);
+  e.entradas.push({ type: "message", message: { role: "assistant", stopReason: "stop", content: [{ type: "text", text: "¿Qué es una derivada?" }] } });
+  e.avisos.length = 0;
+  await e.eventos.get("agent_settled")({ type: "agent_settled", aborted: false }, e.ctx);
+  assert.equal(e.sesion.actual()?.a.tema, "derivacion", "la primera pregunta no cierra la sesión nueva");
+  assert.deepEqual(e.avisos, []);
+});
