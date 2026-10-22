@@ -138,6 +138,34 @@ export function leerItems(datos: DatosCurso, doc: string, ids: string[], incluir
     return t;
   }).join("\n\n"), 32000);
 }
+// acotar corta el final: primero estado, próximo paso, fallas, errores sin resolver y últimos ejercicios (H28).
+function progresoCompacto(p: any, bytes: number): string {
+  if (!p) return "sin registro";
+  const lista = (xs: unknown): any[] => (Array.isArray(xs) ? xs : []), corto = (s: unknown) => String(s ?? "").slice(0, 200);
+  // Las entradas más recientes que entran en su parte del presupuesto: una lista larga no desplaza a las otras.
+  const recientes = (xs: any[], parte: number) => {
+    const r: any[] = [];
+    for (const x of [...xs].reverse()) { if (Buffer.byteLength(JSON.stringify([x, ...r])) > bytes * parte) break; r.unshift(x); }
+    return r;
+  };
+  return acotar(JSON.stringify({ estado: p.estado, proximo_paso: String(p.proximo_paso ?? "").slice(0, 400), falla: recientes(lista(p.borde?.falla).map(corto), 0.25),
+    errores_sin_resolver: recientes(lista(p.errores_de_concepto).filter(e => !e?.resuelto).map(e => corto(e?.descripcion)), 0.25),
+    ultimos_ejercicios: recientes(lista(p.ejercicios).map(e => ({ ...e, notas: e?.notas === undefined ? undefined : corto(e.notas) })), 0.25),
+    domina: recientes(lista(p.borde?.domina).map(corto), 0.15), conceptos_firmes: recientes(lista(p.conceptos_firmes).map(corto), 0.1),
+    discrepancias: recientes(lista(p.discrepancias).map(corto), 0.1), actualizado: p.actualizado }), bytes);
+}
+// Del informe del researcher quedan Resumen y Contra el material en ≤1200 B; el resto está en la nota enlazada (H61).
+function resumirVerificacion(v: string, bytes = 1200): string {
+  const corte = v.lastIndexOf('\n"');
+  let texto: string;
+  try { texto = JSON.parse(v.slice(corte + 1)); } catch { return acotar(v, bytes); }
+  const cabecera = v.slice(0, corte + 1), secciones = texto.split(/^(?=## )/m).filter(s => /^## (Resumen|Contra el material)/.test(s)).join("").trim() || texto;
+  for (let n = bytes; n > 0; n -= 100) {
+    const r = cabecera + JSON.stringify(acotar(secciones, n));
+    if (Buffer.byteLength(r) <= bytes) return r;
+  }
+  return acotar(cabecera, bytes);
+}
 export function dossier(raiz: string, datos: DatosCurso, tema: Tema, maxTokens: number, maxContrato: number, verificacion = "Sin caché validada; usá investigar_tema en modo alcance."): string {
   if (![maxTokens, maxContrato].every(n => Number.isSafeInteger(n) && n > 0)) throw new Error("Presupuestos de contexto inválidos.");
   const contrato = Buffer.byteLength(datos.contrato) <= Math.min(maxContrato, maxTokens) * 4 ? datos.contrato : "Contrato excede el presupuesto: revisalo antes de inferir objetivos o rúbrica.";
@@ -152,13 +180,9 @@ export function dossier(raiz: string, datos: DatosCurso, tema: Tema, maxTokens: 
     const i = datos.items[ref.doc]?.find(i => i.id === id);
     lineas.push(`${clase}: ${ref.doc}/${id} · ${i?.enunciado.replace(/\s+/g, " ").slice(0, 140) || "sin preparar"}`);
   }
-  for (const id of [tema.id, ...(tema.prerequisitos || [])]) {
-    const p = datos.progreso.temas[id];
-    // El borde y próximo paso preceden a listas largas para sobrevivir al presupuesto del dossier.
-    const { estado, borde, proximo_paso, ...evidencia } = p || {};
-    lineas.push(`Progreso ${id}: ${acotar(JSON.stringify(p ? { estado, borde, proximo_paso, ...evidencia } : "sin registro"), id === tema.id ? 3000 : 1500)}`);
-  }
-  lineas.push("## Verificación previa", verificacion);
   if (datos.avisos.length || datos.validacion?.errores.length || datos.validacion?.avisos.length) lineas.push("Preparación incompleta: usá sólo referencias comprobables; los avisos no certifican fidelidad.");
+  // Lo que puede cortarse va al final: el progreso de los prerequisitos.
+  lineas.push(`Progreso ${tema.id}: ${progresoCompacto(datos.progreso.temas[tema.id], 3000)}`, "## Verificación previa", resumirVerificacion(verificacion));
+  for (const id of tema.prerequisitos || []) lineas.push(`Progreso ${id} (prerequisito): ${progresoCompacto(datos.progreso.temas[id], 800)}`);
   return acotar(lineas.join("\n\n"), maxTokens * 4);
 }

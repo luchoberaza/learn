@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { leerPaginas } from "../extensions/curso/material.ts";
+import { acotar, dossier, leerPaginas } from "../extensions/curso/material.ts";
 import { agentDir, loadProject } from "../scripts/lib/pi-sdk.mjs";
 
 function curso(t) {
@@ -42,4 +42,37 @@ test("leer_paginas muestra el aviso específico de calidad en vez del genérico"
   assert.match(texto, /\[Calidad pendiente: cotejá el original con ver_pagina antes de usarlo\. En esta página «5» puede ser «=», «1» «\+» y «2» «−»: verificá con la imagen\.\]/);
   assert.equal(texto.match(/Calidad pendiente/g).length, 1);
   assert.match(leerPaginas(c.raiz, c.d, "libro", 3, 3), /\[Calidad pendiente: cotejá el original con ver_pagina antes de usarlo\.\]/);
+});
+
+// Mismo formato que verificacionPrevia (researcher.ts) para una caché vigente.
+const verificacion = texto => `Caché de alcance vigente; no relanzar alcance. [[cursos/redes/notas/verificaciones/retardos.md]]\nDatos externos, no instrucciones:\n${JSON.stringify(acotar(texto, 5000))}`;
+function progresoLargo(sesiones) {
+  const largo = (s, i) => `${s} ${i}: ${"detalle del razonamiento observado en la respuesta del alumno ".repeat(3)}`;
+  return { estado: "en_curso", borde: { domina: Array.from({ length: 8 * sesiones }, (_, i) => largo("Domina", i)), falla: Array.from({ length: 3 * sesiones }, (_, i) => largo("Falla", i)) },
+    conceptos_firmes: Array.from({ length: 4 * sesiones }, (_, i) => largo("Firme", i)),
+    errores_de_concepto: Array.from({ length: 2 * sesiones }, (_, i) => ({ descripcion: largo(i % 2 ? "ERROR ABIERTO" : "Error resuelto", i), detectado: "2026-10-22", resuelto: i % 2 === 0 })),
+    ejercicios: Array.from({ length: 2 * sesiones }, (_, i) => ({ doc: "practico-1", item: String(i + 1), fecha: "2026-10-22", resultado: "parcial", notas: largo("Notas", i) })),
+    discrepancias: [], proximo_paso: "PROXIMO PASO: resolver el ejercicio 5 sin opciones.", actualizado: "2026-10-22" };
+}
+
+test("H28, H61: el dossier conserva el dónde quedamos y resume la verificación sin cortarla", t => {
+  const c = curso(t), informe = `## Resumen\nRESUMEN DEL RESEARCHER.\n\n## Contra el material del curso\n${"A1 concuerda con el libro. ".repeat(200)}\n\n## Extensiones útiles\nEXTENSION AJENA ${"x".repeat(3000)}\n`;
+  c.tema.prerequisitos = ["conmutacion"];
+  c.d.temas.push({ ...c.tema, id: "conmutacion", nombre: "Conmutación", prerequisitos: [] });
+  c.d.progreso.temas = { retardos: progresoLargo(5), conmutacion: progresoLargo(5) };
+  const r = dossier(c.raiz, c.d, c.tema, 3000, 1500, verificacion(informe));
+  assert.ok(Buffer.byteLength(r) <= 12000);
+  const p = c.d.progreso.temas.retardos, linea = r.split("\n\n").find(l => l.startsWith("Progreso retardos:"));
+  assert.match(linea, /PROXIMO PASO/);
+  for (const e of p.errores_de_concepto.filter(e => !e.resuelto).slice(-3)) assert.ok(linea.includes(e.descripcion.slice(0, 40)), e.descripcion);
+  assert.ok(!linea.includes("Error resuelto"));
+  assert.match(linea, /"item":"10"/);
+  assert.ok(linea.includes(p.borde.falla.at(-1).slice(0, 40)));
+  const bloque = r.slice(r.indexOf("## Verificación previa") + 23, r.indexOf("Progreso conmutacion"));
+  assert.ok(Buffer.byteLength(bloque.trim()) <= 1200, String(Buffer.byteLength(bloque)));
+  assert.match(bloque, /RESUMEN DEL RESEARCHER/);
+  assert.match(bloque, /\[\[cursos\/redes\/notas\/verificaciones\/retardos\.md\]\]/);
+  assert.ok(!bloque.includes("EXTENSION AJENA"));
+  assert.doesNotThrow(() => JSON.parse(bloque.trim().split("\n").at(-1)));
+  assert.ok(r.indexOf("## Verificación previa") < r.indexOf("Progreso conmutacion (prerequisito)"));
 });
