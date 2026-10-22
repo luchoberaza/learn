@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import argparse
 from copy import deepcopy
-from datetime import date, datetime, timezone
+from datetime import date, datetime
 import hashlib
 import json
 from pathlib import Path
@@ -157,14 +157,14 @@ def validar_datos(datos, tema, ctx):
             cadena(s)
     if set(datos["borde"]["domina"]) & set(datos["borde"]["falla"]):
         raise ValueError("Un mismo concepto no puede dominarse y fallar en el mismo registro.")
-    hoy = datetime.now(timezone.utc).date()
+    hoy = datetime.now().date()
     for e in datos["errores_de_concepto"]:
-        if not isinstance(e, dict) or set(e) != {"descripcion", "detectado", "resuelto"}:
+        if not isinstance(e, dict) or set(e) - {"descripcion", "detectado", "resuelto"} or not {"descripcion", "resuelto"} <= set(e):
             raise ValueError("Error de concepto fuera del esquema.")
         cadena(e["descripcion"])
     ejercicios, avisos = [], []
     for e in datos["ejercicios"]:
-        if not isinstance(e, dict) or set(e) - {"doc", "item", "fecha", "resultado", "puntaje", "notas"} or not {"doc", "item", "fecha", "resultado"} <= set(e):
+        if not isinstance(e, dict) or set(e) - {"doc", "item", "fecha", "resultado", "puntaje", "notas"} or not {"doc", "item", "resultado"} <= set(e):
             raise ValueError("Ejercicio fuera del esquema.")
         cadena(e["item"])
         e = deepcopy(e)
@@ -182,11 +182,12 @@ def validar_datos(datos, tema, ctx):
         else:
             e["item"] = base[0]
         ejercicios.append(e)
-    for f in [e.get("detectado") for e in datos["errores_de_concepto"]] + [e.get("fecha") for e in datos["ejercicios"]]:
-        if not isinstance(f, str) or not re.fullmatch(r"\d{4}-\d{2}-\d{2}", f) or date.fromisoformat(f) > hoy:
-            raise ValueError("Fecha de evidencia inválida o futura.")
     t = {k: deepcopy(v) for k, v in datos.items() if k != "resumen"}
     t.update(ejercicios=ejercicios, actualizado=hoy.isoformat())
+    for e, campo in [(e, "detectado") for e in t["errores_de_concepto"]] + [(e, "fecha") for e in t["ejercicios"]]:
+        f = e.setdefault(campo, hoy.isoformat())
+        if not isinstance(f, str) or not re.fullmatch(r"\d{4}-\d{2}-\d{2}", f) or date.fromisoformat(f) > hoy:
+            raise ValueError("Fecha de evidencia inválida o futura.")
     comprobar({"version": 1, "temas": {tema: t}, "historial": []}, ctx)
     return t, avisos
 

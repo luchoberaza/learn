@@ -37,8 +37,8 @@ export default function (pi: ExtensionAPI) {
     parameters: Type.Object({
       estado: Type.Union([Type.Literal("sin_empezar"), Type.Literal("en_curso"), Type.Literal("dominado"), Type.Literal("repasar")]),
       borde: Type.Object({ domina: listaProgreso, falla: listaProgreso }), conceptos_firmes: listaProgreso,
-      errores_de_concepto: Type.Array(Type.Object({ descripcion: textoProgreso, detectado: fecha, resuelto: Type.Boolean() }), { maxItems: 100 }),
-      ejercicios: Type.Array(Type.Object({ doc: slug, item: Type.String({ minLength: 1, maxLength: 2000, description: "id tal como lo muestra leer_items; el inciso va en notas" }), fecha,
+      errores_de_concepto: Type.Array(Type.Object({ descripcion: textoProgreso, detectado: Type.Optional(fecha), resuelto: Type.Boolean() }), { maxItems: 100 }),
+      ejercicios: Type.Array(Type.Object({ doc: slug, item: Type.String({ minLength: 1, maxLength: 2000, description: "id tal como lo muestra leer_items; el inciso va en notas" }), fecha: Type.Optional(fecha),
         resultado: Type.Union([Type.Literal("correcto"), Type.Literal("parcial"), Type.Literal("incorrecto")]),
         puntaje: Type.Optional(Type.String({ maxLength: 200 })), notas: Type.Optional(Type.String({ maxLength: 2000 })) }), { maxItems: 100 }),
       discrepancias: listaProgreso, proximo_paso: textoProgreso, resumen: textoProgreso, cierre: Type.Optional(Type.Boolean()),

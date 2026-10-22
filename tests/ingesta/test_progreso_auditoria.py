@@ -1,4 +1,5 @@
 """Regresiones de la auditoría de progreso, con datos sintéticos y sin modelos."""
+from datetime import datetime, timezone
 import fcntl
 import json
 import os
@@ -8,7 +9,7 @@ import sys
 import threading
 import time
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import yaml
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'scripts/ingesta'))
@@ -118,6 +119,23 @@ class ProgresoAuditoriaTest(unittest.TestCase):
         self.assertIn('libro', ' '.join(r['avisos']))
         self.assertEqual(self.tema()['borde']['domina'], ['derivar un polinomio'])
         self.assertFalse([a for a in leer(self.vault, 'ejemplo')['avisos'] if 'huérfano' in a])
+
+    def test_h53_fechas_locales_y_completadas_por_el_backend(self):
+        # 22:30 en Montevideo es 01:30 UTC del día siguiente.
+        instante = datetime(2026, 10, 23, 1, 30, tzinfo=timezone.utc).timestamp()
+        reloj = Mock(wraps=datetime)
+        reloj.now = lambda tz=None: datetime.fromtimestamp(instante, tz)
+        datos = {**self.datos, 'errores_de_concepto': [{'descripcion': 'confunde la interna', 'resuelto': False}], 'ejercicios': [{'doc': 'practico', 'item': '1', 'resultado': 'correcto'}]}
+        try:
+            with patch.dict(os.environ, {'TZ': 'America/Montevideo'}), patch('progreso.datetime', reloj):
+                time.tzset()
+                self.guardar(datos)
+        finally:
+            time.tzset()
+        t = self.tema()
+        self.assertEqual(str(t['actualizado']), '2026-10-22')
+        self.assertEqual(str(t['errores_de_concepto'][-1]['detectado']), '2026-10-22')
+        self.assertEqual(str(t['ejercicios'][-1]['fecha']), '2026-10-22')
 
 
 class SesionAuditoriaTest(unittest.TestCase):
