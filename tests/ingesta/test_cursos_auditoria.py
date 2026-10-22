@@ -7,11 +7,14 @@ import sys
 import unittest
 from unittest.mock import patch
 
+import yaml
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts/ingesta"))
 from almacen import Conflicto, sha256
 import test_cursos
 from test_ingesta import crear_pdf
-from cursos import revisar
+import test_vision
+from test_vision import TEXTO
+from cursos import revisar, validar
 
 
 def cortar(entrada, salida):
@@ -81,6 +84,49 @@ class CursosAuditoriaTest(unittest.TestCase):
         pdf.write_bytes(b"%PDF cortado")
         with self.assertRaisesRegex(OSError, "sin indice.yaml"):
             revisar(self.vault, "ejemplo", self.propuesta)
+
+    def evaluacion(self, items, refs):
+        if not self.raiz.exists():
+            self.crear()
+        i = copy.deepcopy(self.indice)
+        i["documentos"][0].update(tipo="evaluaciones", archivo="fuentes/evaluaciones/libro.pdf")
+        i["documentos"][0].pop("prioridad")
+        destino = self.raiz / "fuentes/evaluaciones/libro.pdf"
+        destino.parent.mkdir(exist_ok=True)
+        destino.write_bytes(self.fuente.read_bytes())
+        i["temas"][0].update(bibliografia=[], evaluaciones=[{"doc": "libro", "items": refs}])
+        carpeta = self.raiz / "_procesado/libro"
+        carpeta.mkdir(parents=True, exist_ok=True)
+        (carpeta / "items.yaml").write_text(yaml.safe_dump({"doc": "libro", "items": items}))
+        return self.guardar_indice(i)
+
+    def test_h18_validar_acepta_la_solucion_integrada_sin_documento_de_soluciones(self):
+        enunciado = {"id": "5", "paginas": [1], "enunciado": "¿Cuántos paquetes transmite A?"}
+        solucion = {"id": "5-solucion", "paginas": [1], "enunciado": "Son 16 paquetes.", "solucion_de": "5"}
+        r = self.evaluacion([enunciado, solucion], ["5"])
+        self.assertEqual(r["errores"], [])
+        self.assertEqual(r["items_sin_asignar"], [])
+        self.assertIn("es una solución", " ".join(self.evaluacion([enunciado, solucion], ["5-solucion"])["errores"]))
+        for malos in [[enunciado, {**solucion, "solucion_de": "9"}], [{**enunciado, "solucion_de": "5-solucion"}, solucion],
+                      [enunciado, {**solucion, "solucion_de": ["5"]}]]:
+            with self.subTest(items=malos):
+                self.assertIn("Solución integrada inválida", " ".join(self.evaluacion(malos, ["5"])["errores"]))
+
+
+class VisionAuditoriaTest(unittest.TestCase):
+    setUp, tearDown = test_vision.VisionTest.setUp, test_vision.VisionTest.tearDown
+    preparar, guardar, items, q = test_vision.VisionTest.preparar, test_vision.VisionTest.guardar, test_vision.VisionTest.items, test_vision.VisionTest.q
+
+    def test_h18_guardar_items_acepta_solucion_del_mismo_documento_sin_ciclos(self):
+        self.guardar()
+        enunciado = {"id": "5", "paginas": [1], "enunciado": TEXTO}
+        solucion = {"id": "5-solucion", "paginas": [1], "enunciado": "Son 16 paquetes.", "solucion_de": "5"}
+        self.assertEqual(self.items([enunciado, solucion])["ids"], ["5", "5-solucion"])
+        self.assertEqual(yaml.safe_load((self.raiz / "practico/items.yaml").read_text())["items"][1]["solucion_de"], "5")
+        for malos in [[enunciado, {**solucion, "solucion_de": "9"}], [enunciado, {**solucion, "solucion_de": "5-solucion"}],
+                      [{**enunciado, "solucion_de": "5-solucion"}, solucion], [enunciado, {**solucion, "solucion_de": ["5"]}]]:
+            with self.subTest(items=malos), self.assertRaisesRegex(ValueError, "solucion_de"):
+                self.items(malos)
 
 
 if __name__ == "__main__":

@@ -160,7 +160,7 @@ def guardar_items(raiz: Path, vault: Path, datos: dict) -> dict:
         raise ValueError("Se necesita al menos un ítem segmentado por el agente.")
     ids, hashes = set(), {}
     for item in items:
-        if not isinstance(item, dict) or set(item) - {"id", "paginas", "enunciado", "solucion"}:
+        if not isinstance(item, dict) or set(item) - {"id", "paginas", "enunciado", "solucion", "solucion_de"}:
             raise ValueError("Formato de ítem inválido.")
         identificador, paginas = item.get("id"), item.get("paginas")
         if not isinstance(identificador, str) or not identificador.strip() or len(identificador) > 80 or re.search(r"[\x00-\x1f\x7f]", identificador) or identificador in ids:
@@ -189,6 +189,11 @@ def guardar_items(raiz: Path, vault: Path, datos: dict) -> dict:
                 raise ValueError("El archivo de ítems de soluciones no tiene el formato esperado.")
             if smeta["tipo"] != "soluciones" or not any(isinstance(i, dict) and i.get("id") == solucion["id"] for i in vinculados.get("items", [])):
                 raise ValueError("La solución referida no existe en el documento de soluciones.")
+    por_id = {i["id"]: i for i in items}
+    for item in items:
+        enunciado = por_id.get(item["solucion_de"]) if isinstance(item.get("solucion_de"), str) else None
+        if "solucion_de" in item and (enunciado is None or "solucion_de" in enunciado):
+            raise ValueError(f"{item['id']}: solucion_de debe nombrar un enunciado de este mismo documento (sin cadenas ni ciclos).")
     nombre = f"{doc}/items.yaml"
     destino = ruta_segura(raiz, nombre)
     registro = leer_json(raiz, f"{doc}/items-registro.json")

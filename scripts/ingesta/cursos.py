@@ -121,6 +121,10 @@ def validar(raiz: Path, slug: str, *, indice=None, contrato=None, origenes=None,
                     if not isinstance(item.get("enunciado"), str) or not item["enunciado"].strip() or not isinstance(item.get("paginas"), list) or not item["paginas"] or any(type(p) is not int or not 1 <= p <= d["paginas"] for p in item["paginas"]):
                         raise ValueError(f"Enunciado o páginas inválidos en {d['id']}/{item['id']}.")
                     items[d["id"]][item["id"]] = item
+                for item in items[d["id"]].values():
+                    enunciado = items[d["id"]].get(item["solucion_de"]) if isinstance(item.get("solucion_de"), str) else None
+                    if "solucion_de" in item and (enunciado is None or "solucion_de" in enunciado):
+                        errores.append(f"Solución integrada inválida: {d['id']}/{item['id']} (solucion_de debe nombrar un enunciado del mismo documento).")
         for d in documentos.values():
             if "soluciones" in d and documentos.get(d["soluciones"], {}).get("tipo") != "soluciones":
                 errores.append(f"{d['id']}: documento de soluciones inexistente o de otro tipo.")
@@ -178,6 +182,8 @@ def validar(raiz: Path, slug: str, *, indice=None, contrato=None, origenes=None,
                         for i in ids:
                             if i not in items.get(doc, {}):
                                 errores.append(f"Tema {t['id']}: ítem inexistente {doc}/{i}.")
+                            elif "solucion_de" in items[doc][i]:
+                                errores.append(f"Tema {t['id']}: {doc}/{i} es una solución; referenciá su enunciado.")
                             else:
                                 usados.add((doc, i))
                                 revisar_paginas(doc, items[doc][i]["paginas"])
@@ -208,7 +214,7 @@ def validar(raiz: Path, slug: str, *, indice=None, contrato=None, origenes=None,
                 solucion = item.get("solucion")
                 if solucion is not None and (not isinstance(solucion, dict) or documentos.get(solucion.get("doc"), {}).get("tipo") != "soluciones" or solucion.get("id") not in items.get(solucion.get("doc"), {})):
                     errores.append(f"Solución inexistente o inválida: {doc}/{identificador}.")
-        sin_asignar = [{"doc": d, "id": i} for d, banco in items.items() for i in banco if (d, i) not in usados]
+        sin_asignar = [{"doc": d, "id": i} for d, banco in items.items() for i in banco if (d, i) not in usados and "solucion_de" not in banco[i]]
         resultado["items_sin_asignar"] = sin_asignar
         for d in documentos.values():
             if d["tipo"] in {"ejercicios", "evaluaciones", "soluciones"} and d["id"] not in items:
