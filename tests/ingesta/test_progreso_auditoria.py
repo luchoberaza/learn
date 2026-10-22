@@ -195,6 +195,18 @@ class ProgresoAuditoriaTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.guardar(reconstruido=True, huella_log='0' * 64)
 
+    def test_x01_disco_lleno_da_una_linea_en_espanol_y_conserva_el_progreso(self):
+        antes = (self.raiz / 'progreso.yaml').read_bytes()
+        codigo = ("import errno, runpy, sys; from unittest.mock import patch\n"
+                  "sys.path.insert(0, sys.argv[1].rsplit('/', 1)[0]); sys.argv = [sys.argv[1], 'registrar']\n"
+                  "with patch('os.fsync', side_effect=OSError(errno.ENOSPC, 'No space left on device')):\n"
+                  "    runpy.run_path(sys.argv[0], run_name='__main__')")
+        entrada = json.dumps({'vault': str(self.vault), 'curso': 'ejemplo', 'tema': 'derivacion', 'log': self.log, 'datos': self.datos})
+        r = subprocess.run([sys.executable, '-c', codigo, str(SCRIPT)], input=entrada, capture_output=True, text=True, timeout=30)
+        self.assertEqual((r.returncode, r.stderr), (1, 'Disco lleno: no se guardó el progreso; liberá espacio y repetí /fin.\n'))
+        self.assertEqual((self.raiz / 'progreso.yaml').read_bytes(), antes)
+        self.assertFalse(list(self.raiz.glob('.ingesta-*')))
+
 
 class SesionAuditoriaTest(unittest.TestCase):
     def setUp(self):

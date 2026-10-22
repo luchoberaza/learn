@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 from copy import deepcopy
 from datetime import date, datetime
+import errno
 import hashlib
 import json
 from pathlib import Path
@@ -283,5 +284,6 @@ if __name__ == "__main__":
     try:
         main()
     except (OSError, ValueError, TypeError, KeyError, RuntimeError, RecursionError) as e:
-        print(f"Progreso no guardado: {e}", file=sys.stderr)
+        lleno = isinstance(e, OSError) and e.errno == errno.ENOSPC
+        print("Disco lleno: no se guardó el progreso; liberá espacio y repetí /fin." if lleno else f"Progreso no guardado: {e}", file=sys.stderr)
         raise SystemExit(1)
