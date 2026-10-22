@@ -40,7 +40,7 @@ export function registrarSesion(pi: ExtensionAPI, vault = vaultDir, recursos = p
   let datos: DatosCurso | undefined;
   let resumen = "", teach = "", modo = "", pendiente: string | undefined, sinLog = false, religar = false, herramientas: string[] | undefined;
   const activarEstudio = () => { const todas = new Set(pi.getAllTools().map(t => t.name)); pi.setActiveTools(ESTUDIO.filter(n => todas.has(n))); };
-  const cursos = () => readdirSync(rutaSegura(vault, "cursos"), { withFileTypes: true }).filter(d => d.isDirectory() && esSlug(d.name)).map(d => d.name);
+  const cursos = () => { const dir = rutaSegura(vault, "cursos"); return statSync(dir, { throwIfNoEntry: false }) ? readdirSync(dir, { withFileTypes: true }).filter(d => d.isDirectory() && esSlug(d.name)).map(d => d.name) : []; };
   const raiz = (curso: string) => {
     if (!esSlug(curso)) throw new Error("Curso inválido: usá su slug.");
     return rutaSegura(vault, `cursos/${curso}`);

@@ -444,3 +444,9 @@ test("H44: una tool que se registra tarde (reanudar sin el registro de pi, web, 
   e.eventos.get("before_agent_start")({ systemPromptOptions: { sections: {}, skills: [] } }, e.ctx);
   assert.deepEqual(e.activas, estudio);
 });
+test("H71: sin cursos/ todavía, /estudiar remite a /curso-nuevo en vez de un errno", async t => {
+  const e = entorno(t);
+  rmSync(join(e.vault, "cursos"), { recursive: true });
+  await e.estudiar("redes retardos");
+  assert.deepEqual(e.avisos.at(-1), ["warning", "No hay cursos preparados; usá /curso-nuevo."]);
+});
