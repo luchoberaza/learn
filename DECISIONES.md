@@ -281,6 +281,8 @@ El hijo recibe contrato completo, afirmaciones A1–A3, rutas/citas de transcrip
 
 Los primeros ensayos detectaron dos etiquetas falsas de «concuerda» pese a una explicación correcta. No se relajó el test para aceptarlas: se aclaró el veredicto literal con ejemplo y se controlaron dos afirmaciones falsas y una verdadera. También se añadieron los enunciados y el contrato completo al descubrir contexto omitido por el hijo. El ensayo final etiquetó correctamente los tres casos; eso no mide una tasa de fiabilidad ni certifica otras atribuciones, URLs o lecturas. Revisión humana sigue pendiente.
 
+*Superada en parte por DA12: el hijo recibe el contrato sin los objetivos de otros temas.*
+
 ## D6.3 — Caché inmutable y correlación por rama
 
 La huella incorpora tema, contrato, enunciados, configuración/modelo, prompt del agente, índice, metadatos/calidad y transcripciones utilizadas. No incorpora progreso: aprender algo no invalida la investigación. Cabecera de control y hash del cuerpo distinguen una publicación íntegra de una nota editada/incompleta. Publicación mediante temporal privado, fsync y hardlink exclusivo, sin sobrescribir. Primera salida <tema>.md; nuevas fuentes/prompts producen <tema>-<huella>.md. El dossier enlaza la generación vigente, fecha/modelo y un extracto acotado como datos externos, no instrucciones. Se preservan notas manuales y generaciones anteriores, sin limpieza automática.
@@ -480,7 +482,7 @@ node --test .pi/tests/*.test.mjs
 ### DA20 — md-log sigue la nota por inode y la clase no depende de ella
 
 - **Contexto:** renombrar o mover la nota en Obsidian hacía fallar el progreso y `/fin` (H04); si md-log no confirmaba o faltaba disco no había clase y quedaba un .md vacío (H16); una foto HEIC o BMP no se procesaba (H70).
-- **Decisión:** cada vínculo de md-log guarda `ino`, `dev` y nacimiento de la nota, y la sigue por inode dentro del vault si se renombra o mueve (evento `md-log:movido`); si se borra, la recrea en su ruta con un aviso. Si md-log no confirma en 2 s, o falta permiso o disco, la clase sigue sin nota y con un aviso, y ese nombre de log no se reutiliza. El formato de una foto sale de su firma; HEIC pasa a JPEG y BMP a PNG con ImageMagick (`magick`), dependencia opcional; sin él, la nota avisa en una línea.
+- **Decisión:** cada vínculo de md-log guarda `ino`, `dev` y nacimiento de la nota, y la sigue por inode dentro del vault si se renombra o mueve (evento `md-log:movido`); si se borra, la recrea en su ruta con un aviso. Si md-log no confirma en 2 s, o falta permiso o disco, la clase sigue sin nota y con un aviso, y ese nombre de log no se reutiliza. El formato de una foto sale de su firma; HEIC pasa a JPEG y BMP a PNG con ImageMagick (`magick`), dependencia opcional; sin él, pi avisa en una línea que la manden en JPEG o PNG y la nota marca «Imagen N no guardada».
 - **Por qué:** la nota es un registro para el alumno, no un requisito de la clase.
 - **Verifica:** `md-log-auditoria.test.mjs`: «H04: renombrar la nota en Obsidian no pierde entradas, no avisa y /fin la cierra», «H04: una nota movida a otra carpeta del vault se encuentra por inode; una ajena con el mismo nombre no», «H04: si la nota se borró, se recrea en su ruta con un solo aviso», «H70: la firma decide el formato: HEIC y BMP por ruta se convierten y un PNG con extensión .jpg se guarda como .png». `sesion-auditoria.test.mjs`: «H16: si md-log no confirma o sesiones/ no se puede escribir, la clase sigue sin nota y sin .md vacío».
 
