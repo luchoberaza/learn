@@ -18,7 +18,9 @@
 
 **Fase 7 aprobada:** «Aprobado, continuá», commit `29cdb0c`. progreso validado/fusionado/atómico con `.bak`, `/fin`, `/progreso`, reconstrucción confirmada y sugerencia. 83 tests Node / 67 Python, doctor completo en verde. Dos sesiones con Sol y alumno virtual aislado: segundo probe confirma el borde en tres preguntas. Sin progreso ficticio en Redes. El usuario autorizó «Usar openai-codex» al faltar credenciales para el proveedor anterior; se verificaron Sol/Luna texto y Luna imagen antes de cambiar sólo configuración local del proyecto. Detalle: `informes/fase7.md`.
 
-**Fase 8 autorizada y en preparación:** se creó `../fricciones.md` para registrar 3–5 sesiones reales y priorizar/reprobar sus tres trabas principales. Todavía hay 0 sesiones reales del piloto registradas; el alumno virtual no cuenta. Doctor completo volvió a verde; plan, teach y progreso de Redes intactos. Sin cambios de código ni traducción opcional de UI anticipada. Se espera uso real antes de arreglos y del único commit/checkpoint de cierre de esta fase.
+**Fase 8 autorizada, piloto en curso:** `../fricciones.md` registra 3–5 sesiones reales para priorizar y reprobar sus tres trabas principales. Todavía tiene 0 sesiones del piloto; el alumno virtual no cuenta. El commit/checkpoint de cierre de esta fase sigue pendiente.
+
+**Auditoría de robustez (2026-10-22):** `../AUDITORIA.md` midió sesiones reales, una ingesta y arneses sin modelo sobre copias del vault; los P0 y P1 se arreglan y los P2 sólo se reportan. Con las decisiones del usuario (DA1–DA7) se integraron en la rama `cursos`, hasta `e95f723`, dos etapas de arreglos: entorno, ingesta, cursos, progreso, quiz, researcher, sesión, presentación y preparación por tema (DA8–DA26). La etapa de pedagogía (DA7) todavía no está integrada. Sobre ese código, sin modelo ni red: 204 tests Node en verde (incluyen la suite Python) y 132 tests Python OK; `doctor --sin-red`, en una copia del vault y fuera de tmux, sólo marca «Dentro de tmux», las rutas del vault (por la copia) y los cuatro chequeos que `--sin-red` omite.
 
 ## D0.1 — Conservar el upstream y fijar los subagentes
 
@@ -29,6 +31,8 @@
 - No se modificaron `skills/teach/SKILL.md`, quiz, ask-user-question, visual-tools ni md-log. El researcher solo recibió el modelo acordado y una instrucción de salida en español. Los modos anclados al curso quedan para Fase 6.
 - Los checkouts y node_modules no se versionan. Sí se versionan las declaraciones, lockfiles, configuraciones e instalador idempotente.
 
+*Superada en parte por DA12 y DA21: el researcher del curso ya no es un subagente, y quiz y ask_user_question se tradujeron y cambiaron de forma. `skills/teach/SKILL.md` sigue intacto.*
+
 ## D0.2 — La instalación de pi manda
 
 Se verificó pi `1.3.0` contra sus documentos instalados: README, extensiones, paquetes, CLI, configuración, SDK, modelos, TUI y seguridad; se consultaron ejemplos SDK 02/06 y hello, y las declaraciones exportadas.
@@ -37,6 +41,8 @@ Se verificó pi `1.3.0` contra sus documentos instalados: README, extensiones, p
 - Prueba real: las extensiones originales, los subagentes y la web cargan sin errores ni warnings.
 - El SDK usa `ModelRuntime.getModel/completeSimple`; la fachada `ctx.modelRegistry` tiene `find/streamSimple` y no los mismos nombres. El doctor usa `session.modelRuntime`, verificado en las declaraciones instaladas. No confundir ambas superficies en fases posteriores.
 - Los tests y el doctor usan sesiones en memoria y carga con confianza solo para ese proceso; no guardan aprobaciones ni prompts de prueba en las sesiones del usuario.
+
+*Superada en parte por D6.1: la versión verificada y fijada es pi 1.4.0.*
 
 ## D0.3 — Web sin cuentas nuevas: pi-web-access
 
@@ -55,6 +61,8 @@ Los hijos de `pi-interactive-subagents` arrancan con `--no-extensions`. Su códi
 
 `safe_bash` sí está incluido en los subagentes. No necesita una tercera extensión.
 
+*Superada en parte por DA12: el researcher del curso no pasa por pi-interactive-subagents, el puente ni `safe_bash`; carga pi-web-access directo y usa `web_search, web_fetch, read`. El puente queda para los subagentes fuera del curso.*
+
 Comprobación real: la consulta «regla de la cadena derivada universidad» devolvió con Exa fuentes de UNAM y OpenStax; `web_fetch` leyó una página completa. Para el smoke de lectura se usa una página de Wikipedia con contenido suficiente: `example.com` activaba la heurística de contenido incompleto de este extractor, no un fallo de conexión.
 
 No se prometen cuotas ilimitadas ni disponibilidad garantizada de los endpoints sin clave. No se añadieron claves. Las variables de API que se agreguen en el futuro podrían activar créditos de esos proveedores; revisar antes de hacerlo.
@@ -71,6 +79,8 @@ El usuario eligió después **`openai/gpt-6-luna` para ambos roles**. Se actuali
 
 El modelo principal del proyecto se fijó a `openai/gpt-6.1-sol`, para que abrir pi no dependa del predeterminado global `gpt-5.5` que esta cuenta rechaza. No se modificó el predeterminado global.
 
+*Superada en parte por D7.4: el proveedor de los tres roles es `openai-codex`.*
+
 ## D0.5 — Función fish, no alias textual ni tmux anidado
 
 Pedido del usuario: `pi-learn` abre pi en la carpeta actual con tmux configurado.
@@ -83,6 +93,8 @@ Pedido del usuario: `pi-learn` abre pi en la carpeta actual con tmux configurado
 - El arranque fish existente inicializa conda. Se deja un margen conservador de 2500 ms para los hijos, usando la variable documentada `PI_SUBAGENT_SHELL_READY_DELAY_MS`; se respeta un valor ya configurado.
 
 Pruebas: sintaxis, ramas dentro/fuera de tmux y argumentos mediante stubs; además `pi-learn --version` ejecutado bajo un pseudoterminal real abrió tmux, imprimió `1.3.0` y salió correctamente. La interacción de Ctrl+V requiere una imagen real del portapapeles del usuario: no se reemplazó ni se leyó ese portapapeles durante la instalación.
+
+*Superada en parte por DA3 y DA8: una sesión de tmux por carpeta con `new-session -A` y `destroy-unattached`, pi con `-ns --skill .pi/skills`, y 300 ms para el shell de los subagentes, que ya no incluyen al researcher del curso.*
 
 ## D0.6 — Archivos del usuario y Obsidian
 
@@ -100,6 +112,8 @@ Se creó `prueba-base.md` vacío para el checkpoint. El md-log original puede re
 - Prueba del usuario revisada en `prueba-base.md`: preguntas, quiz, log e imagen verificados dentro de tmux; no avanzó más allá del probe. Panel real del researcher, web y entrega al padre verificados por separado con `scripts/probar-researcher` (usa LLM). No se afirma que se haya completado la lección ni que cargar un plugin pruebe su flujo completo.
 - Ingesta, motor OCR, validación de cursos y fotos en logs: diferidos explícitamente a sus fases. No hay benchmark ni elección de motor por anticipado.
 - Los textos técnicos originales de los popups de quiz/ask/md-log siguen sin traducirse, conservando la base original para la prueba inicial. La prosa generada se pide en español; la traducción de UI es opcional en el piloto según el plan.
+
+*Superada en parte por DA21: los popups de quiz y ask_user_question están en español.*
 
 ## D1.1 — Base liviana; ensayos fuera del uso diario
 
@@ -131,6 +145,8 @@ Entorno diario: 266 MiB, aparte de Tesseract/Ghostscript existentes. Los entorno
 
 La base usa Python `3.13.13`, PyMuPDF `1.28.2`, OCRmyPDF `17.13.0`, wordfreq `3.1.1`. Tesseract `5.5.2` proviene de Conda, no del paquete `5.5.3` del sistema; se documentan la ruta y el build exacto. No se instalaron paquetes de sistema. Docling necesitó OpenCV explícito en su entorno de ensayo; no se parcheó upstream. Se usaron cuatro hilos CPU, sin suponer utilizable la GPU visible.
 
+*Superada en parte por DA4: el venv usa ahora el Python 3.13.13 de uv. Tesseract sigue siendo el de Conda, fijado con `ruta_tesseract` (DA22).*
+
 La referencia de tres páginas usó `openai/gpt-6-luna`, con `session.modelRuntime.getModel/completeSimple` verificados contra pi `1.3.0`, igual que el doctor; no se intercambió con la fachada de extensiones. No se repitieron llamadas ni se implementó anticipadamente la tool E. Los costos de catálogo registrados no son una factura.
 
 Los informes visibles están en `informes/fase1/` del vault porque `_procesado` está excluido de Obsidian. Se publican copias nuevas, sin sobrescribir notas existentes. No se creó un curso ni se mezcló GRIMALDI con Redes.
@@ -147,11 +163,15 @@ El modelo se toma de `curso.config.json`, sin fallback ni reintentos automático
 
 `revision_humana: pendiente` se conserva incluso con puntaje alto. La calidad automática no certifica la semántica ni la fidelidad de las tablas. Se reconstruyen índice e informe por página para mantener la consistencia; agrupar esas escrituras queda diferido hasta medir un problema en cursos grandes.
 
+*Superada en parte por DA2 y DA24: la preparación por tema transcribe sin pedir confirmación (tope de 150 páginas por corrida), y un error ya no degrada una página que era buena: la marca `error_vision` para reintentar.*
+
 ## D2.2 — Ítems elegidos por el agente, no por otro pipeline LLM
 
 `guardar_items` es una tool de persistencia para la preparación. No segmenta ni inventa por su cuenta: recibe los ítems que el agente identificó al leer las páginas. Guarda ids originales, páginas, enunciado y solución opcional `{doc, id}` en `items.yaml`, con hashes de fuente/páginas y revisión humana pendiente. Valida duplicados, rangos, visión previa y referencias existentes; preserva YAML con cambios manuales. No devuelve los enunciados ni las soluciones completas.
 
 PyYAML `6.0.3` vuelve a ser dependencia directa **ahora que tiene uso real**: serialización/lectura segura de `items.yaml`. No se instaló ningún paquete del sistema ni se añadieron dependencias de ML.
+
+*Superada por DA2 y DA13: la preparación por tema segmenta con `modelo_vision`, y un ítem admite además `solucion_de` (solución del mismo documento) y `puntos`. `guardar_items` sigue para preparar un documento a mano.*
 
 ## D2.3 — Piloto sin curso ficticio y checkpoint aceptado
 
@@ -175,17 +195,21 @@ En pi instalado 1.3.0, las skills se invocan como `/skill:nombre`; no se vuelven
 
 ## D3.2 — Propuesta explícita y protección de curación manual
 
-`guardar_curso` recibe la ruta de un JSON de propuesta dentro de `_procesado/`. El contrato y el YAML son textos, para conservar comentarios y cambios manuales al construir el diff, no una reserialización automática del índice anterior. El código valida documentos/temas, copia solamente PDFs nuevos desde `_entrada/` y verifica SHA-256. No permite eliminar documentos/temas, reclasificar o renombrar las fuentes existentes ni escribir progreso existente. La creación inicializa únicamente `version: 1, temas: {}, historial: []` por código.
+`guardar_curso` recibe la ruta de un JSON de propuesta dentro de `_procesado/` de la raíz del vault (nunca en `cursos/<slug>/_procesado/`). El contrato y el YAML son textos, para conservar comentarios y cambios manuales al construir el diff, no una reserialización automática del índice anterior. El código valida documentos/temas, copia solamente PDFs nuevos desde `_entrada/` y verifica SHA-256. No permite eliminar documentos/temas, reclasificar o renombrar las fuentes existentes ni escribir progreso existente. La creación inicializa únicamente `version: 1, temas: {}, historial: []` por código.
 
 Para un curso ya existente se muestra el diff y se requiere `ctx.ui.confirm`; sin UI se rechaza y no hay argumento de autoaprobación. Se comparan huellas de propuesta e índice/contrato/progreso al aplicar, y otra vez después de las copias para detectar una edición durante ellas. Los rechazos conservan los textos actuales. Una falla de disco puede dejar una carpeta/copia nueva incompleta: se conserva para intervención, sin borrar ni pisar material para simular reanudación. La ingesta de páginas reutiliza la reanudación existente. El CLI local expone la operación interna para el usuario con permisos de edición; no es un atajo para que una skill eluda la confirmación.
 
 El informe visible verifica su hash antes de regenerarlo y publica un registro recuperable antes del Markdown, siguiendo el patrón de Fase 2. Una edición manual queda preservada.
+
+*Superada en parte por DA23: un `aplicar` cortado ya no deja copias con el nombre final; el curso nuevo se arma en `cursos/.<slug>.nuevo/` y cada PDF se publica con un hard link tras verificar su SHA-256.*
 
 ## D3.3 — Validez estructural no es preparación ni fidelidad
 
 El validador comprueba esquemas de índice/progreso, rutas y symlinks, archivos/páginas, objetivos, ids, ítems, soluciones, hashes de fuentes/transcripciones y ciclos de prerequisitos. YAML con claves duplicadas o alias se rechaza. Se distingue `ok` (sin errores estructurales) de `listo_estudio` (además sin avisos). Páginas referidas sin procesar o pendientes se enumeran como avisos explícitos; referencias a ítems inexistentes sí son errores. El doctor debe detectar una instalación/estructura rota, no fallar artificialmente porque un borrador todavía necesita curación o revisión humana. Imprime sus avisos de preparación sin certificar calidad.
 
 El presupuesto del contrato se avisa mediante estimación bytes UTF-8 / 4; no se agregó un tokenizer ni se presenta esa estimación como un conteo exacto. La escritura/fusión/restauración de progreso sigue reservada a Fase 7; aquí sólo se inicializa el archivo vacío y se lo valida de lectura.
+
+*Sigue vigente: las páginas pendientes y los documentos sin segmentar son avisos, pero ya no esperan una preparación manual (DA1, DA2).*
 
 ## D3.4 — Redes real y checkpoint de revisión pendiente
 
@@ -203,6 +227,8 @@ Se verificaron las docs instaladas de extensiones, TUI, SDK, sesiones, formato d
 
 El autocompletador instalado pasa todos los argumentos previos, y reemplaza ese prefijo completo: devuelve `curso tema`. Su caché se invalida al cambiar el mtime de `indice.yaml`. La resolución por id precede a nombre/alias, aproximación y selector; fuera del índice se ofrece bibliografía BM25 y modo ad hoc, nunca una asociación persistida sin curación.
 
+*Superada en parte por DA14, DA15, DA16 y DA25: durante el estudio no se lista ninguna skill; la restauración también lee `.sesion-activa.json`; el autocompletado usa `.sesion-cargada.json` (no `indice.yaml`) y no sugiere sobre un texto exacto; un subtema que BM25 ubica en el rango de un tema activa ese tema.*
+
 ## D4.2 — Lectura liviana, render local y log sin destrucción
 
 Se reutiliza el parser YAML seguro de Fase 3 mediante un proceso Python asíncrono al activar/restaurar; las lecturas de páginas y búsqueda son TS puro. No se creó un índice paralelo normalizado. Los errores de preparación son avisos y se usa lo identificable. Los retornos de lectura están acotados a 32000 bytes, con citas base 1; las soluciones requieren petición explícita y vínculo real. `ver_pagina` renderiza sin OCR/modelo y usa el mismo formato de caché/1800 px de Fase 2, también para páginas que no fueron seleccionadas en ingesta. Un render cambiado se preserva. No se agregan dependencias ni modelos.
@@ -210,6 +236,8 @@ Se reutiliza el parser YAML seguro de Fase 3 mediante un proceso Python asíncro
 Los logs se crean con apertura exclusiva y sufijos; el vínculo del curso usa `backfill: false`, sin arrastrar programación previa ni reemplazar una nota. El bus instalado emite void y captura errores de listeners: se añade un acuse explícito con timeout para que `/estudiar` no arranque fingiendo que vinculó el log. El comando manual mantiene el relleno de rama, pero exige confirmación para una nota no vacía. Se reemplazó la reescritura de toda la nota al añadir mensajes por append. Un quiz abortado sin detalles no se califica como incorrecto.
 
 La restauración original de md-log usaba `ctx.ui.theme`, que falla en un SDK headless sin tema inicializado. Se comprobó con un error real y se usa estado de texto plano, igual que el vínculo. La regresión prueba restauración con un getter de tema que arroja error. Se conservan la numeración/barajado de los quizzes y la omisión de resultados de lectura/soluciones en el log. Adjuntos de fotos quedan para Fase 5.
+
+*Superada en parte por DA9, DA13 y DA20: antes del intento las tools no muestran soluciones (`ver_pagina` exige `despues_del_intento` en documentos con soluciones), el render tiene su propio lock, y si md-log no confirma la clase sigue sin nota.*
 
 ## D4.3 — Smoke real y aislamiento del harness
 
@@ -227,6 +255,8 @@ Se conserva PNG/JPEG/WebP/GIF, no el `.jpg` incondicional ilustrado en el plan: 
 
 Dentro del vault, embed con ruta desde el vault para evitar ambigüedades entre carpetas; para notas genéricas fuera de cwd se usa el subdirectorio relativo `adjuntos/`. Un mensaje sin texto también se registra. La restauración no reescribe notas ni duplica imágenes. No se agregan dependencias al logger ni un comando de fotos.
 
+*Superada en parte por DA20: el formato sale de la firma del archivo, y HEIC y BMP se convierten con ImageMagick, dependencia opcional.*
+
 ## D5.2 — Manuscrito real externo y alcance del checkpoint
 
 Se buscó autónomamente una foto pública auténtica de un cuaderno (Wikimedia Commons, FlexingCA, CC0); original y procedencia en `_entrada/muestras/externas/fase5/`. No se simuló escritura, no se rasterizó un PDF digital y no se ingesta el material. Es de finanzas, no de Redes: se ensayó aisladamente el protocolo real y la pauta general de justificar de `curso.md`, sin inventar un ítem del curso, rúbrica ni puntaje. El log técnico queda en `informes/fase5/`, no en sesiones/fuentes de Redes.
@@ -243,6 +273,8 @@ No se cambió ni se leyó el contenido del portapapeles personal (sólo tipos di
 
 La preparación silenciosa del modelo llama a la tool antes del probe si falta caché: no es un daemon ni una llamada pesada dentro de /estudiar. Se comprobó el proceso real, no sólo una simulación de schema. Modo ad hoc admite verificar sin inventar un tema/caché de alcance. La tool entrega un resumen inmediato en español y no promete resultados antes de recibirlos.
 
+*Superada por DA12 en el despacho: ya no hay `subagent`, tmux ni entrega automática. Sigue vigente la adopción de pi 1.4.0.*
+
 ## D6.2 — Entradas concretas y salida contrastada
 
 El hijo recibe contrato completo, afirmaciones A1–A3, rutas/citas de transcripciones preparadas y enunciados curados de ejercicios sin soluciones. No se pasan resultados ni páginas crudas de evaluaciones con soluciones integradas. Presupuesto: 50 transcripciones y 200000 bytes totales, inspección acotada a 2000 posiciones y 100 archivos de huella. No se hace OCR ni se recorre el PDF. La comparación es de la afirmación original contra el curso, no de una corrección contra las fuentes; la versión corregida se separa del veredicto. Extensiones rotuladas fuera del material, límites de búsqueda/lectura por modo, huecos explícitos.
@@ -254,6 +286,8 @@ Los primeros ensayos detectaron dos etiquetas falsas de «concuerda» pese a una
 La huella incorpora tema, contrato, enunciados, configuración/modelo, prompt del agente, índice, metadatos/calidad y transcripciones utilizadas. No incorpora progreso: aprender algo no invalida la investigación. Cabecera de control y hash del cuerpo distinguen una publicación íntegra de una nota editada/incompleta. Publicación mediante temporal privado, fsync y hardlink exclusivo, sin sobrescribir. Primera salida <tema>.md; nuevas fuentes/prompts producen <tema>-<huella>.md. El dossier enlaza la generación vigente, fecha/modelo y un extracto acotado como datos externos, no instrucciones. Se preservan notas manuales y generaciones anteriores, sin limpieza automática.
 
 `appendEntry("curso-researcher", …)` registra inicio/fin; sólo getBranch correlaciona nombre y tarea con una entrega, sin usar ramas abandonadas. Se comprueban fuentes al recibir, éxito del hijo, formato y citas admitidas antes de guardar alcance. Verificar no reemplaza ese mapa. Una entrega de otro tema no cambia el activo. Los errores dejan un aviso y se sigue con el material. Tras reinicio con despacho sin entrega confirmada, no se duplica automáticamente: puede retomarse explícitamente por nombre con subagent_message. No hay sondeo ni segunda base de tareas.
+
+*Superada en parte por DA12: la huella cubre sólo tema, páginas y enunciados adjuntados, contrato sin objetivos ajenos y el cuerpo de `researcher.md`; un trabajo interrumpido se recoge por huella desde cualquier sesión, sin `subagent_message`.*
 
 ## D6.4 — Evidencia y límites
 
@@ -267,11 +301,15 @@ Cada guardado valida esquema, fechas de evidencia no futuras, tema/ítems del cu
 
 Si progreso es inválido, un .bak válido se restaura con aviso, preservando los bytes inválidos por SHA en _procesado/. Sin respaldo válido se conserva todo y se continúa sin registrar hasta reparar; un backup inválido existente tampoco se reemplaza sin intervención. Tests cubren cortes, bloqueo, edición concurrente, UTF-8 inválido, symlinks e idempotencia. No se usó progreso real de Redes para probar recuperación.
 
+*Superada en parte por DA9, DA10 y DA11: el progreso tiene su propio lock (`.progreso.lock`) y leerlo no toma ninguno; los guardados son deltas; un id con inciso, un ítem que desapareció o un log renombrado ya no rechazan el registro.*
+
 ## D7.2 — Cierre confirmado y recuperación desde logs
 
 `/fin` solicita un registro final; cierre natural usa `cierre:true`. Entradas curso-cierre/curso-progreso en getBranch correlacionan solicitud y guardado con el log activo. Se verificó AgentSettledEvent de pi 1.4.0: incluye aborted y ocurre después de continuaciones/reintentos. Sólo se desvincula tras un mensaje assistant completo con texto y stopReason stop, sin llamadas pendientes; Escape/error no cierra. La regresión inicial falló al cerrar sin mensaje final y quedó verde con esta condición. md-log serializa su resumen y el unlink con el mismo lock, comprueba el archivo esperado y acusa éxito/error. Sin acuse se mantiene el curso activo. Ad hoc puede cerrar sin escribir un tema ficticio.
 
 La próxima activación detecta el último log del tema sin cierre final; coincide el nombre completo del tema y no sólo un sufijo (regresión roja→verde con otra-derivacion frente a derivacion). Historial legado sin flag se considera registrado. leer_sesion_anterior devuelve texto acotado y SHA; la propuesta se confirma con UI real y el backend verifica esa huella. La reconstrucción se etiqueta, preserva el log y no cierra la sesión actual. No supone errores a partir de preguntas sin respuesta ni persiste pruebas técnicas como si fueran intentos del usuario. La confirmación se cubrió con fixtures (aceptar, rechazar, sin UI y cambio del log), no como clic humano real.
+
+*Superada en parte por DA17 y DA25: la orden de `/fin` va oculta; con el agente ocupado, `/fin` corta el turno en vez de rechazarse; se ofrece reconstruir una sola vez la última sesión real del tema sin cierre.*
 
 ## D7.3 — Confirmar el borde, no reiniciar el probe
 
