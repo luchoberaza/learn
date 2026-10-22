@@ -225,7 +225,8 @@ def registrar(vault: Path, curso: str, tema: str, log: str, datos: dict, cierre=
     if not orden(log, tema):
         raise ValueError("Log fuera del tema o de sesiones/.")
     archivo_log = ruta_segura(raiz, log)
-    if not archivo_log.is_file():
+    # Sólo la reconstrucción necesita el log; renombrarlo en Obsidian no debe impedir guardar.
+    if reconstruido and not archivo_log.is_file():
         raise ValueError("El log de evidencia no existe.")
     with bloqueo(raiz):
         ctx = contexto(raiz)
@@ -234,7 +235,7 @@ def registrar(vault: Path, curso: str, tema: str, log: str, datos: dict, cierre=
             raise Conflicto("El log cambió desde su lectura; releelo antes de reconstruir.")
         indice = texto(raiz, "indice.yaml")
         p, raw, avisos = cargar(raiz, ctx)
-        avisos += observaciones
+        avisos += observaciones + ([] if archivo_log.is_file() else [f"El log {log} no está (¿se renombró o movió en Obsidian?); el progreso se guardó igual con esa ruta."])
         actual = p["temas"].get(tema, {})
         if reconstruido and nuevo.get("estado") == "sin_empezar" and "estado" in actual:
             del nuevo["estado"]  # una sesión sin respuestas no cambia el estado

@@ -44,3 +44,8 @@ test('H27: falla_resuelta quita la falla del borde y el modelo recibe el aviso d
   const r=await e.progreso.registrar('resuelta',{resumen:'Supera una',estado:'dominado',falla_resuelta:['Identificar la interna']},undefined,undefined,e.ctx);
   assert.deepEqual(e.sesion.actual().d.progreso.temas.derivacion.borde.falla,['Signo']);assert.match(r.content[0].text,/'dominado' con fallas/);
 });
+test('H04: con el log renombrado en Obsidian, /fin guarda igual y cierra',async t=>{
+  const e=await entorno(t);const {renameSync}=await import('node:fs');renameSync(join(e.vault,e.sesion.actual().a.log),join(e.raiz,'sesiones/Clase renombrada.md'));
+  await e.comandos.get('fin').handler('',e.ctx);const r=await e.guardar({cierre:true});assert.equal(r.details.guardado,true);assert.match(r.content[0].text,/se guardó igual/);
+  e.final();await e.eventos.get('agent_settled')({},e.ctx);assert.equal(e.sesion.actual(),undefined);
+});

@@ -186,6 +186,15 @@ class ProgresoAuditoriaTest(unittest.TestCase):
         reconstruir({'resumen': 'Sin respuestas', 'estado': 'sin_empezar'})
         self.assertEqual(self.tema()['estado'], 'en_curso')
 
+    def test_h04_log_renombrado_no_impide_guardar(self):
+        (self.raiz / self.log).rename(self.raiz / 'sesiones/Clase (renombrada).md')
+        r = self.guardar(cierre=True)
+        self.assertIn(self.log, ' '.join(r['avisos']))
+        self.assertEqual(r['progreso']['historial'][-1]['log'], self.log)
+        self.assertEqual(self.tema()['estado'], 'en_curso')
+        with self.assertRaises(ValueError):
+            self.guardar(reconstruido=True, huella_log='0' * 64)
+
 
 class SesionAuditoriaTest(unittest.TestCase):
     def setUp(self):
