@@ -2,6 +2,7 @@
 import copy
 import json
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 import unittest
@@ -14,7 +15,8 @@ import test_cursos
 from test_ingesta import crear_pdf
 import test_vision
 from test_vision import TEXTO
-from cursos import revisar, validar
+from pipeline import ejecutar
+from cursos import manifiesto, revisar, validar
 
 
 def cortar(entrada, salida):
@@ -141,6 +143,30 @@ class CursosAuditoriaTest(unittest.TestCase):
         self.assertRegex(avisos, "Documento practico .*sin segmentar")
         self.assertNotIn("Documento parcial", avisos)
         self.assertFalse(r["listo_estudio"])
+
+    def test_h05_manifiesto_de_pendientes_y_de_todo_con_los_ids_del_indice(self):
+        self.crear()
+        banco = self.raiz / "_procesado/libro"
+        (banco / "paginas").mkdir(parents=True)
+        (banco / "paginas/0001.md").write_text("Texto")
+        (banco / "calidad.json").write_text(json.dumps({"paginas": {"1": {"ruta": "digital", "pendiente": False}}}))
+        r = manifiesto(self.vault, "ejemplo", todo=False)
+        archivo = self.vault / "_procesado/manifiesto-ejemplo.json"
+        self.assertEqual(r["manifiesto"], "_procesado/manifiesto-ejemplo.json")
+        self.assertIn("ingestar.py iniciar --manifiesto _procesado/manifiesto-ejemplo.json --salida cursos/ejemplo/_procesado", r["siguiente"])
+        m = json.loads(archivo.read_text())
+        self.assertEqual(m, {"version": 1, "documentos": [{"id": "libro", "titulo": "Libro", "tipo": "bibliografia",
+                                                           "archivo": "cursos/ejemplo/fuentes/bibliografia/libro.pdf", "paginas": [2]}]})
+        shutil.rmtree(banco)
+        ejecutar({**m, "motores": {c: "pymupdf" for c in ["digital", "escaneada", "mixta"]}}, self.vault, self.raiz / "_procesado")
+        self.assertEqual(manifiesto(self.vault, "ejemplo", todo=False)["paginas"], 1)
+        self.assertEqual(json.loads(archivo.read_text())["documentos"][0]["paginas"], [1])
+        salida = subprocess.run([sys.executable, str(Path(test_cursos.__file__).parents[2] / "scripts/ingesta/cursos.py"), "manifiesto",
+                                 "--curso", "ejemplo", "--vault", str(self.vault), "--todo"], capture_output=True, text=True)
+        self.assertEqual(salida.returncode, 0, salida.stderr)
+        self.assertEqual(json.loads(salida.stdout)["paginas"], 3)
+        self.assertEqual(json.loads(archivo.read_text())["documentos"][0]["paginas"], "todas")
+        self.assertFalse((self.raiz / "_procesado/manifiesto-ejemplo.json").exists())
 
 
 class VisionAuditoriaTest(unittest.TestCase):

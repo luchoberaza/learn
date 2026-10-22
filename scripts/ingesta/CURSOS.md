@@ -46,8 +46,11 @@ El manifiesto JSON también va en `_procesado/` de la raíz del vault, nunca den
 {"version":1,"documentos":[{"id":"programa","titulo":"Programa","tipo":"programa","archivo":"cursos/ejemplo/fuentes/programa/programa.pdf","paginas":[1,2]}]}
 ```
 
+`manifiesto` lo arma desde el índice en `_procesado/manifiesto-<slug>.json`: el `id` de cada documento es el del índice, que es como lo encuentran `validar` y las tools. Al crear o ampliar un curso se ingiere sin modelo todo (`--todo`); la caché saltea lo ya preparado. `--pendientes` (predeterminado) toma sólo las páginas referidas por el índice que no tienen transcripción. La visión queda para ejercicios, evaluaciones, soluciones y páginas dudosas.
+
 ```bash
-.pi/.venv/bin/python .pi/scripts/ingesta/ingestar.py iniciar --manifiesto _procesado/manifiesto.json --salida cursos/ejemplo/_procesado
+.pi/.venv/bin/python .pi/scripts/ingesta/cursos.py manifiesto --curso ejemplo --todo
+.pi/.venv/bin/python .pi/scripts/ingesta/ingestar.py iniciar --manifiesto _procesado/manifiesto-ejemplo.json --salida cursos/ejemplo/_procesado
 .pi/.venv/bin/python .pi/scripts/ingesta/ingestar.py estado --salida cursos/ejemplo/_procesado
 ```
 

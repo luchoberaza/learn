@@ -35,8 +35,9 @@ export function registrarCuracion(pi: ExtensionAPI) {
     getArgumentCompletions: completar,
     async handler(args, ctx) {
       try {
-        const r = await ejecutar(pi, "validar", args.trim());
-        pi.sendMessage({ customType: "curso-check", display: true, content: `${args.trim()}: ${r.ok ? "estructura válida" : "con errores"}; ${r.pendientes.length} páginas referidas pendientes.\n${[...r.errores, ...r.avisos].join("\n")}\nInforme: cursos/${args.trim()}/informe-ingesta.md`, details: r });
+        const c = args.trim(), r = await ejecutar(pi, "validar", c);
+        const preparar = r.sin_transcripcion?.length ? `\n${r.sin_transcripcion.length} sin transcripción; preparalas sin modelo desde la raíz del vault:\n.pi/.venv/bin/python .pi/scripts/ingesta/cursos.py manifiesto --curso ${c} --pendientes\n.pi/.venv/bin/python .pi/scripts/ingesta/ingestar.py iniciar --manifiesto _procesado/manifiesto-${c}.json --salida cursos/${c}/_procesado` : "";
+        pi.sendMessage({ customType: "curso-check", display: true, content: `${c}: ${r.ok ? "estructura válida" : "con errores"}; ${r.pendientes.length} páginas referidas pendientes.${preparar}\n${[...r.errores, ...r.avisos].join("\n")}\nInforme: cursos/${c}/informe-ingesta.md`, details: r });
       } catch (e) { ctx.ui.notify(e instanceof Error ? e.message : "No se pudo validar el curso.", "error"); }
     },
   });

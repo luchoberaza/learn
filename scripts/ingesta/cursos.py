@@ -67,7 +67,7 @@ def texto(raiz: Path, nombre: str) -> str:
 
 
 def validar(raiz: Path, slug: str, *, indice=None, contrato=None, origenes=None, max_tokens=1500) -> dict:
-    errores, avisos, pendientes = [], [], set()
+    errores, avisos, pendientes, sin_transcripcion = [], [], set(), set()
     documentos, temas, items = {}, {}, {}
     usados = set()
     resultado = {"curso": slug, "errores": errores, "avisos": avisos, "pendientes": [], "ok": False, "listo_estudio": False}
@@ -158,6 +158,8 @@ def validar(raiz: Path, slug: str, *, indice=None, contrato=None, origenes=None,
                     raise ValueError(f"Registro de página inválido: {doc}/{p}.")
                 if not q or q.get("pendiente") or q.get("ruta") == "pendiente" or not archivo.exists():
                     pendientes.add((doc, p))
+                if not archivo.exists():
+                    sin_transcripcion.add((doc, p))
                 elif q.get("sha256_markdown") and sha256(archivo) != q["sha256_markdown"]:
                     errores.append(f"Transcripción editada fuera de la ingesta: {doc}/{p}.")
         hay_evaluaciones = any(d["tipo"] == "evaluaciones" for d in documentos.values())
@@ -233,6 +235,7 @@ def validar(raiz: Path, slug: str, *, indice=None, contrato=None, origenes=None,
     except (OSError, ValueError, KeyError, TypeError, RecursionError, RuntimeError) as e:
         errores.append(f"No se pudo validar: {e}")
     resultado["pendientes"] = [{"doc": d, "pagina": p} for d, p in sorted(pendientes)]
+    resultado["sin_transcripcion"] = [{"doc": d, "pagina": p} for d, p in sorted(sin_transcripcion)]
     if pendientes:
         avisos.append(f"{len(pendientes)} páginas referidas pendientes o sin preparar; no está listo para estudiar esos pasajes.")
     resultado["ok"] = not errores
@@ -389,6 +392,27 @@ def aplicar(vault: Path, slug: str, propuesta: Path, base: str, huella: str, max
         return {"curso": slug, "nuevo": revision["nuevo"], "copiados": len(revision["copias"]), "validacion": validar(raiz, slug, max_tokens=max_tokens)}
 
 
+def manifiesto(vault: Path, slug: str, todo: bool, max_tokens=1500) -> dict:
+    raiz = carpeta(vault, slug)
+    resultado = validar(raiz, slug, max_tokens=max_tokens)
+    if not resultado["ok"]:
+        raise ValueError("Corregí los errores de /curso-check antes de armar el manifiesto: " + "; ".join(resultado["errores"]))
+    faltan = {}
+    for x in resultado["sin_transcripcion"]:
+        faltan.setdefault(x["doc"], []).append(x["pagina"])
+    indice = cargar_yaml(texto(raiz, "indice.yaml"))["documentos"]
+    # Los ids del índice nombran las carpetas de _procesado que leen validar y las tools.
+    documentos = [{"id": d["id"], "titulo": d["titulo"], "tipo": d["tipo"], "archivo": f"cursos/{slug}/{d['archivo']}",
+                   "paginas": "todas" if todo else faltan[d["id"]]} for d in indice if todo or d["id"] in faltan]
+    nombre = f"_procesado/manifiesto-{slug}.json"
+    salida = {"curso": slug, "manifiesto": nombre, "documentos": len(documentos),
+              "paginas": sum(d["paginas"] for d in indice) if todo else len(resultado["sin_transcripcion"])}
+    if documentos:
+        guardar_json(vault, nombre, {"version": 1, "documentos": documentos})
+        salida["siguiente"] = f".pi/.venv/bin/python .pi/scripts/ingesta/ingestar.py iniciar --manifiesto {nombre} --salida cursos/{slug}/_procesado"
+    return salida
+
+
 def publicar_informe(vault: Path, slug: str, max_tokens=1500) -> dict:
     raiz = carpeta(vault, slug)
     resultado = validar(raiz, slug, max_tokens=max_tokens)
@@ -434,12 +458,15 @@ def publicar_informe(vault: Path, slug: str, max_tokens=1500) -> dict:
 
 def main():
     p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument("accion", choices=["validar", "revisar", "aplicar", "informe"])
+    p.add_argument("accion", choices=["validar", "revisar", "aplicar", "informe", "manifiesto"])
     p.add_argument("--curso", required=True)
     p.add_argument("--vault", type=Path, default=Path.cwd())
     p.add_argument("--propuesta", type=Path)
     p.add_argument("--base")
     p.add_argument("--huella")
+    alcance = p.add_mutually_exclusive_group()
+    alcance.add_argument("--todo", action="store_true", help="manifiesto: todas las páginas de todos los documentos")
+    alcance.add_argument("--pendientes", action="store_true", help="manifiesto: sólo las páginas referidas sin transcripción (predeterminado)")
     args = p.parse_args()
     vault = args.vault.resolve()
     config = json.loads((Path(__file__).resolve().parents[2] / "curso.config.json").read_text())
@@ -448,6 +475,8 @@ def main():
         if args.propuesta is None:
             p.error("Indicá --propuesta con un JSON dentro de _procesado/.")
         resultado = revisar(vault, args.curso, args.propuesta, limite)[0] if args.accion == "revisar" else aplicar(vault, args.curso, args.propuesta, args.base, args.huella, limite)
+    elif args.accion == "manifiesto":
+        resultado = manifiesto(vault, args.curso, args.todo, limite)
     else:
         resultado = validar(carpeta(vault, args.curso), args.curso, max_tokens=limite) if args.accion == "validar" else publicar_informe(vault, args.curso, limite)
     print(json.dumps(resultado, ensure_ascii=False, indent=2))
