@@ -84,8 +84,8 @@ test("X06: el hijo del researcher recibe su orden a los 300 ms y se respeta un v
 });
 
 test("X03: en el servidor de pi-learn una sesión sin cliente no sobrevive", t => {
-  const socket = `pi-entorno-${process.pid}`, tmux = (...a) => spawnSync("tmux", ["-L", socket, ...a], { encoding: "utf8" });
-  t.after(() => tmux("kill-server"));
+  const dir = mkdtempSync(join(tmpdir(), "pi-tmux-")), tmux = (...a) => spawnSync("tmux", ["-S", join(dir, "s"), ...a], { encoding: "utf8" });
+  t.after(() => { tmux("kill-server"); rmSync(dir, { recursive: true, force: true }); });
   assert.equal(tmux("-f", join(piDir, "config/tmux.conf"), "new-session", "-d", "-s", "alumno", "--", "sleep", "30").status, 0);
   assert.notEqual(tmux("has-session", "-t", "=alumno").status, 0);
 });
