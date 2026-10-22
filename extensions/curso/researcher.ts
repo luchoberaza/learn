@@ -138,28 +138,37 @@ const trabajo = (vault: string, curso: string, clave: string) => {
   return rutaSegura(vault, `cursos/${curso}/notas/verificaciones/.trabajos/${clave}`);
 };
 const clave = (p: Pedido) => p.modo === "alcance" ? p.huella : sha(p.tarea);
-function estadoTrabajo(dir: string): "libre" | "corriendo" | "terminada" | "interrumpida" {
-  if (!existsSync(dir) || existsSync(join(dir, "fallo"))) return "libre";
+const ESPERA = 10 * 60_000;
+function estadoTrabajo(dir: string): "libre" | "corriendo" | "terminada" | "interrumpida" | "espera" {
+  if (!existsSync(dir)) return "libre";
+  const fallo = join(dir, "fallo");
+  if (existsSync(fallo)) return readFileSync(fallo, "utf8").startsWith("vencida") && Date.now() - statSync(fallo).mtimeMs < ESPERA ? "espera" : "libre";
   if (existsSync(join(dir, "codigo"))) return "terminada";
-  try { process.kill(JSON.parse(readFileSync(join(dir, "trabajo.json"), "utf8")).pid, 0); return "corriendo"; }
-  catch { return "interrumpida"; }
+  try {
+    const t = JSON.parse(readFileSync(join(dir, "trabajo.json"), "utf8"));
+    if (Date.now() - t.inicio > (t.plazo + 30) * 1000) throw new Error("Pasó el plazo: el pid puede ser de otro proceso.");
+    process.kill(t.pid, 0); return "corriendo";
+  } catch { return "interrumpida"; }
 }
 // Proceso pi propio, sin tmux ni sesión: el alumno no ve nada y el resultado no dispara turnos.
-function lanzar(dir: string, p: Pedido, recursos: string, comando: string[]) {
-  const a = agente(recursos);
+function lanzar(dir: string, p: Pedido, a: ReturnType<typeof agente>, recursos: string, comando: string[], plazo: number) {
   writeFileSync(join(dir, "tarea.md"), p.tarea);
   writeFileSync(join(dir, "sistema.md"), a.cuerpo);
   const args = ["-p", "--no-session", "--no-approve", "--offline", "--no-extensions", "-e", join(recursos, "npm/node_modules/pi-web-access/dist/index.js"),
     "--no-skills", "--no-prompt-templates", "--no-themes", "--no-context-files", "--model", a.modelo, ...(a.thinking ? ["--thinking", a.thinking] : []),
     "--tools", a.tools, "--append-system-prompt", join(dir, "sistema.md")];
-  const hijo = spawn("sh", ["-c", '"$@" < tarea.md > salida.md 2> error.txt; echo $? > codigo.tmp && mv codigo.tmp codigo', "sh", ...comando, ...args], { cwd: dir, detached: true, stdio: "ignore" });
+  // timeout corta al hijo aunque este proceso ya no exista (/reload, kill, terminal cerrada).
+  const hijo = spawn("sh", ["-c", `timeout -k 5 ${plazo} "$@" < tarea.md > salida.md 2> error.txt; echo $? > codigo.tmp && mv codigo.tmp codigo`, "sh", ...comando, ...args], { cwd: dir, detached: true, stdio: "ignore" });
   hijo.on("error", () => {});
   hijo.unref();
-  writeFileSync(join(dir, "trabajo.json"), JSON.stringify({ pid: hijo.pid, inicio: Date.now() }));
+  writeFileSync(join(dir, "trabajo.json"), JSON.stringify({ pid: hijo.pid, inicio: Date.now(), plazo }));
 }
 function recoger(vault: string, p: Pedido, dir: string): { estado: string; file?: string; error: string; texto: string } {
+  let estado = "no_guardada";
   try {
-    if (readFileSync(join(dir, "codigo"), "utf8").trim() !== "0") throw new Error("El researcher no entregó el informe solicitado; seguí con el material sin verificación externa.");
+    const codigo = readFileSync(join(dir, "codigo"), "utf8").trim();
+    if (codigo === "124" || codigo === "137") { estado = "vencida"; throw new Error("El researcher superó el plazo y se canceló."); }
+    if (codigo !== "0") throw new Error("El researcher no entregó el informe solicitado; seguí con el material sin verificación externa.");
     if (huella(vault, p) !== p.huella) throw new Error("Las fuentes cambiaron durante la investigación; resultado no guardado como caché vigente.");
     const raw = leer(dir, "salida.md", 200_000);
     const desde = raw.indexOf("## Resumen");
@@ -177,11 +186,11 @@ function recoger(vault: string, p: Pedido, dir: string): { estado: string; file?
     return { estado: p.modo === "alcance" ? "guardada" : "recibida", file, error: "", texto };
   } catch (e) {
     const error = e instanceof Error ? e.message : "No se guardó la verificación.";
-    writeFileSync(join(dir, "fallo"), error);
-    return { estado: "no_guardada", error, texto: "" };
+    writeFileSync(join(dir, "fallo"), `${estado}: ${error}`);
+    return { estado, error, texto: "" };
   }
 }
-export function registrarResearcher(pi: ExtensionAPI, actual: () => Estado | undefined, refrescar: () => string, vault: string, recursos: string, comando = ["pi"]) {
+export function registrarResearcher(pi: ExtensionAPI, actual: () => Estado | undefined, refrescar: () => string, vault: string, recursos: string, comando = ["pi"], plazo = 180) {
   const pendientes = (ctx: ExtensionContext) => {
     // Un trabajo relanzado reutiliza su nombre: cada fin cierra el inicio anterior.
     const abiertos = new Map<string, Inicio>();
@@ -191,7 +200,7 @@ export function registrarResearcher(pi: ExtensionAPI, actual: () => Estado | und
     }
     return [...abiertos.values()].filter(e => typeof e.nombre === "string" && e.pedido && typeof e.pedido === "object");
   };
-  async function investigar(_id: string, args: { modo: Pedido["modo"]; afirmaciones: string[] }, _signal: AbortSignal | undefined, _update: unknown, _ctx: ExtensionToolContext) {
+  async function investigar(_id: string, args: { modo: Pedido["modo"]; afirmaciones: string[] }, _signal: AbortSignal | undefined, _update: unknown, ctx: ExtensionToolContext) {
       try {
         const estado = actual();
         if (!estado) throw new Error("No hay curso activo. Usá /estudiar <curso> <tema>.");
@@ -208,10 +217,14 @@ export function registrarResearcher(pi: ExtensionAPI, actual: () => Estado | und
           const cache = leerCache(estado.r, tema.id, p.huella);
           if (cache.texto && !cache.previa) return { content: [{ type: "text", text: `${cache.manual ? "Nota manual preservada; no relanzamos ni sobrescribimos alcance. Para afirmaciones nuevas usá verificar." : "Caché de alcance: no se lanzó otro researcher. Las afirmaciones nuevas requieren modo verificar."}\n${acotar(cache.texto, 16000)}` }], details: { cache: !cache.manual, manual: cache.manual } };
         }
-        if (estadoTrabajo(dir) === "corriendo") return { content: [{ type: "text", text: "La verificación ya está en curso en segundo plano; seguí con el material." }], details: { pendiente: clave(p) } };
+        const st = estadoTrabajo(dir);
+        if (st === "corriendo") return { content: [{ type: "text", text: "La verificación ya está en curso en segundo plano; seguí con el material." }], details: { pendiente: clave(p) } };
+        if (st === "espera") throw new Error("Verificación externa no disponible por ahora (la última superó el plazo); seguí con el material.");
+        const a = agente(recursos), barra = a.modelo.indexOf("/"), modelo = ctx.modelRegistry.find(a.modelo.slice(0, barra), a.modelo.slice(barra + 1));
+        if (!modelo || !ctx.modelRegistry.hasConfiguredAuth(modelo)) throw new Error("Verificación externa no disponible: el modelo del researcher no tiene credenciales; seguí con el material.");
         rmSync(dir, { recursive: true, force: true });
         mkdirSync(dir, { recursive: true, mode: 0o700 });
-        lanzar(dir, p, recursos, comando);
+        lanzar(dir, p, a, recursos, comando, plazo);
         pi.appendEntry("curso-researcher", { tipo: "inicio", nombre: clave(p), pedido: p } satisfies Inicio);
         return { content: [{ type: "text", text: "Verificación en segundo plano; seguí con el material." }], details: { nombre: clave(p), cache: false } };
       } catch (e) { return { content: [{ type: "text", text: e instanceof Error ? e.message : "Researcher no disponible; seguí con el material." }], details: undefined, isError: true }; }

@@ -66,8 +66,9 @@ function runtime(e, comando, ...extra) {
   const entradas = [], eventos = new Map(), avisos = [], mensajes = [];
   let activo = { a: { curso: 'calculo', tema: 'derivadas' }, d: e.d, r: e.raiz };
   const pi = { on: (n, h) => eventos.set(n, h), appendEntry: (customType, data) => entradas.push({ type: 'custom', customType, data }), events: { emit: () => {} }, sendMessage: (m, o) => mensajes.push([m, o]) };
-  const ctx = { sessionManager: { getBranch: () => entradas }, ui: { notify: (m, tipo) => avisos.push([m, tipo]) }, executeTool: assert.fail };
-  const r = { entradas, avisos, mensajes, ctx, set activo(v) { activo = v; },
+  const ctx = { sessionManager: { getBranch: () => entradas }, ui: { notify: (m, tipo) => avisos.push([m, tipo]) }, executeTool: assert.fail,
+    modelRegistry: { find: (proveedor, id) => ({ provider: proveedor, id }), hasConfiguredAuth: modelo => r.credenciales && modelo.provider === 'openai' && modelo.id === 'gpt-6-luna' } };
+  const r = { entradas, avisos, mensajes, ctx, credenciales: true, set activo(v) { activo = v; },
     construir: () => registrarResearcher(pi, () => activo, () => verificacionPrevia(e.vault, e.recursos, e.d, e.tema), e.vault, e.recursos, comando, ...extra),
     alcance: (afirmaciones = ['La derivada de x² es 2x.']) => r.investigar('1', { modo: 'alcance', afirmaciones }, undefined, undefined, ctx),
     async turno() { const ev = { type: 'before_agent_start', messageType: 'user', prompt: 'Sigo', systemPromptOptions: { sections: {} } }; await eventos.get('before_agent_start')(ev, ctx); return ev; } };
@@ -137,4 +138,27 @@ test('H33: un informe terminado se recupera por huella desde otra sesión, sin r
   const cache = await otra.alcance();
   assert.equal(cache.details.cache, true); assert.equal(otra.entradas.length, 0);
   await r.turno(); assert.equal(r.entradas.at(-1).data.tipo, 'fin'); assert.deepEqual(r.avisos, []);
+});
+
+test('H34: el researcher colgado se mata al vencer el plazo, avisa una vez y espera antes de relanzar', async t => {
+  const e = entorno(t), r = runtime(e, falso(e, eterno), 1);
+  const res = await r.alcance(), dir = carpeta(e, res.details.nombre);
+  t.after(() => matar(dir));
+  await esperar(() => existsSync(join(dir, 'codigo')));
+  const { pid } = JSON.parse(readFileSync(join(dir, 'trabajo.json'), 'utf8'));
+  await esperar(() => { try { process.kill(-pid, 0); return false; } catch { return true; } });
+  await r.turno(); await r.turno();
+  assert.equal(r.entradas.at(-1).data.estado, 'vencida');
+  assert.deepEqual(r.avisos, [['Verificación del material no disponible; seguimos con el material del curso.', 'warning']]);
+  assert.equal(r.mensajes.length, 1); assert.equal(r.mensajes[0][1].triggerTurn, undefined);
+  const otra = await r.alcance();
+  assert.equal(otra.isError, true); assert.doesNotMatch(otra.content[0].text, /en curso|despachada/); assert.match(otra.content[0].text, /no disponible/);
+  assert.equal(r.entradas.filter(x => x.data.tipo === 'inicio').length, 1);
+});
+
+test('H34: sin credenciales del modelo del researcher no se lanza nada', async t => {
+  const e = entorno(t), r = runtime(e, falso(e, informe)); r.credenciales = false;
+  const res = await r.alcance();
+  assert.equal(res.isError, true); assert.match(res.content[0].text, /^Verificación externa no disponible: [^\n]+$/);
+  assert.equal(r.entradas.length, 0); assert.ok(!existsSync(join(e.raiz, 'notas/verificaciones/.trabajos')));
 });

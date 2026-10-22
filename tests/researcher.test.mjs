@@ -18,7 +18,7 @@ function entorno(t) {
   let activo={a:{curso:'calculo',tema:'derivadas'},d,r:raiz}, llamadas=0, refrescos=0;
   const entradas=[],eventos=new Map(),avisos=[],entregas=[];
   const pi={on:(n,h)=>eventos.set(n,h),appendEntry:(customType,data)=>{if(data.tipo==='inicio')llamadas++;entradas.push({type:'custom',customType,data});},events:{emit:(n,p)=>entregas.push([n,p])},sendMessage:()=>{}};
-  const ctx={sessionManager:{getBranch:()=>entradas,getEntries:assert.fail},ui:{notify:m=>avisos.push(m)},executeTool:assert.fail};
+  const ctx={sessionManager:{getBranch:()=>entradas,getEntries:assert.fail},ui:{notify:m=>avisos.push(m)},executeTool:assert.fail,modelRegistry:{find:()=>({}),hasConfiguredAuth:()=>true}};
   const dormido=join(vault,'dormido.mjs');writeFileSync(dormido,`import {existsSync} from 'node:fs';setInterval(()=>{if(!existsSync(${JSON.stringify(vault)}))process.exit(0);},100);`);
   const construir=()=>registrarResearcher(pi,()=>activo,()=>{refrescos++;return verificacionPrevia(vault,recursos,d,tema);},vault,recursos,[process.execPath,dormido]);
   const investigar=construir();
