@@ -302,6 +302,30 @@ class ArranqueTest(Base):
         self.assertEqual(estado["estado"], "interrumpida")
         self.assertIn("MemoryError", estado["aviso"])
 
+    def test_sin_tesseract_no_se_pierde_la_vision_de_una_pagina_escaneada(self):
+        with pymupdf.open() as digital, pymupdf.open() as escaneado:
+            digital.new_page(width=500, height=700).insert_textbox(pymupdf.Rect(45, 60, 450, 400), PROSA, fontsize=12)
+            escaneado.new_page(width=500, height=700).insert_image(pymupdf.Rect(0, 0, 500, 700), stream=digital[0].get_pixmap(dpi=100).tobytes("png"))
+            escaneado.save(self.vault / "escaneado.pdf")
+        real = extraccion.identidad_motor
+        def con_spa(motor, idiomas):
+            return real(motor, idiomas) if motor == "pymupdf" else {"motor": motor, "tesseract": "tesseract 5.5.2"}
+        def sin_spa(motor, idiomas):
+            if motor == "pymupdf":
+                return real(motor, idiomas)
+            raise ValueError("Faltan idiomas OCR en tesseract")
+        manifiesto = {"version": 1, "documentos": [self.doc("escaneado")]}
+        with patch("pipeline.identidad_motor", side_effect=con_spa):
+            ejecutar(manifiesto, self.vault, self.salida, extractor=lambda *_: PROSA)
+        self.transcribir("escaneado", "Transcripción de visión: " + PROSA)
+        with patch("pipeline.identidad_motor", side_effect=sin_spa):
+            ejecutar(manifiesto, self.vault, self.salida, extractor=lambda *_: self.fail("No reextraer"))
+        with patch("pipeline.identidad_motor", side_effect=con_spa):
+            ejecutar(manifiesto, self.vault, self.salida, extractor=lambda *_: "Texto del OCR " + PROSA)
+        q = self.q("escaneado")
+        self.assertEqual((q["motor"], q["ruta"]), ("vision", "vision"))
+        self.assertIn("Transcripción de visión", (self.salida / "escaneado/paginas/0001.md").read_text())
+
     def test_ruta_tesseract_va_primero_en_el_path(self):
         (self.vault / "curso.config.json").write_text(json.dumps({**self.config, "ruta_tesseract": str(self.vault / "otro/tesseract")}))
         caminos = []

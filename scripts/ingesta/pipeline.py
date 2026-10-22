@@ -381,13 +381,17 @@ def ejecutar(manifiesto: dict, vault: Path, salida: Path, *, limite_paginas: int
                         except (OSError, RuntimeError, ValueError, subprocess.SubprocessError) as error:
                             if isinstance(error, Conflicto):
                                 raise
-                            resultado.update(puntaje=0, pendiente=True, ruta="pendiente", error=type(error).__name__,
-                                             avisos=[f"Falló la extracción ({type(error).__name__}: {error}); se continúa con las otras páginas."])
-                            # Conservar un resultado previo como provisional si falló un reprocesamiento.
                             markdown = almacenado
-                            if almacenado is not None:
-                                resultado["sha256_markdown"] = previo["sha256_markdown"]
-                                resultado["avisos"].append("Se conserva el texto anterior como provisional.")
+                            if ajena:
+                                # Sin reclasificar (p. ej., sin tesseract) la visión o la edición humana sigue intacta.
+                                resultado = dict(previo)
+                            else:
+                                resultado.update(puntaje=0, pendiente=True, ruta="pendiente", error=type(error).__name__,
+                                                 avisos=[f"Falló la extracción ({type(error).__name__}: {error}); se continúa con las otras páginas."])
+                                # Conservar un resultado previo como provisional si falló un reprocesamiento.
+                                if almacenado is not None:
+                                    resultado["sha256_markdown"] = previo["sha256_markdown"]
+                                    resultado["avisos"].append("Se conserva el texto anterior como provisional.")
                         resultado["segundos"] = round(time.perf_counter() - inicio, 4)
                         guardar_json(raiz, f"{identificador}/cache/{numero:04}.json",
                                      {"calidad": resultado, "markdown": markdown, "sha256_anterior": previo.get("sha256_markdown")})
