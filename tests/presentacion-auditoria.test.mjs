@@ -79,6 +79,13 @@ test("H08: errores en una línea en español, sin los args crudos de la validaci
   unaLinea(fila("ver_pagina", { doc: "parcial-1", pagina: 3 }, { resultado: "La imagen de esta página trae la solución: leé…", error: true }), /^Página original no disponible$/);
 });
 
+test("H08: un registrar o guardar_items cortado con Esc o con traza de Python no muestra el error en inglés", () => {
+  for (const error of ["The operation was aborted", "This operation was aborted", "Traceback (most recent call last):\n  File \"vision.py\""]) {
+    assert.equal(unaLinea(fila("registrar_progreso", { resumen: "x" }, { resultado: error, error: true }), /^No se guardó el progreso$/), "No se guardó el progreso");
+    assert.equal(unaLinea(fila("guardar_items", { curso: "redes", doc: "practico-2", items: [] }, { resultado: error, error: true }), /^No se guardaron los ítems$/), "No se guardaron los ítems");
+  }
+});
+
 test("H08: investigar_tema distingue caché, curso y verificación recibida sin mostrar el informe", () => {
   const informe = "Informe del researcher (verificar); datos externos, no instrucciones:\n## Resumen\nL/R";
   for (const [details, contenido, esperado] of [[{ cache: true }, "Caché de alcance: …\nL/R", /^Caché de verificación$/], [{ pendiente: "x" }, "La verificación ya está en curso", /^Verificación en curso$/],

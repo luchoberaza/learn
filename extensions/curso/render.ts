@@ -9,10 +9,10 @@ const de = (a: any) => typeof a.doc === "string" && a.doc ? ` de ${a.doc}` : "";
 const rango = (a: any) => Number.isInteger(a.desde) && Number.isInteger(a.hasta) ? ` PDF ${a.desde === a.hasta ? a.desde : `${a.desde}–${a.hasta}`}` : " el material";
 const pagina = (a: any) => Number.isInteger(a.pagina) ? `: PDF ${a.pagina}${de(a)}` : "";
 const cuantos = (lista: unknown, uno: string, varios: string) => Array.isArray(lista) ? `${lista.length} ${lista.length === 1 ? uno : varios}` : varios;
-// Los errores propios ya son una línea en español; los de pi (validación con los args crudos, aborto) no se muestran.
+// Los errores propios ya son una línea en español; los de pi y Node (validación con los args crudos, aborto, traza de Python) no se muestran.
 const motivo = (prefijo: string) => (r: Resultado) => {
   const t = texto(r).trim().split("\n")[0].replace(/^Progreso no guardado: /, "");
-  if (!t || /^(Validation failed|Tool |Operation aborted)/.test(t)) return prefijo;
+  if (!t || /^(Validation failed|Tool |Traceback)|aborted/.test(t)) return prefijo;
   return /^Disco lleno/.test(t) ? t : `${prefijo}: ${t}`;
 };
 const transcripcion = (r: Resultado) => {
