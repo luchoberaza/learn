@@ -1,6 +1,6 @@
 import { after, before, test } from "node:test";
 import assert from "node:assert/strict";
-import { loadProject } from "../scripts/lib/pi-sdk.mjs";
+import { agentDir, loadProject, vaultDir } from "../scripts/lib/pi-sdk.mjs";
 
 let p;
 before(async () => { p = await loadProject(); p.sdk.initTheme("dark"); });
@@ -91,4 +91,15 @@ test("H08: preparación con progreso corto; el diff de guardar_curso se ve enter
   for (const v of fila("transcribir_paginas", { curso: "redes", doc: "practico-2", paginas: [1, 2, 3] }, { parcial: "practico-2: página PDF 2 (2/3)." })) assert.deepEqual(v, ["Transcribiendo 3 páginas de practico-2", "practico-2: página PDF 2 (2/3)."]);
   unaLinea(fila("transcribir_paginas", { doc: "practico-2", paginas: [1, 2, 3] }, { resultado: { content: [{ type: "text", text: "Transcritas: 2…" }], details: { transcritas: 2, cache: 0, fallidas: [3], pendientes: [] } }, error: true }), /^2 transcritas, 0 en caché, 1 fallidas$/);
   unaLinea(fila("guardar_items", { curso: "redes", doc: "practico-1", items: [{ id: "1", enunciado: "ENUNCIADO" }] }, { resultado: { content: [{ type: "text", text: "Guardados 1 ítems de practico-1: 1." }], details: { items: 1, ids: ["1"] } } }), /^Guardados 1 ítems de practico-1$/);
+});
+
+test("H09/X04: «Working» y «Thinking...» quedan en español desde el arranque", async t => {
+  const { sdk } = p, etiquetas = {};
+  const { session } = await sdk.createAgentSession({ cwd: vaultDir, agentDir, settingsManager: p.session.settingsManager, resourceLoader: p.loader, sessionManager: sdk.SessionManager.inMemory() });
+  t.after(() => session.dispose());
+  await session.bindExtensions({ uiContext: new Proxy({ setWorkingMessage: m => { etiquetas.trabajando = m; }, setHiddenThinkingLabel: m => { etiquetas.pensando = m; } }, { get: (o, k) => o[k] ?? (() => {}) }) });
+  assert.deepEqual(etiquetas, { trabajando: "Trabajando…", pensando: "Pensando…" });
+  const mensaje = new sdk.AssistantMessageComponent({ role: "assistant", content: [{ type: "thinking", thinking: "I wonder if I can end the turn" }, { type: "text", text: "Seguimos." }] }, true, undefined, etiquetas.pensando);
+  const visto = mensaje.render(60).map(limpio).join("\n");
+  assert.match(visto, /Pensando…/); assert.doesNotMatch(visto, /Thinking|wonder/);
 });
