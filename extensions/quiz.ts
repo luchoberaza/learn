@@ -143,17 +143,18 @@ function textoPlano(texto: string): string {
 }
 
 // D5: antes de responder no se muestran enlaces (la página citada puede traer la respuesta); se conserva
-// el texto visible de [[x|alias]] y [texto](url), y se descarta la línea que queda como rótulo vacío.
+// el texto visible de [[x|alias]], [texto](url) y [[nota]], y se descarta la línea que queda como rótulo vacío.
 function sinEnlaces(texto: string): string {
 	return texto
 		.split("\n")
 		.map((linea) => {
-			const limpia = linea
+			const visible = linea
 				.replace(/\[\[[^\]|]*\|([^\]]*)\]\]|\[([^\]]*)\]\([^)]*\)/g, "$1$2")
-				.replace(/\[\[[^\]]*\]\]|https?:\/\/\S+/g, "")
-				.replace(/\s{2,}/g, " ")
-				.trim();
-			return limpia !== linea.trim() && /^[\p{L}\s]*:?$/u.test(limpia) ? null : limpia;
+				.replace(/(?<!!)\[\[([^\]#/]+)\]\]/g, "$1");
+			const resto = visible.replace(/!?\[\[[^\]]*\]\]|https?:\/\/\S+/g, "");
+			if (resto === visible) return visible;
+			const limpia = resto.replace(/\s{2,}/g, " ").trim();
+			return /^(\p{L}+\s?){0,3}:?$/u.test(limpia) ? null : limpia;
 		})
 		.filter((linea) => linea !== null)
 		.join("\n")

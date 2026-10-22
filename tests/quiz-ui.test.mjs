@@ -127,3 +127,18 @@ test("H50: shuffle:false no fija la correcta salvo opciones numéricas, que se o
   for (let k = 0; k < 40; k++) await quiz.execute("m" + k, { ...numericas, shuffle: undefined }, undefined, u => { mezcladas.add(u.details.options[0].label); }, { hasUI: false });
   assert.ok(mezcladas.size > 1, "sin shuffle:false las numéricas también se barajan");
 });
+
+test("H49: quitar enlaces no borra condiciones del enunciado", async () => {
+  const vistas = [];
+  await quiz.execute("f2", { ...base, details: [
+    "Considerá un enlace de [[propagacion|retardo de propagación]] alto",
+    "Pensá en [[retardo de cola]] y en el tamaño del buffer",
+    "Según el libro [[cursos/redes/fuentes/Redes.pdf#page=56]] calculá el retardo de cola",
+    "![[cursos/redes/figuras/fig-1.png]]",
+    "Ver [[cursos/redes/fuentes/Redes.pdf#page=56]]",
+    "Sin propagación  ni cola",
+  ].join("\n") }, undefined, () => {}, ui(["esc"], vistas));
+  const encabezado = vistas[0];
+  for (const l of ["Considerá un enlace de retardo de propagación alto", "Pensá en retardo de cola y en el tamaño del buffer", "Según el libro calculá el retardo de cola", "Sin propagación  ni cola"]) assert.ok(encabezado.includes(l), l);
+  assert.doesNotMatch(encabezado, /\[\[|page=|^ *!$|^ *Ver$/m);
+});
