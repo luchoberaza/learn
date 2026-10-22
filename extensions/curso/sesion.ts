@@ -3,7 +3,7 @@ import { mkdirSync, openSync, closeSync, readdirSync, readFileSync, statSync } f
 import { basename, join, relative } from "node:path";
 import { piDir, vaultDir } from "../../scripts/lib/pi-sdk.mjs";
 import { normalizar } from "../../scripts/ingesta/bm25.ts";
-import { buscarMaterial, cita, conSolucion, documento, dossier, esSlug, leerItems, leerPaginas, ordenarTemas, resolverTemas, rutaSegura,
+import { buscarMaterial, cita, documento, dossier, esSlug, leerItems, leerPaginas, ordenarTemas, resolverTemas, rutaSegura,
   type Activo, type DatosCurso, type Tema } from "./material.ts";
 
 import { verificacionPrevia } from "./researcher.ts";
@@ -178,7 +178,7 @@ export function registrarSesion(pi: ExtensionAPI, vault = vaultDir, recursos = p
     async ver_pagina({ doc, pagina, despues_del_intento = false }: { doc: string; pagina: number; despues_del_intento?: boolean }, signal?: AbortSignal) {
       const { a, d, r } = actual(), fuente = documento(d, doc);
       if (!Number.isInteger(pagina) || pagina < 1 || pagina > fuente.paginas) throw new Error("Página PDF fuera de rango.");
-      if (!despues_del_intento && conSolucion(d, fuente)) throw new Error("La imagen de esta página trae la solución: leé el enunciado con leer_items y mostrala recién después del intento (despues_del_intento:true).");
+      if (!despues_del_intento && (["evaluaciones", "soluciones"].includes(fuente.tipo) || d.items[doc]?.some(i => i.solucion_de !== undefined))) throw new Error("La imagen de esta página trae la solución: leé el enunciado con leer_items y mostrala recién después del intento (despues_del_intento:true).");
       const resultado = await pi.exec(join(recursos, ".venv/bin/python"), [join(recursos, "scripts/ingesta/sesion.py"), "renderizar", "--vault", vault, "--curso", a.curso, "--doc", doc, "--pagina", String(pagina)], { timeout: 10000, signal });
       if (resultado.code !== 0) throw new Error(resultado.stderr.trim() || "No se pudo renderizar la página.");
       return { imagen: readFileSync(rutaSegura(r, `_procesado/${doc}/render/${String(pagina).padStart(4, "0")}.png`)).toString("base64"), cita: cita(d, doc, pagina) };

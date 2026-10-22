@@ -65,7 +65,7 @@ export function ordenarTemas(datos: DatosCurso): Tema[] {
   return [...datos.temas].sort((a, b) => nivel(a) - nivel(b) || a.unidad - b.unidad);
 }
 // Evaluaciones, soluciones y documentos con ítems solucion_de traen la solución en sus páginas: antes del intento, sin texto ni enlace.
-export const conSolucion = (datos: DatosCurso, d: Documento) => d.tipo === "evaluaciones" || d.tipo === "soluciones" || (datos.items[d.id] || []).some(i => i.solucion_de !== undefined);
+const conSolucion = (datos: DatosCurso, d: Documento) => d.tipo === "evaluaciones" || d.tipo === "soluciones" || (datos.items[d.id] || []).some(i => i.solucion_de !== undefined);
 const sinEnlace = (paginas: number[]) => `PDF p. ${paginas.join(", ")} (el enlace va después del intento)`;
 const esSolucion = (d: Documento, i: Item) => d.tipo === "soluciones" || i.solucion_de !== undefined;
 export function buscarMaterial(raiz: string, datos: DatosCurso, consulta: string, tipo?: string) {
