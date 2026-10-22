@@ -104,6 +104,10 @@ test("H55, H31: la preparación se informa por tema y no por avisos del curso ni
   c.escribir("_procesado/libro/calidad.json", JSON.stringify({ paginas: { 1: { pendiente: false }, 2: { pendiente: true } } }));
   c.tema.ejercicios.push({ doc: "practico", items: ["2", "3"] });
   assert.match(dossier(c.raiz, c.d, c.tema, 3000, 1500), /Preparación del tema: sin texto confiable todavía en libro PDF 1–3 \(2 de 3 páginas\); practico: ítems 2, 3\. Se preparan solos en segundo plano/);
+  // Ya pasó por visión y sigue dudosa (p. ej. [ilegible]): la preparación no la repite, así que no se promete.
+  c.tema.ejercicios.pop();
+  c.escribir("_procesado/libro/calidad.json", JSON.stringify({ paginas: { 1: { pendiente: false }, 2: { pendiente: true, vision: { clave: "x" } }, 3: { pendiente: false } } }));
+  assert.doesNotMatch(dossier(c.raiz, c.d, c.tema, 3000, 1500), /Preparación del tema/);
 });
 
 // Curso real de punta a punta (ingesta base sin modelo) con un modelo simulado: visión, segmentación y clasificación.

@@ -142,10 +142,11 @@ export function leerItems(datos: DatosCurso, doc: string, ids: string[], incluir
 export function faltantesTema(raiz: string, datos: DatosCurso, tema: Tema): string[] {
   const faltan: string[] = [];
   for (const ref of tema.bibliografia || []) {
-    let qs: Record<string, { pendiente?: boolean }> = {};
+    let qs: Record<string, { pendiente?: boolean; vision?: unknown; error_vision?: unknown }> = {};
     try { qs = JSON.parse(leer(raiz, `_procesado/${ref.doc}/calidad.json`, 50_000_000)).paginas || {}; } catch { /* Sin ingesta falta todo el rango. */ }
     const [desde, hasta] = ref.paginas, total = hasta - desde + 1;
-    const sin = Array.from({ length: total }, (_, i) => desde + i).filter(p => !qs[p] || qs[p].pendiente).length;
+    // Una página que ya pasó por visión y sigue dudosa no se vuelve a preparar: la marca leer_paginas.
+    const sin = Array.from({ length: total }, (_, i) => desde + i).filter(p => !qs[p] || (qs[p].pendiente && (!qs[p].vision || qs[p].error_vision))).length;
     if (sin) faltan.push(`${ref.doc} PDF ${desde}–${hasta} (${sin} de ${total} páginas)`);
   }
   for (const clase of ["ejercicios", "evaluaciones"] as const) for (const ref of tema[clase] || []) {
