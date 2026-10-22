@@ -533,7 +533,7 @@ def main():
     limite = config["max_tokens_curso_md"]
     if args.accion in {"revisar", "aplicar"}:
         if args.propuesta is None:
-            p.error("Indicá --propuesta con un JSON dentro de _procesado/.")
+            p.error("Indicá --propuesta con un JSON en _procesado/ de la raíz del vault.")
         resultado = revisar(vault, args.curso, args.propuesta, limite)[0] if args.accion == "revisar" else aplicar(vault, args.curso, args.propuesta, args.base, args.huella, limite)
     elif args.accion == "manifiesto":
         resultado = manifiesto(vault, args.curso, args.todo, limite)
