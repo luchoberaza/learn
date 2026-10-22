@@ -239,9 +239,11 @@ export function registrarResearcher(pi: ExtensionAPI, actual: () => Estado | und
         if (!esSlug(p.curso) || !esSlug(p.tema) || !/^[a-f0-9]{64}$/.test(p.huella) || !Array.isArray(p.archivos) || p.archivos.length > 100 || p.archivos.some(f => !f.startsWith(`cursos/${p.curso}/`))) throw new Error("Estado de investigación inválido; se preservaron las notas.");
         const dir = trabajo(vault, p.curso, inicio.nombre), st = estadoTrabajo(dir);
         if (st === "corriendo") continue;
-        // Libre: otra sesión ya lo recogió; se cierra en silencio.
-        avisar = st !== "libre";
-        r = st === "terminada" ? recoger(vault, p, dir) : st === "interrumpida" ? { estado: "interrumpida", error: "El researcher se interrumpió sin entregar el informe.", texto: "" } : { estado: "recogida", error: "", texto: "" };
+        // Si ya lo recogió el dossier u otra sesión, su fallo se informa igual; un informe guardado se cierra en silencio.
+        const fallo = existsSync(join(dir, "fallo")) ? readFileSync(join(dir, "fallo"), "utf8") : "";
+        avisar = st !== "libre" || !!fallo;
+        r = st === "terminada" ? recoger(vault, p, dir) : st === "interrumpida" ? { estado: "interrumpida", error: "El researcher se interrumpió sin entregar el informe.", texto: "" }
+          : fallo ? { estado: fallo.slice(0, fallo.indexOf(":")), error: fallo.slice(fallo.indexOf(":") + 2), texto: "" } : { estado: "recogida", error: "", texto: "" };
       } catch (e) { r = { estado: "no_guardada", error: e instanceof Error ? e.message : "Estado de investigación inválido.", texto: "" }; }
       pi.appendEntry("curso-researcher", { tipo: "fin", nombre: inicio.nombre, estado: r.estado, file: r.file, error: r.error });
       pi.events.emit("curso:verificacion", { curso: p.curso, tema: p.tema, modo: p.modo, nombre: inicio.nombre, estado: r.estado, file: r.file, error: r.error });

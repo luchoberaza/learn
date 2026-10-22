@@ -158,6 +158,18 @@ test('H34: el researcher colgado se mata al vencer el plazo, avisa una vez y esp
   assert.equal(r.entradas.filter(x => x.data.tipo === 'inicio').length, 1);
 });
 
+test('H34: un plazo vencido que el dossier recogió primero se avisa como no disponible, no como lista', async t => {
+  const e = entorno(t), r = runtime(e, falso(e, eterno), 1);
+  const res = await r.alcance(), dir = carpeta(e, res.details.nombre);
+  t.after(() => matar(dir));
+  await esperar(() => existsSync(join(dir, 'codigo')));
+  verificacionPrevia(e.vault, e.recursos, e.d, e.tema); // restaurar o registrar_progreso arman el dossier antes del turno
+  await r.turno();
+  assert.equal(r.entradas.at(-1).data.estado, 'vencida');
+  assert.deepEqual(r.avisos, [['Verificación del material no disponible; seguimos con el material del curso.', 'warning']]);
+  assert.equal(r.mensajes.length, 1); assert.doesNotMatch(r.mensajes[0][0].content, /^Informe/);
+});
+
 test('H34: sin credenciales del modelo del researcher no se lanza nada', async t => {
   const e = entorno(t), r = runtime(e, falso(e, informe)); r.credenciales = false;
   const res = await r.alcance();
