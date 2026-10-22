@@ -58,7 +58,7 @@ test('H32: una caché previa del tema se inyecta marcada «previa» y no bloquea
 
 // researcher simulado: guarda sus argumentos y responde con un informe válido que cita la primera ancla.
 function falso(e, cuerpo) {
-  const f = join(e.vault, 'falso.mjs'); writeFileSync(f, `import { readFileSync, writeFileSync } from 'node:fs';\nwriteFileSync(${JSON.stringify(join(e.vault, 'argv.json'))}, JSON.stringify(process.argv.slice(2)));\n${cuerpo}`);
+  const f = join(e.vault, 'falso.mjs'); writeFileSync(f, `import { existsSync, readFileSync, writeFileSync } from 'node:fs';\nconst vault = ${JSON.stringify(e.vault)};\nwriteFileSync(${JSON.stringify(join(e.vault, 'argv.json'))}, JSON.stringify(process.argv.slice(2)));\n${cuerpo}`);
   return [process.execPath, f];
 }
 const informe = `const cita = readFileSync(0, 'utf8').match(/\\[\\[cursos\\/[^\\]]+#page=\\d+\\]\\]/)[0];
@@ -111,7 +111,8 @@ test('H07: tras /fin el informe se guarda en silencio, sin avisos ni mensajes', 
   assert.match(verificacionPrevia(e.vault, e.recursos, e.d, e.tema), /vigente/);
 });
 
-const eterno = `setInterval(() => {}, 1000);`;
+// Nunca entrega; termina solo cuando el test borra el vault.
+const eterno = `setInterval(() => { if (!existsSync(vault)) process.exit(0); }, 100);`;
 const matar = dir => { try { process.kill(-JSON.parse(readFileSync(join(dir, 'trabajo.json'), 'utf8')).pid, 'SIGKILL'); } catch { /* Ya terminó. */ } };
 test('H33: un researcher muerto sin informe no bloquea el alcance tras /reload y no sugiere subagent_message', async t => {
   const e = entorno(t), r = runtime(e, falso(e, eterno));
