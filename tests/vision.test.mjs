@@ -28,7 +28,7 @@ ejecutar({'version':1,'motores':{c:'pymupdf' for c in ['digital','escaneada','mi
   solicitud = { vault, salida: join(vault, "_procesado/prueba"), doc: "practico", paginas: [1, 3] };
   llamadas = [];
   ctx = { hasUI: true, ui: { confirm: async () => true }, modelRegistry: {
-    find: () => ({ input: ["text", "image"] }),
+    find: () => ({ input: ["text", "image"] }), hasConfiguredAuth: () => true,
     streamSimple: (_modelo, contexto, opciones) => {
       llamadas.push({ contexto, opciones });
       return { result: async () => ({ stopReason: "stop", content: [{ type: "text", text: texto }], usage: structuredClone(uso) }) };
@@ -116,7 +116,7 @@ test("cancelar detiene la tanda y deja recuperable la página actual", async () 
   const resultado = await transcribir(ctx, solicitud, config, control.signal);
   assert.equal(resultado.resumen.cancelada, true);
   assert.equal(llamadas.length, 1);
-  assert.equal(calidad().error_vision, true);
+  assert.equal(calidad().error_vision, undefined);
 });
 test("una anotación manual nunca se reemplaza ni llega al modelo", async () => {
   writeFileSync(join(solicitud.salida, "practico/paginas/0001.md"), "Mis anotaciones");

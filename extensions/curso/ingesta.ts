@@ -38,6 +38,14 @@ export async function transcribir(ctx: Pick<ExtensionContext, "modelRegistry" | 
   if (typeof config.modelo_vision !== "string" || config.modelo_vision.indexOf("/") < 1) throw new Error("Modelo de visión inválido en curso.config.json.");
   const paginas = [...new Set(solicitud.paginas)].sort((a, b) => a - b);
   const resumen = { solicitadas: paginas.length, transcritas: 0, cache: 0, fallidas: [] as number[], pendientes: [] as number[], avisos: [] as string[], cancelada: false };
+  const separador = config.modelo_vision.indexOf("/");
+  const modelo = ctx.modelRegistry.find(config.modelo_vision.slice(0, separador), config.modelo_vision.slice(separador + 1));
+  if (!modelo?.input.includes("image") || !ctx.modelRegistry.hasConfiguredAuth(modelo)) {
+    resumen.fallidas.push(...paginas);
+    resumen.avisos.push(modelo?.input.includes("image") ? `Visión no disponible: no hay credenciales para ${modelo.provider}; ejecutá /login y repetí la transcripción.`
+      : `Visión no disponible: ${config.modelo_vision} no existe o no acepta imágenes; revisá modelo_vision en curso.config.json.`);
+    return { resumen, usage: undefined };
+  }
   if (paginas.length > config.max_paginas_vision_sin_confirmar) {
     if (!ctx.hasUI) throw new Error(`La tanda de ${paginas.length} páginas necesita confirmación interactiva; no se envió ninguna página.`);
     resumen.cancelada = !(await ctx.ui.confirm("Confirmar gasto de visión",
@@ -45,8 +53,6 @@ export async function transcribir(ctx: Pick<ExtensionContext, "modelRegistry" | 
     if (resumen.cancelada) return { resumen, usage: undefined };
   }
   let usage: Usage | undefined;
-  const separador = config.modelo_vision.indexOf("/");
-  const modelo = ctx.modelRegistry.find(config.modelo_vision.slice(0, separador), config.modelo_vision.slice(separador + 1));
   for (const pagina of paginas) {
     if (signal?.aborted) { resumen.cancelada = true; break; }
     informar?.(`${solicitud.doc}: página PDF ${pagina} (${resumen.transcritas + resumen.cache + resumen.fallidas.length + 1}/${paginas.length}).`);
@@ -56,10 +62,9 @@ export async function transcribir(ctx: Pick<ExtensionContext, "modelRegistry" | 
     try {
       preparada = await python("preparar", datos, signal);
       if (preparada.cache) { resumen.cache++; continue; }
-      etapa = "modelo";
-      if (!modelo?.input.includes("image")) throw new Error("Modelo de visión no disponible.");
       const imagen = readFileSync(preparada.imagen);
       if (createHash("sha256").update(imagen).digest("hex") !== preparada.sha256_imagen) throw new Error("Cambió el render.");
+      etapa = "modelo";
       const llamada = AbortSignal.any([...(signal ? [signal] : []), AbortSignal.timeout(180000)]);
       const respuesta = await ctx.modelRegistry.streamSimple(modelo, { messages: [{ role: "user", timestamp: Date.now(), content: [
         { type: "text", text: preparada.prompt },
@@ -71,21 +76,23 @@ export async function transcribir(ctx: Pick<ExtensionContext, "modelRegistry" | 
         for (const k of ["input", "output", "cacheRead", "cacheWrite", "total"] as const) usage.cost[k] += respuesta.usage.cost[k];
       }
       const texto = respuesta.content.filter(b => b.type === "text").map(b => b.text).join("\n");
-      if (respuesta.stopReason !== "stop" || !texto.trim()) throw new Error("Respuesta incompleta.");
+      if (respuesta.stopReason !== "stop" || !texto.trim()) throw new Error(respuesta.errorMessage || "respuesta vacía o cortada.");
       etapa = "guardar";
       const guardada = await python("guardar", { ...datos, ...preparada, texto, completa: true, uso: respuesta.usage,
         umbral: config.umbral_calidad_pagina }, signal);
       resumen.transcritas++;
       if (guardada.pendiente) resumen.pendientes.push(pagina);
     } catch (error) {
+      // Una cancelación del usuario no es un fallo: la página queda como estaba.
+      if (signal?.aborted) { resumen.cancelada = true; break; }
+      const mensaje = error instanceof Error ? error.message : String(error);
       resumen.fallidas.push(pagina);
-      resumen.avisos.push(`PDF ${pagina}: ${etapa !== "modelo" && error instanceof Error ? error.message.slice(0, 350) : "No se completó la llamada de visión; no se reintentó ni se cambió de modelo."}`);
+      resumen.avisos.push(`PDF ${pagina}: ${etapa === "modelo" ? `Visión no disponible: ${mensaje.slice(0, 200)}` : mensaje.slice(0, 350)}`);
       if (preparada && !preparada.cache) {
-        // Persistir el fallo aunque se haya cancelado la petición; nunca reemplaza texto ajeno.
+        // Nunca reemplaza texto ajeno; una página base buena sólo queda marcada para reintentar.
         try { await python("fallar", { ...datos, ...preparada }, AbortSignal.timeout(10000)); }
         catch { resumen.avisos.push(`PDF ${pagina}: no se pudo actualizar el estado; se preservaron los archivos existentes.`); }
       }
-      if (signal?.aborted) { resumen.cancelada = true; break; }
     }
   }
   return { resumen, usage };

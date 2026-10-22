@@ -10,11 +10,12 @@ from unittest.mock import patch
 
 import yaml
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts/ingesta"))
-from almacen import Conflicto, sha256
+from almacen import Conflicto, bloquear, sha256
 import test_cursos
 from test_ingesta import crear_pdf
 import test_vision
 from test_vision import TEXTO
+import vision
 from pipeline import ejecutar
 from cursos import manifiesto, revisar, validar
 
@@ -194,6 +195,18 @@ class VisionAuditoriaTest(unittest.TestCase):
         for puntos in [-1, True, "", "x" * 41, [12], float("inf")]:
             with self.subTest(puntos=puntos), self.assertRaisesRegex(ValueError, "puntos"):
                 self.items([{**items[0], "puntos": puntos}])
+
+    def test_h39_fallo_de_vision_no_degrada_una_pagina_digital_buena(self):
+        self.manifiesto["documentos"].append({"id": "libro", "titulo": "Libro", "tipo": "bibliografia", "archivo": "muestra.pdf", "paginas": [3]})
+        ejecutar(self.manifiesto, self.vault, self.raiz)
+        calidad = lambda: json.loads((self.raiz / "libro/calidad.json").read_text())["paginas"]["3"]
+        self.assertEqual(calidad()["ruta"], "digital")
+        datos = self.preparar(doc="libro", pagina=3)
+        with bloquear(self.raiz, self.vault):
+            vision.guardar(self.raiz, self.vault, datos, fallo=True)
+        q = calidad()
+        self.assertEqual((q["ruta"], q["pendiente"], q["error_vision"]), ("digital", False, True))
+        self.assertFalse(self.preparar(doc="libro", pagina=3)["cache"])
 
 
 if __name__ == "__main__":
