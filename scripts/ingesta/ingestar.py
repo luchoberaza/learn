@@ -11,19 +11,24 @@ import subprocess
 import sys
 
 from almacen import bloquear, leer_json, ruta_segura
-from pipeline import ejecutar
+from pipeline import adoptar, ejecutar
 
 
 def argumentos() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Ingesta base local: nunca modifica los PDFs originales.")
-    parser.add_argument("comando", choices=["procesar", "iniciar", "estado"], help="procesar en esta terminal, iniciar en segundo plano o consultar estado")
+    parser.add_argument("comando", choices=["procesar", "iniciar", "estado", "adoptar"],
+                        help="procesar en esta terminal, iniciar en segundo plano, consultar estado o adoptar una página editada a mano")
     parser.add_argument("--manifiesto", type=Path, help="JSON con documentos y páginas a procesar")
     parser.add_argument("--salida", required=True, type=Path, help="Directorio derivado dentro de _procesado/")
     parser.add_argument("--vault", type=Path, default=Path.cwd(), help="Raíz del vault (predeterminada: carpeta actual)")
     parser.add_argument("--limite-paginas", type=int, help="Pausar tras esta cantidad de páginas nuevas; permite reanudar")
+    parser.add_argument("--doc", help="adoptar: id del documento")
+    parser.add_argument("--pagina", type=int, help="adoptar: página PDF (base 1)")
     args = parser.parse_args()
-    if args.comando != "estado" and not args.manifiesto:
+    if args.comando in {"procesar", "iniciar"} and not args.manifiesto:
         parser.error("procesar e iniciar requieren --manifiesto")
+    if args.comando == "adoptar" and (not args.doc or args.pagina is None):
+        parser.error("adoptar requiere --doc y --pagina")
     return args
 
 
@@ -45,6 +50,13 @@ def main() -> int:
                 except BlockingIOError:
                     pass
         print(json.dumps(estado, ensure_ascii=False, indent=2))
+        return 0
+    if args.comando == "adoptar":
+        from vision import actualizar
+        with bloquear(salida, vault) as raiz:
+            resultado = adoptar(raiz, args.doc, args.pagina)
+            actualizar(raiz)
+        print(json.dumps(resultado, ensure_ascii=False))
         return 0
     config = json.loads((Path(__file__).resolve().parents[2] / "curso.config.json").read_text(encoding="utf-8"))
     manifiesto = {"umbral_calidad": config["umbral_calidad_pagina"], "idiomas_ocr": config["idioma_ocr"],

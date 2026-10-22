@@ -167,8 +167,7 @@ class IngestaTest(unittest.TestCase):
         self.ejecutar()
         pagina = self.salida / "muestra/paginas/0001.md"
         pagina.write_text("Mis anotaciones personales")
-        with self.assertRaises(Conflicto):
-            self.ejecutar()
+        self.assertIn("adoptar", " ".join(self.ejecutar()["editadas"]))
         self.assertEqual(pagina.read_text(), "Mis anotaciones personales")
 
     def test_rechaza_pdf_cambiado_sin_borrar_resultados(self):

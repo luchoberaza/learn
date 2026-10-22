@@ -8,6 +8,7 @@ import json
 import os
 from pathlib import Path
 import re
+import shlex
 import subprocess
 import time
 
@@ -94,12 +95,17 @@ def contenido_pagina(texto: str) -> str:
     return texto.split("\n\n", 1)[1] if texto.startswith("<!-- p. PDF ") and "\n\n" in texto else texto
 
 
+def editada(raiz: Path, doc: str, numero: int) -> Conflicto:
+    return Conflicto(f"La página {doc}/{numero:04}.md fue editada fuera de la ingesta; se preservó y no se indexa. Para conservarla: "
+                     f".pi/.venv/bin/python .pi/scripts/ingesta/ingestar.py adoptar --salida {shlex.quote(str(raiz))} --doc {doc} --pagina {numero}")
+
+
 def pagina_verificada(raiz: Path, id_doc: str, numero: int, entrada: dict) -> str | None:
     pagina = ruta_segura(raiz, f"{id_doc}/paginas/{numero:04}.md")
     if not pagina.exists():
         return None
     if not entrada.get("sha256_markdown") or sha256(pagina) != entrada["sha256_markdown"]:
-        raise Conflicto(f"La página generada {id_doc}/{numero:04}.md fue editada fuera de la ingesta; se preservó.")
+        raise editada(raiz, id_doc, numero)
     return pagina.read_text(encoding="utf-8")
 
 
@@ -114,12 +120,31 @@ def recuperar_registro(raiz: Path, doc: str, numero: int, previo: dict) -> dict:
         actual = sha256(archivo) if archivo.exists() else None
         esperado = entrada["sha256_markdown"]
         if actual not in {None, esperado, registro.get("sha256_anterior")}:
-            raise Conflicto(f"La página {doc}/{numero:04}.md tiene cambios ajenos a la ingesta; se preservó.")
+            raise editada(raiz, doc, numero)
         if actual != esperado:
             atomico(raiz, f"{doc}/paginas/{numero:04}.md", markdown)
     elif archivo.exists():
-        raise Conflicto("Hay un markdown sin registro de origen; se preservó.")
+        raise editada(raiz, doc, numero)
     return entrada
+
+
+def adoptar(raiz: Path, doc: str, numero: int) -> dict:
+    """Registra la edición humana de una página como su transcripción; la ingesta ya no la regenera."""
+    if not re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", doc) or not leer_json(raiz, f"{doc}/meta.json"):
+        raise ValueError("Documento inválido: usá el id de un documento ya ingerido.")
+    calidades = leer_json(raiz, f"{doc}/calidad.json", {"paginas": {}})
+    previo = (leer_json(raiz, f"{doc}/cache/{numero:04}.json") or {}).get("calidad") or calidades["paginas"].get(str(numero))
+    archivo = ruta_segura(raiz, f"{doc}/paginas/{numero:04}.md")
+    if not previo or not archivo.exists():
+        raise ValueError("Esa página no tiene registro ni transcripción; procesala primero con la ingesta.")
+    q = {k: v for k, v in previo.items() if k not in {"error", "error_vision"}}
+    q.update(ruta="manual", motor="manual", pendiente=False, requiere_vision=False, revision_humana="hecha",
+             sha256_markdown=sha256(archivo), avisos=["Edición humana adoptada: la ingesta no la regenera."])
+    guardar_json(raiz, f"{doc}/cache/{numero:04}.json", {"calidad": q, "markdown": archivo.read_bytes().decode("utf-8"),
+                                                         "sha256_anterior": previo.get("sha256_markdown")})
+    calidades["paginas"][str(numero)] = q
+    guardar_json(raiz, f"{doc}/calidad.json", calidades)
+    return {"doc": doc, "pagina": numero, "ruta": "manual", "revision_humana": "hecha"}
 
 
 def enunciados(texto: str, en_solucion: bool) -> tuple[str, bool]:
@@ -136,7 +161,7 @@ def enunciados(texto: str, en_solucion: bool) -> tuple[str, bool]:
 
 
 def construir_busqueda(raiz: Path) -> dict:
-    fragmentos = []
+    fragmentos, editadas = [], []
     for carpeta in sorted(raiz.iterdir()):
         if not carpeta.is_dir() or carpeta.is_symlink() or not (carpeta / "meta.json").exists():
             continue
@@ -149,7 +174,11 @@ def construir_busqueda(raiz: Path) -> dict:
         secciones = leer_json(raiz, f"{doc}/estructura.json", {"secciones": []})["secciones"]
         en_solucion, siguiente = False, 1
         for p, cal in sorted(calidades.items(), key=lambda par: int(par[0])):
-            markdown = pagina_verificada(raiz, doc, int(p), cal)
+            try:
+                markdown = pagina_verificada(raiz, doc, int(p), cal)
+            except Conflicto as error:
+                editadas.append(str(error))
+                continue
             if markdown is None:
                 continue
             texto = contenido_pagina(markdown)
@@ -174,8 +203,11 @@ def construir_busqueda(raiz: Path) -> dict:
     df = Counter(termino for f in fragmentos for termino in f["frecuencias"])
     resultado = {"version": 1, "normalizacion": "NFD-sin-tildes-v1", "k1": 1.2, "b": 0.75,
                  "cantidad": len(fragmentos), "largo_promedio": sum(f["largo"] for f in fragmentos) / max(1, len(fragmentos)),
-                 "df": dict(df), "fragmentos": fragmentos}
+                 "df": dict(df), "fragmentos": fragmentos, "editadas": editadas}
     guardar_json(raiz, "busqueda.json", resultado)
+    estado = leer_json(raiz, "estado-ingesta.json")
+    if estado is not None and estado.get("editadas", []) != editadas:
+        guardar_json(raiz, "estado-ingesta.json", {**estado, "editadas": editadas})
     return resultado
 
 
@@ -196,7 +228,7 @@ def informe(raiz: Path) -> None:
         lineas.extend([f"## {meta['titulo']}", "", f"- Documento: `{doc}` · tipo: `{meta['tipo']}`.",
                        f"- PDF completo: **{meta['paginas']} páginas**; solicitadas: **{len(solicitadas)}**; con registro: **{len(procesadas)}**.",
                        f"- Fuera de esta selección: {meta['paginas'] - len(solicitadas)}; no se declara procesado el documento completo.",
-                       "- Rutas sobre la selección solicitada: " + ", ".join(f"{r}: {rutas[r]} ({100 * rutas[r] / len(solicitadas):.1f} %)" for r in ["digital", "ocr", "vision", "pendiente"]) + ".",
+                       "- Rutas sobre la selección solicitada: " + ", ".join(f"{r}: {rutas[r]} ({100 * rutas[r] / len(solicitadas):.1f} %)" for r in ["digital", "ocr", "vision", "manual", "pendiente"]) + ".",
                        f"- Clasificaciones observadas: {dict(clases)}.", "", "| Página PDF | Impresa | Motor | Puntaje | Estado | Avisos |",
                        "|---|---|---|---:|---|---|"])
         for numero in solicitadas:
@@ -204,8 +236,13 @@ def informe(raiz: Path) -> None:
             if q is None:
                 lineas.append(f"| {cita(meta['archivo'], numero)} | — | — | — | pendiente | No procesada todavía |")
                 continue
-            avisos = "; ".join(q["avisos"]).replace("|", "\\|").replace("\n", " ") or "—"
-            lineas.append(f"| {cita(meta['archivo'], numero)} | {q.get('impresa') or '—'} | {q.get('motor') or '—'} | {q['puntaje']:.2f} | {q['ruta']} | {avisos} |")
+            ruta, avisos = q["ruta"], q["avisos"]
+            try:
+                pagina_verificada(raiz, doc, numero, q)
+            except Conflicto as error:
+                ruta, avisos = "editada", [str(error)]
+            avisos = "; ".join(avisos).replace("|", "\\|").replace("\n", " ") or "—"
+            lineas.append(f"| {cita(meta['archivo'], numero)} | {q.get('impresa') or '—'} | {q.get('motor') or '—'} | {q['puntaje']:.2f} | {ruta} | {avisos} |")
         lineas.append("")
     lineas.extend(["## Mapeo e ítems", "", "- Tabla tema → material: **pendiente de la curación de Fase 3**; no se inventó a partir de BM25.",
                    "- Temas sin material: todavía no evaluables sin un índice curado.",
@@ -246,10 +283,15 @@ def ejecutar(manifiesto: dict, vault: Path, salida: Path, *, limite_paginas: int
                     calidades = leer_json(raiz, f"{identificador}/calidad.json", {"version": 1, "paginas": {}})
                     titulos = {int(p): q.get("encabezados", []) for p, q in calidades["paginas"].items()}
                     seleccion = sorted(set(doc["paginas"]) | set(anterior["seleccion"] if anterior else []))
+                    editadas_doc = set()
                     for n in seleccion:
-                        recuperado = recuperar_registro(raiz, identificador, n, calidades["paginas"].get(str(n), {}))
-                        if recuperado:
-                            calidades["paginas"][str(n)] = recuperado
+                        try:
+                            recuperado = recuperar_registro(raiz, identificador, n, calidades["paginas"].get(str(n), {}))
+                            if recuperado:
+                                calidades["paginas"][str(n)] = recuperado
+                            pagina_verificada(raiz, identificador, n, calidades["paginas"].get(str(n), {}))
+                        except Conflicto:
+                            editadas_doc.add(n)  # se preserva y se avisa; no frena el resto de la ingesta
                     guardar_json(raiz, f"{identificador}/calidad.json", calidades)
                     meta = {"version": 1, "id": identificador, "sha256": huella, "paginas": len(pdf), "titulo": doc["titulo"],
                             "tipo": doc["tipo"], "archivo": doc["archivo"], "seleccion": seleccion,
@@ -258,6 +300,11 @@ def ejecutar(manifiesto: dict, vault: Path, salida: Path, *, limite_paginas: int
                     for numero in doc["paginas"]:
                         estado.update(documento=identificador, pagina=numero)
                         previo = calidades["paginas"].get(str(numero), {})
+                        if numero in editadas_doc:
+                            estado["procesadas"] += 1
+                            estado["pendientes"] += 1
+                            progreso()
+                            continue
                         almacenado = pagina_verificada(raiz, identificador, numero, previo)
                         clase_previa = previo.get("clasificacion", {}).get("clase")
                         motor = motores.get(clase_previa)
@@ -276,7 +323,7 @@ def ejecutar(manifiesto: dict, vault: Path, salida: Path, *, limite_paginas: int
                             continue
                         if limite_paginas is not None and nuevas >= limite_paginas:
                             estado["estado"] = "interrumpida"
-                            construir_busqueda(raiz)
+                            estado["editadas"] = construir_busqueda(raiz)["editadas"]
                             informe(raiz)
                             progreso()
                             return estado
@@ -347,7 +394,7 @@ def ejecutar(manifiesto: dict, vault: Path, salida: Path, *, limite_paginas: int
                             log.write(json.dumps({"fecha": ahora(), "doc": identificador, "pagina": numero,
                                                   "motor": resultado["motor"], "ruta": resultado["ruta"], "segundos": resultado["segundos"]}, ensure_ascii=False) + "\n")
                     guardar_json(raiz, f"{identificador}/estructura.json", estructura(pdf, titulos))
-            construir_busqueda(raiz)
+            estado["editadas"] = construir_busqueda(raiz)["editadas"]
             informe(raiz)
             estado["estado"] = "completada_con_pendientes" if estado["pendientes"] else "completada"
         except (KeyboardInterrupt, SystemExit):

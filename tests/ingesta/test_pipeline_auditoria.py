@@ -1,18 +1,22 @@
 """Regresiones de la auditoría sobre la ingesta, sin LLM. Las pruebas con PDFs reales se omiten si falta el curso."""
 from __future__ import annotations
 
+from contextlib import redirect_stdout
+import io
 import json
 from pathlib import Path
 import shutil
 import sys
 import tempfile
 import unittest
+from types import SimpleNamespace
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts/ingesta"))
 
 import pymupdf
 from almacen import bloquear
+import ingestar
 import extraccion
 from extraccion import clasificar
 from pipeline import construir_busqueda, ejecutar
@@ -183,6 +187,48 @@ class SolucionesFueraDelIndiceTest(Base):
             self.assertIn(enunciado, texto)
         for solucion in ["registro MX", "RCPT TO", "Content-type", "ventaja concreta", "temporizadores", "Son 16 paquetes"]:
             self.assertNotIn(solucion, texto)
+
+
+class EdicionManualTest(Base):
+    def setUp(self):
+        super().setUp()
+        self.pdf("a.pdf", ["Primer documento con texto sobre enrutamiento y tablas de reenvío. " * 4] * 2)
+        self.pdf("b.pdf", ["Segundo documento con texto sobre congestión y control de flujo. " * 4])
+        self.ejecutar(self.doc("a"), self.doc("b"))
+        self.editada = self.salida / "a/paginas/0001.md"
+        self.editada.write_text("Mi resumen corregido sobre enrutamiento", encoding="utf-8")
+
+    def busqueda(self) -> dict:
+        return json.loads((self.salida / "busqueda.json").read_text())
+
+    def adoptar(self, doc: str = "a", pagina: int = 1) -> int:
+        args = SimpleNamespace(comando="adoptar", vault=self.vault, salida=self.salida, doc=doc, pagina=pagina, manifiesto=None, limite_paginas=None)
+        with patch("ingestar.argumentos", return_value=args), redirect_stdout(io.StringIO()):
+            return ingestar.main()
+
+    def test_una_pagina_editada_no_traba_otros_documentos_ni_vision(self):
+        estado = self.ejecutar(self.doc("b"))
+        self.assertEqual(estado["estado"], "completada")
+        self.assertIn("ingestar.py adoptar", estado["editadas"][0])
+        self.assertIn("--doc a --pagina 1", estado["editadas"][0])
+        self.assertEqual({(f["doc"], f["pagina"]) for f in self.busqueda()["fragmentos"]}, {("a", 2), ("b", 1)})
+        self.assertIn("| editada |", (self.salida / "informe-ingesta.md").read_text())
+        self.assertEqual(self.transcribir("b", "Transcripción de visión: " + PROSA)["ruta"], "vision")
+        estado = self.ejecutar(self.doc("a"), self.doc("b"))
+        self.assertEqual(estado["estado"], "completada_con_pendientes")
+        self.assertEqual(self.editada.read_text(encoding="utf-8"), "Mi resumen corregido sobre enrutamiento")
+
+    def test_adoptar_registra_la_edicion_y_la_ingesta_la_conserva(self):
+        self.assertEqual(self.adoptar(), 0)
+        q = self.q("a")
+        self.assertEqual((q["ruta"], q["revision_humana"], q["pendiente"]), ("manual", "hecha", False))
+        self.assertIn("Mi resumen corregido", " ".join(f["texto"] for f in self.busqueda()["fragmentos"]))
+        self.assertEqual(json.loads((self.salida / "estado-ingesta.json").read_text())["editadas"], [])
+        with patch("extraccion.VERSION_ALGORITMO", 99):
+            estado = self.ejecutar(self.doc("a"), self.doc("b"))
+        self.assertEqual((estado["estado"], estado["editadas"]), ("completada", []))
+        self.assertEqual(self.editada.read_text(encoding="utf-8"), "Mi resumen corregido sobre enrutamiento")
+        self.assertEqual(self.q("a")["ruta"], "manual")
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
