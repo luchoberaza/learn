@@ -80,43 +80,39 @@ export function buscarMaterial(raiz: string, datos: DatosCurso, consulta: string
       fragmento: `Sin texto antes del intento: ${como}.` }];
   });
 }
-// Corta desde «Solución» hasta la próxima «Pregunta N»; el estado sigue de una página a la otra.
-function sinSolucion(texto: string, estado: { en: boolean; marcas: number }): string {
-  const lineas = estado.en ? ["[Solución omitida hasta después del intento.]"] : [];
-  for (const linea of texto.split("\n")) {
-    const t = normalizar(linea).replace(/^(?:[\s#>*_]|<[^>]*>)+/, "");
-    if (/^(solucion|resolucion|respuesta)/.test(t)) {
-      estado.marcas++;
-      if (!estado.en) lineas.push("[Solución omitida hasta después del intento.]");
-      estado.en = true;
-    } else if (/^(pregunta|ejercicio|problema)\s*\d/.test(t)) estado.en = false;
-    if (!estado.en) lineas.push(linea);
+// Quita de todo el documento lo que va de «Solución» a la próxima «Pregunta N»; si alguna pregunta no trae su marca, no se separa.
+function sinSoluciones(raiz: string, d: Documento, noSeparable: Error): string[] {
+  if (d.tipo === "soluciones") throw noSeparable;
+  const omitida = "[Solución omitida hasta después del intento.]", paginas: string[] = [];
+  let en = false, marcada = true, preguntas = 0;
+  for (let p = 1; p <= d.paginas; p++) {
+    let texto: string;
+    try { texto = leer(raiz, `_procesado/${d.id}/paginas/${String(p).padStart(4, "0")}.md`, 200_000); } catch { throw noSeparable; }
+    const lineas = en ? [omitida] : [];
+    for (const linea of texto.split("\n")) {
+      const t = normalizar(linea).replace(/^(?:[\s#>*_|•-]|<[^>]*>)+/, "");
+      if (/^(solucion|resolucion|respuesta)/.test(t)) { if (!en) lineas.push(omitida); en = marcada = true; }
+      else if (/^(pregunta|ejercicio|problema)\s*(n\S{0,2}\s*)?\d/.test(t)) { if (!marcada) throw noSeparable; en = marcada = false; preguntas++; }
+      if (!en) lineas.push(linea);
+    }
+    paginas.push(lineas.join("\n").replace(/\[\[[^\]]*\]\]/g, ""));
   }
-  return lineas.join("\n");
+  if (!preguntas || !marcada) throw noSeparable;
+  return paginas;
 }
 export function leerPaginas(raiz: string, datos: DatosCurso, doc: string, desde: number, hasta: number, despuesDelIntento = false): string {
   const d = documento(datos, doc);
   if (![desde, hasta].every(Number.isInteger) || desde < 1 || hasta < desde || hasta > d.paginas) throw new Error("Rango PDF inválido (base 1, extremos incluidos).");
-  const reservado = !despuesDelIntento && conSolucion(d), estado = { en: false, marcas: 0 };
-  const noSeparable = `No se puede separar el enunciado de la solución en ${doc}: leé el enunciado con leer_items; el texto completo va con despues_del_intento:true.`;
-  if (reservado && d.tipo === "soluciones") throw new Error(noSeparable);
+  const reservadas = !despuesDelIntento && conSolucion(d) ? sinSoluciones(raiz, d, new Error(`No se puede separar el enunciado de la solución en ${doc}: leé el enunciado con leer_items; el texto completo va con despues_del_intento:true.`)) : undefined;
   let salida = "";
-  for (let p = reservado ? 1 : desde; p <= hasta && Buffer.byteLength(salida) < 30000; p++) {
-    let texto: string | undefined;
-    try { texto = leer(raiz, `_procesado/${doc}/paginas/${String(p).padStart(4, "0")}.md`, 200_000); } catch { /* sin transcripción */ }
-    if (reservado) {
-      if (texto === undefined) throw new Error(noSeparable);
-      texto = sinSolucion(texto, estado).replace(/\[\[[^\]]*\]\]/g, "");
-      if (p < desde) continue;
-    }
-    const enlace = reservado ? sinEnlace([p]) : cita(datos, doc, p);
-    salida += texto === undefined ? `\nPágina PDF ${p} sin transcripción utilizable; consultá ver_pagina. ${enlace}\n` : `\n${texto}\n${enlace}\n`;
+  for (let p = desde; p <= hasta && Buffer.byteLength(salida) < 30000; p++) {
+    try { salida += reservadas ? `\n${reservadas[p - 1]}\n${sinEnlace([p])}\n` : `\n${leer(raiz, `_procesado/${doc}/paginas/${String(p).padStart(4, "0")}.md`, 200_000)}\n${cita(datos, doc, p)}\n`; }
+    catch { salida += `\nPágina PDF ${p} sin transcripción utilizable; consultá ver_pagina. ${cita(datos, doc, p)}\n`; }
     try {
       const q = JSON.parse(leer(raiz, `_procesado/${doc}/calidad.json`)).paginas?.[String(p)];
       if (!q || q.pendiente) salida += "[Calidad pendiente: cotejá el original antes de usarlo.]\n";
     } catch { salida += "[Calidad no disponible.]\n"; }
   }
-  if (reservado && !estado.marcas) throw new Error(noSeparable);
   if (Buffer.byteLength(salida) >= 30000) salida += "\n[Rango incompleto; pedí menos páginas o ver_pagina para una página extensa.]";
   return acotar(salida, 32000);
 }

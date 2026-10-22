@@ -90,6 +90,24 @@ test("leer_paginas: corta las soluciones entre páginas y sin cortar con segurid
   assert.throws(() => leerPaginas(raiz, d, "parcial", 2, 2), /leer_items/);
 });
 
+test("leer_paginas: cada pregunta del documento necesita su marca de solución; si no, rechaza", t => {
+  const raiz = mkdtempSync(join(tmpdir(), "pi-fuga-"));
+  t.after(() => rmSync(raiz, { recursive: true, force: true }));
+  const leerParcial = paginas => {
+    rmSync(join(raiz, "_procesado"), { recursive: true, force: true });
+    mkdirSync(join(raiz, "_procesado/p/paginas"), { recursive: true });
+    paginas.forEach((texto, i) => writeFileSync(join(raiz, `_procesado/p/paginas/000${i + 1}.md`), texto));
+    const d = { curso: "c", documentos: [{ id: "p", titulo: "P", tipo: "evaluaciones", archivo: "fuentes/evaluaciones/p.pdf", paginas: paginas.length }], items: {} };
+    return leerPaginas(raiz, d, "p", 1, paginas.length);
+  };
+  for (const paginas of [["Pregunta 1\nUno.\nSolución\nSECRETO\nPregunta 2\nDos.\nSol.: SECRETO"],
+    ["Pregunta 1\nUno.\nSolución\nComo en la\nPregunta 2 del práctico, SECRETO\nPregunta 2\nDos.\nSolución\nSECRETO"],
+    ["Pregunta 1 (10 puntos) Uno. Solución: SECRETO\nPregunta 2\nDos.\nSolución\nSECRETO"],
+    ["Pregunta 1\nUno.\nSolución\nSECRETO\nPregunta 2\nDos.", "Rta: SECRETO"]]) assert.throws(() => leerParcial(paginas), /leer_items/, paginas[0]);
+  const texto = leerParcial(["Solución del parcial\nEjercicio Nº 1\nUno.\n| **Solución** |\n| SECRETO |\nEjercicio Nº 2\nDos.\n- Solución: SECRETO"]);
+  assert.match(texto, /Uno\.[^]*Dos\./); assert.doesNotMatch(texto, /SECRETO/);
+});
+
 test("leer_items de evaluaciones cita sin enlace antes del intento y con enlace después", () => {
   const d = datos(), antes = leerItems(d, "parcial", ["1", "2"]);
   assert.doesNotMatch(antes, /SOLUCION|\[\[|#page=/); assert.match(antes, /PDF p\. 1 \(el enlace va después del intento\)/);
