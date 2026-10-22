@@ -55,7 +55,7 @@ function curso(t, d = datos(), paginas = PAGINAS) {
   const comandos = new Map();
   const pi = { on: () => {}, registerCommand: (n, c) => comandos.set(n, c), appendEntry: () => {}, setSessionName: () => {}, sendUserMessage: () => {}, sendMessage: () => {},
     exec: async () => ({ code: 0, stdout: JSON.stringify(d), stderr: "" }), events: { emit: (_n, payload) => payload.onComplete?.() } };
-  const ctx = { hasUI: true, isIdle: () => true, sessionManager: { getBranch: () => [] },
+  const ctx = { hasUI: true, isIdle: () => true, sessionManager: { getBranch: () => [] }, model: { provider: "prueba", id: "modelo" }, modelRegistry: { hasConfiguredAuth: () => true },
     ui: { notify: () => {}, setStatus: () => {}, select: async (_t, opciones) => opciones[0] } };
   return { raiz, d, tools: registrarSesion(pi, vault, recursos), activar: () => comandos.get("estudiar").handler("calculo derivacion", ctx) };
 }

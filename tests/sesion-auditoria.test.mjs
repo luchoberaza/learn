@@ -44,6 +44,7 @@ function entorno(t, d = datos()) {
     exec: async () => ({ code: 0, stdout: JSON.stringify(d), stderr: "", killed: false }),
     events: { emit: (_n, p) => p.onComplete?.() } };
   const ctx = { hasUI: true, isIdle: () => true, sessionManager: { getBranch: () => entradas },
+    model: { provider: "prueba", id: "modelo" }, modelRegistry: { hasConfiguredAuth: () => true },
     ui: { notify: (m, tipo) => avisos.push([tipo, m]), setStatus: (k, v) => { estados[k] = v; }, select: async (_t, o) => o[0], confirm: async () => true } };
   return { vault, raiz, pi, ctx, comandos, eventos, entradas, avisos, ordenes, usuario, estados, sesion: registrarSesion(pi, vault, recursos),
     estudiar: args => comandos.get("estudiar").handler(args, ctx) };
@@ -237,4 +238,32 @@ test("H16: si md-log no confirma o sesiones/ no se puede escribir, la clase sigu
   chmodSync(join(f.raiz, "sesiones"), 0o755);
   assert.equal(f.sesion.actual().a.tema, "derivacion");
   assert.deepEqual(f.avisos.at(-1), ["warning", "Sin permiso para escribir en sesiones/: seguimos sin nota de Obsidian."]);
+});
+test("H02: sin modelo o sin credenciales no se crea nada y se dice qué hacer en una línea", async t => {
+  const e = entorno(t);
+  e.ctx.model = undefined;
+  await e.estudiar("calculo derivacion");
+  assert.deepEqual(e.avisos.at(-1), ["error", "No hay un modelo elegido: elegí uno con /model y repetí /estudiar."]);
+  e.ctx.model = { provider: "prueba", id: "modelo" };
+  e.ctx.modelRegistry = { hasConfiguredAuth: () => false, getProviderAuth: async () => undefined };
+  await e.estudiar("calculo derivacion");
+  assert.deepEqual(e.avisos.at(-1), ["error", "Sin credenciales para prueba/modelo: ejecutá /login y repetí /estudiar."]);
+  assert.deepEqual([e.entradas.length, e.ordenes.length, readdirSync(join(e.raiz, "sesiones")).length], [0, 0, 0]);
+  e.ctx.modelRegistry.getProviderAuth = async () => ({ type: "api_key" });
+  await e.estudiar("calculo derivacion");
+  assert.equal(e.ordenes.length, 1);
+});
+test("H02: un turno que termina en error del proveedor agrega una línea en español con la causa y qué hacer", async t => {
+  const e = entorno(t), turno = errorMessage => e.entradas.push({ type: "message", message: { role: "assistant", stopReason: "error", errorMessage, content: [] } });
+  const settled = (aborted = false) => e.eventos.get("agent_settled")({ type: "agent_settled", aborted }, e.ctx);
+  turno("fetch failed"); await settled();
+  assert.equal(e.avisos.length, 0, "sin curso activo no es una clase");
+  await e.estudiar("calculo derivacion");
+  for (const [error, causa] of [["fetch failed", /^Sin conexión con el proveedor/], ["429 You have reached your Subscription Sharing usage limit", /^El proveedor rechazó el pedido por cuota/],
+    ['No API key found for "openai-codex"', /^Faltan o vencieron las credenciales del modelo: ejecutá \/login/], ["Internal server error", /^El modelo devolvió un error/]]) {
+    e.avisos.length = 0; turno(error); await settled();
+    assert.equal(e.avisos.length, 1); assert.match(e.avisos[0][1], causa); assert.match(e.avisos[0][1], /escribí «seguí» para reintentar o \/fin para guardar\.$/);
+  }
+  e.avisos.length = 0; await settled(true);
+  assert.equal(e.avisos.length, 0);
 });

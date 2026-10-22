@@ -33,7 +33,7 @@ function entorno(t, d = datos(), entradas = []) {
     sendUserMessage: m => mensajes.push({ usuario: m }), sendMessage: m => mensajes.push({ orden: m.content }),
     exec: async () => ({ code: 0, stdout: JSON.stringify(d), stderr: "" }),
     events: { emit: (n, payload) => { vinculos.push([n, payload]); payload.onComplete?.(); } } };
-  const ctx = { hasUI: true, isIdle: () => true, sessionManager: { getBranch: () => entradas, getEntries: assert.fail },
+  const ctx = { hasUI: true, isIdle: () => true, sessionManager: { getBranch: () => entradas, getEntries: assert.fail }, model: { provider: "prueba", id: "modelo" }, modelRegistry: { hasConfiguredAuth: () => true },
     ui: { notify: (...m) => avisos.push(m), setStatus: () => {}, select: async (_titulo, opciones) => opciones[0] } };
   const tools = registrarSesion(pi, vault, recursos);
   return { pi, ctx, comandos, eventos, mensajes, avisos, vinculos, tools, raiz, vault, recursos, entradas };

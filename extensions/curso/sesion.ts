@@ -108,6 +108,17 @@ export function registrarSesion(pi: ExtensionAPI, vault = vaultDir, recursos = p
     }
     Object.assign(event.systemPromptOptions.sections, { teach, modo_curso: modo, curso: resumen });
   });
+  // pi muestra el error del proveedor en inglés: se suma una línea con la causa probable y qué hacer.
+  pi.on("agent_settled", (event, ctx) => {
+    const ultimo = activo && !event.aborted ? ctx.sessionManager.getBranch().findLast(e => e.type === "message") : undefined;
+    if (ultimo?.type !== "message" || ultimo.message.role !== "assistant" || ultimo.message.stopReason !== "error") return;
+    const error = ultimo.message.errorMessage || "";
+    const causa = /usage limit|quota|rate.?limit|\b429\b|too many requests/i.test(error) ? "El proveedor rechazó el pedido por cuota o límite de uso: esperá o cambiá de modelo con /model"
+      : /api key|unauthori[sz]ed|\b40[13]\b|authenticat|credential|expired|\/login/i.test(error) ? "Faltan o vencieron las credenciales del modelo: ejecutá /login"
+      : /fetch failed|network|ENOTFOUND|EAI_AGAIN|ECONN|ETIMEDOUT|socket|timed? ?out/i.test(error) ? "Sin conexión con el proveedor del modelo: revisá la red"
+      : "El modelo devolvió un error";
+    ctx.ui.notify(`${causa}; escribí «seguí» para reintentar o /fin para guardar.`, "warning");
+  });
   const cacheCompletar = new Map<string, { mtime: number; temas: Tema[] }>();
   pi.registerCommand("estudiar", {
     description: "Estudiar un tema del curso con sus fuentes, contexto persistente y log en Obsidian",
@@ -137,7 +148,12 @@ export function registrarSesion(pi: ExtensionAPI, vault = vaultDir, recursos = p
         else if (lista.length === 1) curso = lista[0];
         else if (palabras.length) { ctx.ui.notify(lista.length ? `No hay un curso «${palabras[0]}»: elegí uno de ${lista.join(", ")}.` : "No hay cursos preparados; usá /curso-nuevo.", "warning"); return; }
         if (!curso) { ctx.ui.notify("Uso: /estudiar <curso> [tema]", "warning"); return; }
-        const consulta = palabras.join(" ");
+        const consulta = palabras.join(" "), modelo = ctx.model;
+        if (!modelo) { ctx.ui.notify("No hay un modelo elegido: elegí uno con /model y repetí /estudiar.", "error"); return; }
+        // hasConfiguredAuth lee un snapshot que puede estar viejo; como pi, se confirma con la resolución real (un error lo informa el turno).
+        if (!ctx.modelRegistry.hasConfiguredAuth(modelo) && !(await ctx.modelRegistry.getProviderAuth(modelo.provider).catch(() => true))) {
+          ctx.ui.notify(`Sin credenciales para ${modelo.provider}/${modelo.id}: ejecutá /login y repetí /estudiar.`, "error"); return;
+        }
         const d = await cargar(curso, true);
         for (const aviso of d.avisos.filter(a => a.startsWith("Progreso") || a === COPIA)) ctx.ui.notify(aviso, "warning");
         let candidatos = consulta ? resolverTemas(d.temas, consulta) : ordenarTemas(d), resultados: ReturnType<typeof buscarMaterial> = [];
