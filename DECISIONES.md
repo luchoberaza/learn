@@ -286,3 +286,207 @@ Se conservan los intentos fallidos: modelo inicial distinto (1792636116750); rut
 Al retomar la fase, openai ya no tenía autenticación configurada y el modelo seleccionado por el runtime era openai-codex/gpt-6.1-sol. Doctor falló ambos pings openai/gpt-6-luna. Se informó y el usuario eligió «Usar openai-codex». Antes de adoptar el cambio respondieron openai-codex/gpt-6.1-sol por texto y gpt-6-luna por texto/PNG. Se verificaron docs de modelos y las declaraciones públicas del runtime instalado. Se cambiaron sólo .pi/settings.json, curso.config.json, frontmatter del researcher y las expectativas de los scripts de ensayo; ninguna credencial ni configuración personal.
 
 Doctor completo volvió a verde con el nuevo proveedor; los informes previos conservan sus ids históricos. El cambio de modelo/config invalida por diseño las claves de researcher/visión, preservando sus generaciones anteriores. No se recreó alcance ni se retranscribieron PDFs durante Fase 7: el próximo estudio puede lanzar un alcance nuevo, y una futura preparación de visión explícita puede consumir llamadas nuevas. No se alteró la versión de pi ni se eligió otro nombre de modelo. No se relanzaron los ensayos históricos de fotos/visión/researcher sólo para actualizar su etiqueta de proveedor; siguen disponibles como opcionales.
+
+## Auditoría de robustez — 2026-10-22
+
+Decisiones tomadas a partir de `../AUDITORIA.md`; los ids H/X son sus hallazgos. DA1–DA7 son decisiones del usuario y DA8–DA26, decisiones de diseño de los arreglos. «Verifica» nombra el test o el comando que lo comprueba. Los tests corren sin modelo ni red desde la raíz del vault:
+
+```bash
+node --test .pi/tests/*.test.mjs
+.pi/.venv/bin/python -m unittest discover -s .pi/tests/ingesta
+```
+
+### DA1 — Al crear un curso se ingiere todo sin modelo (usuario)
+
+- **Contexto:** Redes tenía ingeridas 52 de 987 páginas; aplicación, transporte, red y enlace no tenían texto y el tutor leía imágenes página por página (H05).
+- **Decisión:** `/curso-nuevo` y `/curso-agregar` ingieren sin modelo todas las páginas de todos los documentos: `cursos.py manifiesto --curso <slug> --todo` (escribe `_procesado/manifiesto-<slug>.json` en la raíz del vault) e `ingestar.py iniciar`. Mientras corre, la salida del curso queda tomada («Ya hay una ingesta escribiendo en esta salida.») y las skills esperan a que `estado` diga `completada` o `completada_con_pendientes`.
+- **Por qué:** es local y no gasta modelo; la caché saltea lo ya preparado.
+- **Verifica:** `test_cursos_auditoria.py`, `test_h05_manifiesto_de_pendientes_y_de_todo_con_los_ids_del_indice`; `.pi/.venv/bin/python .pi/scripts/ingesta/cursos.py --help` muestra `manifiesto` y `--todo | --pendientes`.
+
+### DA2 — La primera vez que se estudia un tema se prepara con modelo, en segundo plano (usuario)
+
+- **Contexto:** visión, segmentación y asignación de ítems eran pasos manuales con confirmación: había 5 de 25 preguntas de parcial y 10 de 71 ejercicios segmentados, y la matemática digital de Kurose sale rota (H19, H22).
+- **Decisión:** si el tema activo (no ad hoc) necesita preparación, un handler de `before_agent_start` la lanza sin `await`, una vez por clase, con `modelo_vision`: visión de las páginas pendientes de su bibliografía; visión de todas las páginas de parciales y prácticos sin segmentar; segmentación en `items.yaml`, con las soluciones integradas como ítems aparte; y clasificación por tema de los ítems que el índice no asigna, en `cursos/<c>/_procesado/asignaciones.json`. `indice.yaml` no se toca y manda.
+  - Sin confirmación por cantidad; tope de 150 páginas por corrida (`TOPE` en `extensions/curso/preparacion.ts`). Lo que falta sigue la próxima vez.
+  - Lock `cursos/<c>/_procesado/.preparacion.lock` con `{pid, inicio}`: se reemplaza si su pid murió o tiene más de 6 h. Con la ingesta base corriendo, espera al próximo turno sin avisar.
+  - Una respuesta inválida se reintenta una vez con el motivo; un enunciado que trae un marcador de solución se rechaza. Un documento de tipo `soluciones` no se segmenta solo.
+  - Una falla es una línea «Preparación del material no disponible: …; seguimos con lo que hay.». El estado por tema queda en `_procesado/preparacion.json`.
+- **Por qué:** fricción cero sin demorar la primera pregunta; en el e2e de la rama `fix/preparacion` con pi 1.4.0 llegó a los 0,6–0,75 s con la preparación ya lanzada (notas de esa rama). El tope acota lo que gasta una corrida sin pedir confirmación.
+- **Verifica:** `preparacion-auditoria.test.mjs`: «preparación: la primera vez transcribe, segmenta con soluciones y puntos, clasifica y avisa sin turno ni confirmación», «preparación: no demora el turno, y sin credenciales avisa una línea y no llama al modelo», «preparación: con la ingesta base corriendo u otro pi preparando espera sin avisos y retoma un lock de un pi muerto», «preparación: un kill a mitad no rompe nada y la próxima vez sigue sin repetir páginas». `test_preparacion_auditoria.py`: `test_prioriza_el_tema_luego_parciales_y_practicos_con_tope`, `test_asignar_valida_y_nunca_toca_el_indice`.
+
+### DA3 — ponytail y las skills globales, fuera sólo en este proyecto (usuario)
+
+- **Contexto:** la última sección del prompt del tutor era ponytail («lazy senior developer…») y entraban 58 skills globales, una en colisión con teach (H14).
+- **Decisión:** `.pi/settings.json` filtra el paquete personal con `{ "source": "git:github.com/DietrichGebert/ponytail", "autoload": false, "extensions": ["!**"], "skills": ["!**"] }`, sin tocar `~/.pi`. `pi-learn` abre `pi <args> -ns --skill ~/Projects/pi-learning/.pi/skills`, salvo en los subcomandos de pi. Se reinstaló `pi-learn.fish` en `~/.config/fish/functions/`.
+- **Por qué:** el usuario no quiere cambiar su configuración personal. El filtro con `[]` no funciona y `"!**"` sí (AUDITORIA §6).
+- **Verifica:** doctor, «Prompt del tutor: sin secciones ajenas» y «Skills de cursos»; `entorno-auditoria.test.mjs`, «H14: pi-learn abre el tutor sin ponytail ni skills globales y con las skills del proyecto» y «H14: los argumentos de pi-learn van primero y no tapan los subcomandos de pi».
+
+### DA4 — `.pi/.venv` con el Python 3.13.13 de uv (usuario)
+
+- **Contexto:** el venv dependía de Conda base (`home = ~/miniconda3/bin` en su `pyvenv.cfg`), y con el venv roto o lento `/estudiar` no arrancaba (H03).
+- **Decisión:** `.pi/.venv` se recreó con el Python 3.13.13 que gestiona uv; el anterior quedó en `.pi/.venv.conda-bak`. La receta está en SETUP, «Dependencias globales».
+- **Por qué:** un Python gestionado por uv no depende de la instalación de Conda.
+- **Verifica:** doctor, «Python de ingesta: 3.13.13»; `.pi/.venv/pyvenv.cfg` apunta a `~/.local/share/uv/python/cpython-3.13.13-linux-x86_64-gnu`; `entorno-auditoria.test.mjs`, «comprobar: respeta ruta_tesseract y dice cómo recrear el venv con Python de uv».
+
+### DA5 — Thinking medium, sin proveedor de respaldo, errores en español (usuario)
+
+- **Contexto:** sin credenciales, red o cuota, `/estudiar` dejaba un error rojo en inglés y un log de 0 B (H02); el thinking se veía en inglés (H09). La auditoría proponía thinking «low» para acortar esperas (H10).
+- **Decisión:** el tutor razona en `medium`, el predeterminado de pi 1.4.0, que ningún settings cambia; el bloque queda oculto (`hideThinkingBlock: true`). Por ahora no hay proveedor de respaldo. `/estudiar` comprueba modelo y credenciales antes de crear nada, y un turno que termina en error del proveedor suma una línea en español con la causa probable (disco, cuota, credenciales, red u otro) y «seguí» o /fin.
+- **Por qué:** el usuario prefirió no bajar el razonamiento ni sumar otro proveedor; lo que sí hace falta es que el alumno entienda en español qué pasó y qué hacer.
+- **Verifica:** `sesion-auditoria.test.mjs`: «H02: sin modelo o sin credenciales no se crea nada y se dice qué hacer en una línea», «H02: un turno que termina en error del proveedor agrega una línea en español con la causa y qué hacer». `entorno-auditoria.test.mjs`: «H09: el thinking del tutor queda oculto como setting de proyecto». Doctor, «Thinking oculto».
+
+### DA6 — Logs técnicos fuera de las notas del curso (usuario)
+
+- **Contexto:** cada sesión de Redes ofrecía reconstruir logs de pruebas técnicas como si fueran del alumno; en pantalla apareció una «afirmación deliberadamente falsa» (H15).
+- **Decisión:** los logs técnicos de las pruebas de Redes se movieron a `_procesado/archivo-pruebas/redes/` del vault, con un `LEEME.md`.
+- **Por qué:** no son evidencia del alumno, y `_procesado` está excluido de Obsidian.
+- **Verifica:** `ls _procesado/archivo-pruebas/redes/` muestra `LEEME.md`, `sesiones/` y `verificaciones/`; `cursos/redes/sesiones/` sólo conserva `adjuntos/`.
+
+### DA7 — Pedagogía: decisión 6 de la auditoría (usuario)
+
+- **Contexto:** la auditoría dejó al usuario el tope del probe, la aprobación del plan, el puntaje, la reserva de ítems y el simulacro (H12, H35, H56, H20; AUDITORIA §5).
+- **Decisión:** un pedido explícito de explicación corta el probe, que tiene tope de 4 preguntas; el plan se aprueba con un botón y no se repite al retomar; la corrección da «≈ x/N»; hay un ítem reservado y `/simulacro`; por ahora no hay práctica por bloque.
+- **Por qué:** cierra los desvíos del contrato pedagógico que la auditoría dejó a decisión del usuario (C4, E3, E7, E9; PLAN:480, 487 y 492).
+- **Estado:** decidida, todavía no integrada en `cursos`. Su comportamiento y su verificación se documentan al integrarla.
+
+### DA8 — pi-learn: una sesión de tmux por carpeta, que muere sin cliente
+
+- **Contexto:** cerrar la ventana no terminaba pi, y el siguiente `pi-learn` abría otro pi sobre la misma sesión; `/resume` podía perder la respuesta del alumno (X03). Sin red y sin los paquetes fijados, pi no arrancaba (H41).
+- **Decisión:** fuera de tmux, `pi-learn` usa `new-session -A -s pi-learn-<hash de la carpeta>` en el servidor `-L pi-learn`: si ya hay un pi en esa carpeta se adjunta, y avisa si no puede usar los argumentos. `config/tmux.conf` fija `destroy-unattached on`. Si faltan los paquetes fijados, avisa y abre pi con `PI_OFFLINE=1`. El margen del shell de los subagentes baja a 300 ms.
+- **Por qué:** una sola instancia por carpeta evita dos pi sobre la misma sesión. Fish con Conda ejecuta la orden aunque llegue a los 0 ms (comentario de `config/fish/pi-learn.fish`): 300 ms queda de margen.
+- **Verifica:** `entorno-auditoria.test.mjs`: «X03: en el servidor de pi-learn una sesión sin cliente no sobrevive», «X03: pi-learn reutiliza la sesión de tmux de la carpeta y avisa si no puede usar los argumentos», «H41: sin los paquetes fijados pi-learn avisa en una línea y arranca pi sin red de inicio», «X06: el hijo del researcher recibe su orden a los 300 ms y se respeta un valor propio».
+
+### DA9 — El progreso tiene su propio lock
+
+- **Contexto:** el progreso usaba el lock de la salida del curso, que la ingesta retiene durante toda la corrida: con una ingesta en curso, `/estudiar` arrancaba con progreso vacío y fallaban `registrar_progreso`, `/fin` y `ver_pagina` (H06).
+- **Decisión:** leer el progreso no toma lock. `registrar_progreso` toma `cursos/<c>/.progreso.lock` y espera hasta 5 s («Otro proceso está guardando; reintentá.»). `ver_pagina` lee su caché sin lock y renderiza bajo `_procesado/<doc>/render/.render.lock`.
+- **Por qué:** `progreso.yaml` ya se publicaba atómico (temporal + fsync + rename); el lock compartido sólo hacía esperar a lectores detrás de un escritor largo.
+- **Verifica:** `test_progreso_auditoria.py`: `test_h06_leer_y_registrar_no_usan_el_bloqueo_de_la_ingesta`, `test_h06_registrar_espera_el_bloqueo_de_progreso`, `test_h06_dos_registros_simultaneos_guardan_ambas_evidencias`, `test_h06_cargar_y_render_cacheado_no_esperan_a_la_ingesta`.
+
+### DA10 — `registrar_progreso` recibe deltas
+
+- **Contexto:** el esquema exigía los 8 campos en cada guardado y `registrar_progreso` se llevaba el 26 % de la espera entre preguntas (H10); `borde.falla` acumulaba fallas superadas (H27).
+- **Decisión:** sólo `resumen` es obligatorio; lo omitido se conserva y lo nuevo se fusiona. Sin `estado` explícito, un tema nuevo sigue `sin_empezar` hasta que llega evidencia del alumno y entonces pasa a `en_curso`. `falla_resuelta` quita fallas por texto exacto; una falla nueva saca el concepto de `conceptos_firmes`; `dominado` con fallas en el borde da un aviso.
+- **Por qué:** la fusión ya existía; mandar sólo lo nuevo acorta cada guardado.
+- **Verifica:** `test_progreso_auditoria.py`: `test_h10_delta_con_solo_lo_nuevo_conserva_lo_previo`, `test_h10_el_estado_omitido_sigue_a_la_evidencia`, `test_h27_falla_resuelta_y_falla_nueva_sacan_lo_contradicho`.
+
+### DA11 — El registro tolera ids con inciso, ítems huérfanos y logs movidos
+
+- **Contexto:** un id como «2(a–c)» rechazaba todo el registro (H13); re-segmentar un banco invalidaba `progreso.yaml` (H31); las fechas eran UTC (H53); reconstruir una sesión vieja pisaba lo actual (H29); renombrar la nota impedía guardar (H04).
+- **Decisión:** los ids se normalizan al id base y el inciso va a notas; en documentos sin `items.yaml` quedan `sin_segmentar`; un ítem que desaparece queda «huérfano» con aviso. Las fechas son locales y el backend completa `fecha` y `detectado`; una reconstrucción fecha con el día del log y no pisa estado ni próximo paso más nuevos. Un log renombrado no impide guardar: sólo reconstruir lo exige.
+- **Por qué:** perder evidencia del alumno por un detalle de formato es peor que guardar con un aviso.
+- **Verifica:** `test_progreso_auditoria.py`: `test_h13_ids_tolerantes_guardan_el_resto_y_avisan`, `test_h31_item_resegmentado_queda_huerfano_sin_invalidar_progreso`, `test_h53_fechas_locales_y_completadas_por_el_backend`, `test_h29_reconstruir_una_sesion_vieja_no_pisa_lo_actual`, `test_h04_log_renombrado_no_impide_guardar`.
+
+### DA12 — El researcher corre en un pi propio, sin tmux
+
+- **Contexto:** el researcher iba por pi-interactive-subagents: partía la pantalla unos 60 s durante el probe, mostraba el informe crudo con su costo y disparaba turnos, también después de `/fin` (H07); `/reload` lo mataba (H33); no tenía plazo (H34); su caché estaba vigente en 0 de 8 temas (H32).
+- **Decisión:** `investigar_tema` lanza, desacoplado (`detached`), un `pi -p` sin sesión, extensiones, skills ni archivos de contexto, que carga sólo pi-web-access y usa el modelo, el thinking y las tools (`web_search, web_fetch, read`) de `agents/researcher.md`, bajo `timeout -k 5 180`. Trabaja en `cursos/<c>/notas/verificaciones/.trabajos/<clave>/`.
+  - Cualquier sesión lo recoge por huella; tras un plazo vencido, esa huella espera 10 min antes de relanzarse. Sin credenciales del modelo no se lanza.
+  - El informe llega al tutor como mensaje oculto `curso-verificacion` para el turno siguiente, sin disparar turnos; el alumno ve una línea.
+  - La huella del alcance cubre tema, páginas y enunciados adjuntados, contrato sin objetivos ajenos y el cuerpo de `researcher.md`; el modelo, sin proveedor, es un metadato. Las cachés anteriores quedan como «previa».
+- **Por qué:** el plan pedía un researcher silencioso (AUDITORIA §5); un proceso propio sobrevive a `/reload`, a un kill y al cierre de la terminal. pi-interactive-subagents sigue cargado para los subagentes fuera del curso.
+- **Verifica:** `researcher-auditoria.test.mjs`: «H07: investigar_tema lanza un pi propio sin tmux ni subagent, vuelve enseguida y entrega sin turnos», «H33: un informe terminado se recupera por huella desde otra sesión, sin relanzar», «H34: el researcher colgado se mata al vencer el plazo, avisa una vez y espera antes de relanzar», «H34: sin credenciales del modelo del researcher no se lanza nada», «H32: la huella del alcance depende sólo del tema, sus páginas y el prompt del researcher».
+
+### DA13 — Índice sin soluciones y soluciones separadas por ítem
+
+- **Contexto:** los parciales reales traen la solución integrada. `buscar_material` mostró en pantalla la solución oficial de UDP, 9 de 16 búsquedas típicas traían texto de solución (H01, X02), y una solución del mismo PDF no se podía vincular (H18).
+- **Decisión:**
+  - El BM25 de evaluaciones y ejercicios guarda sólo enunciados: corta desde «Solución», «Resolución», «Respuesta(s)» o «Rta.:» (`pipeline.SOLUCION`) hasta el próximo «Pregunta/Ejercicio/Problema N», también entre páginas. Los documentos de tipo `soluciones` no se indexan.
+  - Un documento cuenta como «con soluciones» si es de tipo `evaluaciones` o `soluciones` o tiene algún ítem `solucion_de`. Antes del intento, `buscar_material` da de él sólo la ubicación y los ids; `leer_paginas` cambia cada solución por «[Solución omitida hasta después del intento.]» o rechaza si no puede separarla; `ver_pagina` exige `despues_del_intento:true`; `leer_items` no lista ítems de solución ni enlaza sus páginas.
+  - En `items.yaml`, la solución integrada es otro ítem con `solucion_de: '<id>'`, y `puntos` guarda el puntaje oficial (número ≥ 0 o texto de hasta 40 caracteres), que `leer_items` muestra.
+- **Por qué:** «nunca muestres una solución antes del intento» (PLAN §5.2) quedaba abierto en tres tools; separar por ítem permite corregir contra la solución oficial sin mostrarla antes.
+- **Verifica:** `fuga-auditoria.test.mjs`, incluido «datos reales: 0 fragmentos de solución en búsquedas, páginas e ítems del parcial» (se saltea sin los datos de Redes). `test_pipeline_auditoria.py`: `test_evaluaciones_indexan_solo_enunciados_y_soluciones_nada`, `test_parcial_real_con_solucion_integrada`. `test_cursos_auditoria.py`: `test_h18_guardar_items_acepta_solucion_del_mismo_documento_sin_ciclos`, `test_h72_guardar_items_conserva_puntos_validos`.
+
+### DA14 — Set de tools de estudio
+
+- **Contexto:** durante el estudio seguían activas 21 tools (bash, edit, write, `transcribir_paginas`, `web_search`…), y teach figuraba también como skill: el tutor la releía antes de la primera pregunta (H44, H43).
+- **Decisión:** con un curso activo sólo quedan `quiz`, `ask_user_question`, `buscar_material`, `leer_paginas`, `leer_items`, `ver_pagina`, `registrar_progreso`, `leer_sesion_anterior`, `investigar_tema` y `read`, que sólo abre imágenes fuera de `cursos/`; no se lista ninguna skill. El set se reafirma en cada turno y al cerrar vuelve el anterior.
+- **Por qué:** «sólo la extensión escribe progreso» (PLAN §3.3) se cumplía sólo por prompt; además se evita gastar visión o editar archivos en plena clase.
+- **Verifica:** `sesion-auditoria.test.mjs`: «H44/H43: con un curso activo sólo quedan las tools del estudio, sin skills; al cerrar vuelve el set anterior», «H44: una tool que se registra tarde (reanudar sin el registro de pi, web, MCP) no queda activa durante el estudio».
+
+### DA15 — Snapshot de la carga del curso
+
+- **Contexto:** toda la carga pasaba por Python con un timeout de 10 s y sin respaldo: con el venv roto o lento `/estudiar` no arrancaba y al reanudar se perdía el modo curso (H03).
+- **Decisión:** cada `sesion.py cargar` exitoso se copia a `cursos/<c>/.sesion-cargada.json`. Si Python falla o se cuelga, la clase sigue con esa copia y avisa una vez («Material desde la última carga; el entorno de ingesta no respondió: corré .pi/scripts/doctor.»); sin copia, `/estudiar` falla con ese consejo. Al restaurar espera hasta 30 s. El autocompletado de `/estudiar` lee la copia, sin llamar a Python.
+- **Por qué:** una dependencia caída no debe cortar la sesión (AUDITORIA §5), y el material no cambia entre cargas.
+- **Verifica:** `sesion-auditoria.test.mjs`: «H03: Python colgado o roto sin copia previa: una línea en español que remite al doctor, sin curso a medias», «H03: con una carga previa, /estudiar y la restauración siguen con la copia y lo avisan una vez», «H17: el autocompletado no se ofrece sobre un texto exacto y no vuelve a llamar a Python».
+
+### DA16 — Registro propio del curso activo y margen de disco
+
+- **Contexto:** con el disco lleno pi rompe su archivo de sesión: `/resume` recuperó 1 de 13 entradas, sin curso ni log (X01, bug de pi).
+- **Decisión:** el curso activo se anota también en `cursos/<c>/.sesion-activa.json` (sesión de pi, pid, curso, tema y log), que se borra al cerrar y restaura el curso si el archivo de pi perdió sus entradas. `/estudiar` no arranca con menos de 200 MB libres y avisa con menos de 1 GB; el doctor marca menos de 2 GB. Un ENOSPC al guardar el progreso, o al cargar o renderizar el material, se explica en una línea en español.
+- **Por qué:** el bug es de pi; el proyecto puede guardar su estado fuera de ese archivo y avisar antes de llegar al disco lleno.
+- **Verifica:** `sesion-auditoria.test.mjs`: «X01: con menos de 200 MB libres /estudiar no arranca; con menos de 1 GB avisa y sigue», «X01: un registro propio restaura curso, tema y log si pi perdió sus entradas; se borra al cerrar». `entorno-auditoria.test.mjs`: «X01: el doctor marca menos de 2 GB libres y dice cómo ver qué ocupa». `test_progreso_auditoria.py`: `test_x01_disco_lleno_da_una_linea_en_espanol_y_conserva_el_progreso`.
+
+### DA17 — Órdenes internas ocultas
+
+- **Contexto:** las órdenes internas («Iniciá el probe…», «Llamá registrar_progreso…») se veían en el chat y quedaban como «VOS» en la nota (H54).
+- **Decisión:** `/estudiar`, `/fin`, el cambio de tema y la respuesta tras un corte mandan sus órdenes como mensaje custom `curso-orden` con `display: false`, que dispara el turno. Los avisos al tutor de la preparación (`curso-preparacion`) y del researcher (`curso-verificacion`) también van ocultos, para el turno siguiente y sin dispararlo.
+- **Por qué:** son instrucciones al modelo, no mensajes del alumno.
+- **Verifica:** `sesion-auditoria.test.mjs`: «H54: /estudiar y /fin mandan sus órdenes ocultas, que disparan el turno y no quedan como mensaje del alumno».
+
+### DA18 — Cada tool del curso se ve en una línea en español
+
+- **Contexto:** las tools mostraban argumentos y resultados crudos (enunciados del práctico, JSON) y las etiquetas decían «Working…» y «Thinking...» (H08, H09).
+- **Decisión:** `pi.registerToolRenderer` (`extensions/curso/render.ts`, registrado desde `presentacion.ts`) dibuja cada tool del curso en una línea («Leí PDF 54–57 de kurose-7», «Progreso guardado»), sin argumentos y sin el texto de `leer_paginas`, `leer_items` o `buscar_material`, ni siquiera expandido. Los errores de pi en inglés (validación, Esc, traza de Python) se reducen a la línea de la tool, como «No se guardó el progreso». `guardar_curso` muestra el diff entero antes de confirmar. En cada `session_start`, las etiquetas pasan a «Trabajando…» y «Pensando…». Una tool nueva del curso necesita su fila en `render.ts`.
+- **Por qué:** el alumno no tiene que ver material ni soluciones en crudo, ni textos en inglés.
+- **Verifica:** `presentacion-auditoria.test.mjs`: «H08: cada tool del curso se ve en una línea en español, sin argumentos ni texto del resultado», «H08: un registrar o guardar_items cortado con Esc o con traza de Python no muestra el error en inglés», «H09/X04: «Working» y «Thinking...» quedan en español desde el arranque».
+
+### DA19 — Compactación con plantilla de clase
+
+- **Contexto:** `/compact` resumía con la plantilla de pi, en inglés, y una vez marcó «(Correcta)» un quiz sin responder (H62).
+- **Decisión:** con una clase activa, `session_before_compact` pide el resumen con una plantilla en español (Curso y tema, Borde, Práctica, Próximo paso, Datos) en la que lo no respondido queda «pendiente, sin responder». Es una sola llamada con el modelo y el thinking de la sesión; `/compact <texto>` se suma como «Además:». Sin clase (preparando un curso o después de `/fin`), o si algo falla, sigue la plantilla de pi.
+- **Por qué:** después de compactar el tutor tiene que conservar el borde real del alumno; fuera de clase, la plantilla de pi conserva mejor rutas y decisiones.
+- **Verifica:** `presentacion-auditoria.test.mjs`: «H62: /compact resume en español con curso, tema y log, y no califica el quiz sin responder», «H62: si el resumen en español falla, pi sigue con el suyo y la sesión no se corta», «H62: sin clase activa (preparando un curso o tras /fin) /compact usa la plantilla de pi, que conserva rutas y decisiones».
+
+### DA20 — md-log sigue la nota por inode y la clase no depende de ella
+
+- **Contexto:** renombrar o mover la nota en Obsidian hacía fallar el progreso y `/fin` (H04); si md-log no confirmaba o faltaba disco no había clase y quedaba un .md vacío (H16); una foto HEIC o BMP no se procesaba (H70).
+- **Decisión:** cada vínculo de md-log guarda `ino`, `dev` y nacimiento de la nota, y la sigue por inode dentro del vault si se renombra o mueve (evento `md-log:movido`); si se borra, la recrea en su ruta con un aviso. Si md-log no confirma en 2 s, o falta permiso o disco, la clase sigue sin nota y con un aviso, y ese nombre de log no se reutiliza. El formato de una foto sale de su firma; HEIC pasa a JPEG y BMP a PNG con ImageMagick (`magick`), dependencia opcional; sin él, la nota avisa en una línea.
+- **Por qué:** la nota es un registro para el alumno, no un requisito de la clase.
+- **Verifica:** `md-log-auditoria.test.mjs`: «H04: renombrar la nota en Obsidian no pierde entradas, no avisa y /fin la cierra», «H04: una nota movida a otra carpeta del vault se encuentra por inode; una ajena con el mismo nombre no», «H04: si la nota se borró, se recrea en su ruta con un solo aviso», «H70: la firma decide el formato: HEIC y BMP por ruta se convierten y un PNG con extensión .jpg se guarda como .png». `sesion-auditoria.test.mjs`: «H16: si md-log no confirma o sesiones/ no se puede escribir, la clase sigue sin nota y sin .md vacío».
+
+### DA21 — Forma del quiz (D1–D5)
+
+- **Contexto:** quiz y ask_user_question estaban en inglés («I don't know», «Submit»), el popup mostraba LaTeX crudo y la forma delataba la respuesta: 5 de 22 quizzes con dos opciones, details con el enlace a la página de la respuesta y `shuffle:false` con la correcta primera (H45–H50).
+- **Decisión:** UI en español, con «No sé» siempre al final. El LaTeX común del enunciado, de details y de las opciones se muestra en Unicode; la explicación se guarda en LaTeX. Un single-select con menos de 3 opciones reales es el único rechazo: el modelo lo rehace y el alumno ve «Pregunta descartada por tener menos de 3 opciones; ya viene otra.». Descriptions en todas las opciones o en ninguna; antes de responder no se muestran enlaces; siempre se baraja, y `shuffle:false` sólo ordena opciones que son todas numéricas.
+- **Por qué:** es el contrato de quizzes de la versión anterior (AUDITORIA §2, D1–D5).
+- **Verifica:** `quiz-ui.test.mjs`, por ejemplo «H47: single-select con 2 opciones se rechaza en español sin abrir el popup; con 3 o multi-select se acepta», «H49: details no muestra enlaces antes de responder», «H50: shuffle:false no fija la correcta salvo opciones numéricas, que se ordenan».
+
+### DA22 — Ingesta: matemática, ediciones a mano y Tesseract
+
+- **Contexto:** la matemática de Kurose (fuente MathematicalPi) salía rota con un aviso genérico tapado por falsos positivos (H22); una fórmula destrozada por el OCR pasaba sin aviso (H23); editar a mano un .md trababa la preparación (H36); `iniciar` informaba éxito aunque el hijo muriera y se exigía Tesseract con `spa` hasta para PDFs digitales (H37).
+- **Decisión:**
+  - Detector de matemática v3 (`VERSION_ALGORITMO = 3`): fuentes matemáticas (sin OpenSymbol/StarSymbol ni monoespaciadas), superíndices numéricos, símbolos y `^`; MathematicalPi marca `operadores_cifrados`; en OCR se buscan restos de fórmulas. Al subir la versión, las páginas de visión o manuales sólo se reclasifican.
+  - Una página editada sin adoptar se preserva, no se indexa y figura como `editada`; `ingestar.py adoptar --salida … --doc … --pagina …` la registra como ruta `manual`, con revisión humana hecha, y ninguna ingesta la regenera.
+  - Tesseract se exige sólo con páginas escaneadas; la clave opcional `ruta_tesseract` de `curso.config.json` fija cuál. `iniciar` espera unos 2 s y sale con código 1 si el hijo murió; `estado` distingue `iniciando` y `error`.
+- **Por qué:** avisos específicos donde hay matemática de verdad, y que una edición humana o una herramienta ausente no frenen lo demás.
+- **Verifica:** `test_pipeline_auditoria.py`: `test_operadores_cifrados_avisan_y_piden_vision`, `test_nuevo_algoritmo_conserva_vision_y_desatasca_falsos_positivos`, `test_formula_escaneada_queda_pendiente_y_la_prosa_no` (necesita Tesseract con `spa`), `test_adoptar_registra_la_edicion_y_la_ingesta_la_conserva`, `test_pdf_digital_no_exige_tesseract_con_spa`, `test_iniciar_informa_si_el_hijo_muere_y_estado_no_muestra_la_corrida_anterior`.
+
+### DA23 — Curación: copias seguras, propuesta en la raíz y avisos por tema
+
+- **Contexto:** un `aplicar` cortado dejaba un PDF parcial con el nombre final y el curso no se podía volver a guardar (H38); una propuesta o un manifiesto en `cursos/<c>/_procesado/` trababan la creación (H40); un tema sin evaluaciones no avisaba (H19); los rangos del índice dejaban afuera material que piden objetivos y parciales (H21).
+- **Decisión:** un curso nuevo se arma en `cursos/.<slug>.nuevo/`. Cada PDF se copia como `.<pdf>.parcial-<pid>`, con fsync y verificación de SHA-256, y pasa al nombre final con `os.link`, que requiere hard links. Una carpeta de curso sin `indice.yaml` se informa y no se toca. Propuesta y manifiesto van en `_procesado/` de la raíz del vault, y el error nombra el archivo ajeno. `validar` suma un aviso por tema sin evaluaciones y por documento sin segmentar, y devuelve `sin_transcripcion`. `cursos.py cruzar` es una ayuda de curación: busca siglas y términos con guion de objetivos e ítems en la bibliografía del tema.
+- **Por qué:** que un corte siempre se pueda resolver repitiendo la operación.
+- **Verifica:** `test_cursos_auditoria.py`: `test_h38_curso_nuevo_cortado_no_aparece_y_se_puede_repetir`, `test_h38_ampliacion_cortada_o_matada_no_deja_pdf_parcial_con_el_nombre_final`, `test_h38_carpeta_incompleta_no_es_un_curso_existente`, `test_h40_propuesta_dentro_del_curso_pide_la_raiz_del_vault`, `test_h19_avisa_por_tema_sin_evaluaciones_y_por_documento_sin_segmentar`, `test_h21_cruzar_senala_terminos_fuera_del_rango_y_donde_estan`.
+
+### DA24 — Un fallo de visión no degrada lo que estaba bien
+
+- **Contexto:** un fallo de visión dejaba «pendiente» una página digital buena y ocultaba el error real (H39).
+- **Decisión:** antes de llamar se comprueba que el modelo exista, acepte imágenes y tenga credenciales (el snapshot y, si dice que no, `getProviderAuth`); sin credenciales no se pide confirmar ni se llama, y se dice «…; ejecutá /login». Un fallo muestra el error real y no degrada páginas digitales, de OCR ni de visión que ya eran buenas: las marca `error_vision` para reintentar. Esc no cuenta como fallo. Una página `manual` es caché.
+- **Por qué:** una llamada fallida no debe empeorar lo que ya servía.
+- **Verifica:** `vision-auditoria.test.mjs`: «H39: un 401 dice el error real y no degrada una página digital buena», «H39: cancelar con Esc no registra la página como fallida», «H39: sin credenciales de visión no pide confirmar, no llama y dice qué hacer», «H39: un snapshot de credenciales viejo no bloquea la visión si pi resuelve la autenticación». `test_preparacion_auditoria.py`: `test_pagina_adoptada_es_cache_no_se_pisa_y_sirve_para_items`.
+
+### DA25 — `/estudiar` y `/fin`: cortes, cambio de tema y reconstrucción
+
+- **Contexto:** con un quiz abierto `/fin` y `/estudiar` se rechazaban y se perdía lo tipeado (H26); cambiar de tema abandonaba el log sin registrar (H25); cada sesión ofrecía reconstruir logs técnicos, vacíos o ad hoc, y un rechazo no se recordaba (H15); tras un kill el último mensaje del alumno quedaba sin respuesta (H63); los subtemas caían en ad hoc (H24).
+- **Decisión:** con el agente ocupado, `/fin` y `/estudiar` cortan el turno (`abort` + `waitForIdle`); `/estudiar` primero pregunta y sólo corta al confirmar, y un quiz abierto espera a que el alumno lo cierre. Con un tema activo, `/estudiar` ofrece «Guardar y cambiar», «Cambiar sin guardar» o «Cancelar». Se ofrece reconstruir una sola vez la última sesión real del tema sin cierre (ni ad hoc, ni técnica, ni la viva de otro pi); lo ya ofrecido queda en `cursos/<c>/.no-reconstruir.json`. Al reanudar tras un corte con un mensaje del alumno sin respuesta, el tutor lo responde solo. Un subtema que BM25 ubica dentro del rango de un tema activa ese tema.
+- **Por qué:** un comando del alumno no se pierde ni deja la clase a medias.
+- **Verifica:** `sesion-auditoria.test.mjs`: «H26: /estudiar con el agente ocupado corta el turno y sigue; con una pregunta abierta, antes confirma», «H25: con un tema activo, /estudiar ofrece guardar y cambiar, cambiar sin guardar o cancelar», «H15: sólo se ofrece reconstruir una sesión real, una sola vez», «H63: si pi se cortó antes de responder al alumno, al reanudar se avisa y el tutor lo responde sin duplicarlo», «H24: un subtema que sólo encuentra BM25 resuelve al tema cuyo rango contiene esas páginas».
+
+### DA26 — El dossier ordena por prioridad
+
+- **Contexto:** el dossier cortaba el progreso en 3000 B con la verificación al final: tras dos sesiones ya no se veían errores ni ejercicios (H28, H61). Además avisaba «Preparación parcial» de todo el curso en cada `/estudiar` (H55).
+- **Decisión:** el progreso del tema entra en ≤3000 B en este orden: estado, próximo paso, fallas, errores sin resolver, últimos ejercicios, domina y conceptos firmes, cada lista con su parte del presupuesto y lo más reciente primero. La verificación se resume en ≤1200 B y cada prerequisito en ≤800 B. Los ítems van con vistas previas de hasta 2400 B, primero los del índice y después los asignados automáticamente, y nunca se listan soluciones. Una línea «Preparación del tema» dice qué páginas del tema faltan, en vez de los avisos de todo el curso.
+- **Por qué:** al retomar, el «dónde quedamos» es lo que más necesita el tutor.
+- **Verifica:** `preparacion-auditoria.test.mjs`: «H28, H61: el dossier conserva el dónde quedamos y resume la verificación sin cortarla», «H55, H31: la preparación se informa por tema y no por avisos del curso ni ejercicios huérfanos», «el dossier nunca lista ítems de solución aunque el índice los referencie».
