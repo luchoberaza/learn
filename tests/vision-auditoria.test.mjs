@@ -26,7 +26,7 @@ ejecutar({'version':1,'motores':{c:'pymupdf' for c in ['digital','escaneada','mi
   solicitud = { vault, salida: join(vault, "_procesado/prueba"), doc: "libro", paginas: [3] };
   llamadas = []; confirmaciones = 0;
   ctx = { hasUI: true, ui: { confirm: async () => { confirmaciones++; return true; } }, modelRegistry: {
-    find: (provider, id) => ({ provider, id, input: ["text", "image"] }), hasConfiguredAuth: () => true,
+    find: (provider, id) => ({ provider, id, input: ["text", "image"] }), hasConfiguredAuth: () => true, getProviderAuth: async () => undefined,
     streamSimple: (...args) => { llamadas.push(args); return { result: async () => ({ stopReason: "error", errorMessage: "401 Unauthorized: token vencido", content: [], usage: structuredClone(uso) }) }; },
   } };
 });
@@ -79,4 +79,11 @@ test("H39: sin credenciales de visión no pide confirmar, no llama y dice qué h
   assert.deepEqual(resumen.fallidas, [1, 3]);
   assert.match(resumen.avisos.join(" "), /Visión no disponible: .*\/login/);
   assert.deepEqual([calidad(1), calidad(3)], antes);
+});
+test("H39: un snapshot de credenciales viejo no bloquea la visión si pi resuelve la autenticación", async () => {
+  ctx.modelRegistry.hasConfiguredAuth = () => false;
+  ctx.modelRegistry.getProviderAuth = async () => ({ auth: { apiKey: "x" } });
+  const { resumen } = await transcribir(ctx, solicitud, config);
+  assert.equal(llamadas.length, 1);
+  assert.doesNotMatch(resumen.avisos.join(" "), /credenciales/);
 });

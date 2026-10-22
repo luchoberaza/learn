@@ -40,7 +40,9 @@ export async function transcribir(ctx: Pick<ExtensionContext, "modelRegistry" | 
   const resumen = { solicitadas: paginas.length, transcritas: 0, cache: 0, fallidas: [] as number[], pendientes: [] as number[], avisos: [] as string[], cancelada: false };
   const separador = config.modelo_vision.indexOf("/");
   const modelo = ctx.modelRegistry.find(config.modelo_vision.slice(0, separador), config.modelo_vision.slice(separador + 1));
-  if (!modelo?.input.includes("image") || !ctx.modelRegistry.hasConfiguredAuth(modelo)) {
+  // hasConfiguredAuth lee un snapshot que puede estar viejo; como pi, se confirma con la resolución real (un error lo informa la llamada).
+  const credenciales = modelo && (ctx.modelRegistry.hasConfiguredAuth(modelo) || await ctx.modelRegistry.getProviderAuth(modelo.provider).catch(() => true));
+  if (!modelo?.input.includes("image") || !credenciales) {
     resumen.fallidas.push(...paginas);
     resumen.avisos.push(modelo?.input.includes("image") ? `Visión no disponible: no hay credenciales para ${modelo.provider}; ejecutá /login y repetí la transcripción.`
       : `Visión no disponible: ${config.modelo_vision} no existe o no acepta imágenes; revisá modelo_vision en curso.config.json.`);
