@@ -158,3 +158,11 @@ test("H45+H49: renderCall con args a medio llegar no lanza (pi mostraría los ar
     assert.doesNotMatch(texto, /undefined/, texto);
   }
 });
+
+test("H47: el rechazo le habla al modelo; el alumno ve un aviso que no le pide nada", async () => {
+  const r = await quiz.execute("d4", { ...base, options: base.options.slice(0, 2) }, undefined, () => {}, { hasUI: true, ui: {} });
+  assert.match(r.content[0].text, /3 opciones.*volvé a llamarlo/is);
+  const visto = render(quiz.renderResult(r, {}, theme)) + "\n" + r.details.message;
+  assert.doesNotMatch(visto, /llam|quiz:/i);
+  assert.match(visto, /otra/);
+});

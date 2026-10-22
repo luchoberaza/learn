@@ -962,14 +962,12 @@ export default function quiz(pi: ExtensionAPI) {
 			}
 
 			// D1, único rechazo: con 2 opciones se acierta al 50 % (las de rumbo van por ask_user_question).
+			// details.message lo ven el alumno y el log; content, sólo el modelo.
 			if (mode === "single-select" && options.length < 3) {
-				return unavailableResult(
-					question,
-					mode,
-					"quiz: hacen falta al menos 3 opciones reales además de «No sé»; volvé a llamarlo con 3 o más.",
-					[],
-					context,
-				);
+				return {
+					...unavailableResult(question, mode, "Pregunta descartada por tener menos de 3 opciones; ya viene otra.", [], context),
+					content: [{ type: "text" as const, text: "quiz: hacen falta al menos 3 opciones reales además de «No sé»; volvé a llamarlo con 3 o más." }],
+				};
 			}
 
 			// D3: descriptions en todas o en ninguna; asimétricas delatan la correcta.
