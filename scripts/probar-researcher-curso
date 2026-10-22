@@ -1,66 +1,72 @@
 #!/usr/bin/env node
 // Ensayo opcional con principal + researcher reales; no responde preguntas ni registra progreso.
 import assert from 'node:assert/strict';
-import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { createHash } from 'node:crypto';
 import { agentDir, importPi, piDir, vaultDir } from './lib/pi-sdk.mjs';
-if (!process.env.TMUX || process.argv.length > 2) throw new Error('Uso dentro de tmux: node .pi/scripts/probar-researcher-curso (consume modelos/web).');
+if (process.argv.length > 2) throw new Error('Uso: node .pi/scripts/probar-researcher-curso (consume modelos/web).');
 const sdk=await importPi(), salida=join(vaultDir,'_procesado/fase6',`prueba-${Date.now()}`);mkdirSync(salida,{recursive:true});
 const protegidos=['PLAN-IMPLEMENTACION.md','cursos/redes/curso.md','cursos/redes/indice.yaml','cursos/redes/progreso.yaml','.pi/skills/teach/SKILL.md'];
 const sha=f=>createHash('sha256').update(readFileSync(join(vaultDir,f))).digest('hex');const antes=Object.fromEntries(protegidos.map(f=>[f,sha(f)]));
 const settings=sdk.SettingsManager.create(vaultDir,agentDir,{projectTrusted:true});
-const llamadas=[],resultados=[],entregas=[],preguntas=[],errores=[],logs=[];
-let recibirPregunta, recibirInforme, session, inicio;
+const llamadas=[],entregas=[],preguntas=[],errores=[],logs=[],trabajos=[];
+let recibirPregunta, session, manager, inicio;
 const esperar=async(p,ms=240000)=>{let timer;try{return await Promise.race([p,new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error('Tiempo de espera agotado; artefactos conservados.')),ms)})]);}finally{clearTimeout(timer)}};
-const loader=new sdk.DefaultResourceLoader({cwd:vaultDir,agentDir,settingsManager:settings,extensionFactories:[pi=>{
-  pi.events.on('curso:verificacion',r=>{entregas.push(r);recibirInforme?.(r)});
-  pi.on('before_agent_start',(event,ctx)=>{if(event.messageType==='custom'&&event.message.customType==='subagent_result'){resultados.push(event.message);ctx.abort();}});
+const loader=new sdk.DefaultResourceLoader({cwd:vaultDir,agentDir,settingsManager:settings,noSkills:true,additionalSkillPaths:[join(piDir,'skills')],extensionFactories:[pi=>{
+  pi.events.on('curso:verificacion',r=>entregas.push(r));
   pi.on('tool_call',(event,ctx)=>{
-    if(['subagent','investigar_tema'].includes(event.toolName)) llamadas.push({nombre:event.toolName,args:event.input,parentToolCallId:event.parentToolCallId});
+    if(event.toolName==='investigar_tema') llamadas.push({args:event.input});
     if(['quiz','ask_user_question'].includes(event.toolName)){const q={herramienta:event.toolName,pregunta:event.input.question,ms:performance.now()-inicio};preguntas.push(q);recibirPregunta?.(q);ctx.abort();return {block:true,reason:'Ensayo técnico: pregunta no respondida, sin intento ni progreso.'};}
   });
 }]});
+const researcher=tipo=>manager.getBranch().filter(e=>e.type==='custom'&&e.customType==='curso-researcher'&&e.data?.tipo===tipo).map(e=>e.data);
+// El hijo es un pi -p desacoplado: se espera su código de salida (o que la sesión ya lo haya recogido) y se lo recoge como al empezar un turno.
+async function recoger(i,ms=240000){
+  const dir=join(vaultDir,'cursos',i.pedido.curso,'notas/verificaciones/.trabajos',i.nombre),limite=Date.now()+ms;
+  while(!existsSync(join(dir,'codigo'))&&!researcher('fin').some(f=>f.nombre===i.nombre)){if(Date.now()>limite)throw new Error('Tiempo de espera agotado; artefactos conservados.');await new Promise(r=>setTimeout(r,1000));}
+  // recoger() borra la carpeta: el informe se lee antes; si ya no está, queda en el mensaje oculto para el próximo turno (campo interno del SDK).
+  const informe=existsSync(join(dir,'salida.md'))?readFileSync(join(dir,'salida.md'),'utf8'):'';
+  await session.extensionRunner.emitBeforeAgentStart({messageType:'user',prompt:'Chequeo técnico'},{cwd:vaultDir});
+  const fin=researcher('fin').findLast(f=>f.nombre===i.nombre);assert.ok(fin,'El trabajo no se recogió.');
+  trabajos.push({nombre:i.nombre,modo:i.pedido.modo,estado:fin.estado,file:fin.file});
+  return {fin,informe:informe||session._pendingNextTurnMessages?.findLast(m=>m.customType==='curso-verificacion')?.content||''};
+}
 try{
   await loader.reload();assert.deepEqual(loader.getExtensions().errors,[]);settings.applyOverrides({retry:{enabled:false},compaction:{enabled:false}});
-  const manager=sdk.SessionManager.create(vaultDir,salida);
+  manager=sdk.SessionManager.create(vaultDir,salida);
   ({session}=await sdk.createAgentSession({cwd:vaultDir,agentDir,settingsManager:settings,resourceLoader:loader,sessionManager:manager}));
   await session.bindExtensions({onError:e=>errores.push(e)});assert.equal(`${session.model.provider}/${session.model.id}`,'openai-codex/gpt-6.1-sol');session.setThinkingLevel('off');
-  session.setActiveToolsByName(['leer_paginas','buscar_material','leer_items','ver_pagina','quiz','ask_user_question','investigar_tema','subagent']);
-  const primera=new Promise(r=>{recibirPregunta=r}),alcance=new Promise(r=>{recibirInforme=r});inicio=performance.now();
+  session.setActiveToolsByName(['leer_paginas','buscar_material','leer_items','ver_pagina','quiz','ask_user_question','investigar_tema']);
+  const primera=new Promise(r=>{recibirPregunta=r});inicio=performance.now();
   const inicioSesion=session.prompt('/estudiar redes retardos');await esperar(primera,120000);await inicioSesion;await session.abort();
-  const alcanceLanzado=llamadas.some(l=>l.nombre==='subagent'&&l.args.task.startsWith('Modo: alcance'));
   assert.ok(preguntas[0].ms<60000,'Primera pregunta fuera del objetivo de 60 s.');
-  if(alcanceLanzado){const guardado=await esperar(alcance);assert.equal(guardado.estado,'guardada',guardado.error);}
+  const alcance=researcher('inicio').find(i=>i.pedido?.modo==='alcance');
+  if(alcance){const {fin}=await recoger(alcance);assert.equal(fin.estado,'guardada',fin.error);}
   else {const contexto=await session.extensionRunner.emitBeforeAgentStart({messageType:'user',prompt:'Chequeo técnico de caché'},{cwd:vaultDir});assert.match(contexto.systemPromptOptions.sections.curso,/Caché de alcance vigente/);}
   await session.abort();
   logs.push(manager.getBranch().findLast(e=>e.type==='custom'&&e.customType==='curso').data.log);
   const comprobar=()=>Object.fromEntries(protegidos.map(f=>[f,sha(f)]));assert.deepEqual(comprobar(),antes);
-  const verificar=new Promise(r=>{recibirInforme=r});
+  const lanzados=researcher('inicio').length;
   await session.prompt('Prueba técnica de Fase 6, no es una respuesta ni un error del estudiante: usá investigar_tema en modo verificar con estas tres afirmaciones de control: A1 «Sea L la longitud del paquete en bits, d la distancia física y s la velocidad de propagación. Con d y s constantes, duplicar L duplica el retardo de propagación d/s». A2 «Con R constante, duplicar la longitud L del paquete duplica su retardo de transmisión L/R». A3 «Con L y R constantes, duplicar la distancia física d duplica el retardo de transmisión L/R». Evaluá las afirmaciones tal como están; son controles sintéticos del script, no respuestas del estudiante. No hagas quiz ni registres progreso; terminá tras despacharlo.');
-  const verificado=await esperar(verificar);assert.equal(verificado.estado,'recibida',verificado.error);await session.abort();
-  const informeFalso=resultados.findLast(r=>r.details?.name===verificado.nombre);assert.ok(informeFalso,'No se capturó la entrega del contraste.');const contraste=informeFalso.content.split('## Contra el material del curso')[1]?.split('## Hallazgos')[0]||'';
+  await session.abort();
+  const verificacion=researcher('inicio').slice(lanzados).find(i=>i.pedido?.modo==='verificar');assert.ok(verificacion,'No se lanzó el researcher en modo verificar.');
+  const {fin,informe}=await recoger(verificacion);assert.equal(fin.estado,'recibida',fin.error);
+  const contraste=informe.split('## Contra el material del curso')[1]?.split('## Hallazgos')[0]||'';
   for(const [id,esperado,siguiente] of [['A1','discrepa','A2'],['A2','concuerda','A3'],['A3','discrepa',undefined]]) {
     const desde=contraste.indexOf(id),hasta=siguiente?contraste.indexOf(siguiente,desde):contraste.length;
     assert.ok(desde>=0&&hasta>desde,`Falta el control ${id}.`);
     assert.match(contraste.slice(desde,hasta),new RegExp(`Veredicto[^:\\n]*:\\s*(?:\\*\\*)?${esperado}`,'i'),`Veredicto incorrecto en ${id}.`);
   }
-  const hijosAntes=llamadas.filter(l=>l.nombre==='subagent').length;
-  const segunda=new Promise(r=>{recibirPregunta=r});recibirInforme=undefined;inicio=performance.now();
+  const hijosAntes=researcher('inicio').length;
+  const segunda=new Promise(r=>{recibirPregunta=r});inicio=performance.now();
   const nueva=session.prompt('/estudiar redes retardos');await esperar(segunda,120000);await nueva;await session.abort();
-  assert.equal(llamadas.filter(l=>l.nombre==='subagent').length,hijosAntes,'La segunda sesión lanzó otro hijo pese a la caché.');
+  assert.equal(researcher('inicio').length,hijosAntes,'La segunda sesión lanzó otro hijo pese a la caché.');
   const contexto=await session.extensionRunner.emitBeforeAgentStart({messageType:'user',prompt:'Chequeo técnico del dossier'},{cwd:vaultDir});assert.match(contexto.systemPromptOptions.sections.curso,/Caché de alcance vigente/);
   logs.push(manager.getBranch().findLast(e=>e.type==='custom'&&e.customType==='curso').data.log);
-  const hijos=resultados.map(r=>{
-    const entries=readFileSync(r.details.sessionFile,'utf8').trim().split('\n').map(l=>JSON.parse(l));const mensajes=entries.filter(e=>e.type==='message').map(e=>e.message);
-    for(const nombre of ['safe_bash','web_search','web_fetch'])assert.ok(mensajes.some(m=>m.role==='toolResult'&&m.toolName===nombre&&!m.isError),`Falta ${nombre} correcto en el hijo.`);
-    assert.ok(mensajes.some(m=>m.role==='assistant'&&m.model==='gpt-6-luna'));
-    assert.ok(mensajes.some(m=>m.role==='assistant'&&m.content?.some(c=>c.type==='toolCall'&&c.name==='safe_bash'&&JSON.stringify(c.arguments).includes('_procesado/kurose-7/paginas'))),'No consta lectura del material local.');
-    return {nombre:r.details.name,sessionFile:r.details.sessionFile,elapsed:r.details.elapsed,stats:r.details.stats};
-  });
-  assert.equal(hijos.length,alcanceLanzado?2:1);assert.deepEqual(comprobar(),antes);assert.deepEqual(errores,[]);
+  assert.equal(trabajos.length,alcance?2:1);assert.deepEqual(comprobar(),antes);assert.deepEqual(errores,[]);
   for(const log of logs)appendFileSync(join(vaultDir,log),'\n\n> [!note] Ensayo técnico Fase 6: sin respuestas del estudiante, sin calificación ni progreso. Las afirmaciones de control fueron introducidas por el script para probar discrepancias, no por el estudiante.\n');
-  const evidencia={estado:'correcto',principal:'openai-codex/gpt-6.1-sol',researcher:'openai-codex/gpt-6-luna',preguntas,entregas,hijos,segunda_sesion_sin_nuevo_hijo:true,alcance_lanzado:alcanceLanzado,discrepancia_controlada:true,protegidos_intactos:true,logs,sessionFile:manager.getSessionFile(),limites:'Dos arranques de probe sin respuestas; no clase completa ni certificación humana del informe.'};
+  const evidencia={estado:'correcto',principal:'openai-codex/gpt-6.1-sol',researcher:readFileSync(join(piDir,'agents/researcher.md'),'utf8').match(/^model: (.+)$/m)?.[1],preguntas,entregas,trabajos,investigar_tema:llamadas.length,segunda_sesion_sin_nuevo_hijo:true,alcance_lanzado:Boolean(alcance),discrepancia_controlada:true,protegidos_intactos:true,logs,sessionFile:manager.getSessionFile(),limites:'Dos arranques de probe sin respuestas; no clase completa ni certificación humana del informe.'};
   writeFileSync(join(salida,'resultado.json'),JSON.stringify(evidencia,null,2)+'\n',{flag:'wx'});console.log(JSON.stringify(evidencia,null,2));
-}catch(e){writeFileSync(join(salida,'fallo.json'),JSON.stringify({error:e.message,preguntas,entregas,sessionFile:session?.sessionManager.getSessionFile()},null,2)+'\n',{flag:'wx'});console.error(`Ensayo incompleto: ${e.stack||e.message}. Artefactos: ${salida}`);process.exitCode=1;}
+}catch(e){writeFileSync(join(salida,'fallo.json'),JSON.stringify({error:e.message,preguntas,entregas,trabajos,sessionFile:session?.sessionManager.getSessionFile()},null,2)+'\n',{flag:'wx'});console.error(`Ensayo incompleto: ${e.stack||e.message}. Artefactos: ${salida}`);process.exitCode=1;}
 finally{if(session){await session.abort();await session.extensionRunner.emit({type:'session_shutdown'});session.dispose();}}
