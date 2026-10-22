@@ -19,7 +19,8 @@ import pymupdf
 import yaml
 
 from almacen import Conflicto, atomico, bloquear, guardar_json, leer_json, ruta_segura, sha256
-from pipeline import TIPOS, cita, firma
+from extraccion import normalizar
+from pipeline import TIPOS, cita, contenido_pagina, firma
 
 SLUG = r"[a-z0-9]+(?:-[a-z0-9]+)*"
 
@@ -413,6 +414,65 @@ def manifiesto(vault: Path, slug: str, todo: bool, max_tokens=1500) -> dict:
     return salida
 
 
+def normal(texto: str) -> str:
+    return re.sub(r"\s+", " ", re.sub(r"-\s+", "-", normalizar(texto)))
+
+
+def cruzar(vault: Path, slug: str, max_tokens=1500) -> dict:
+    """Términos de objetivos e ítems asignados que no aparecen en las páginas de bibliografía de su tema."""
+    raiz = carpeta(vault, slug)
+    resultado = validar(raiz, slug, max_tokens=max_tokens)
+    if not resultado["ok"]:
+        raise ValueError("Corregí los errores de /curso-check antes de cruzar: " + "; ".join(resultado["errores"]))
+    indice = cargar_yaml(texto(raiz, "indice.yaml"))
+    # La cita final del objetivo, «(programa, PDF 2)», no es un término del tema.
+    objetivos = {o: re.sub(r"\s*\([^()]*\)\.?$", "", d) for o, d in re.findall(r"(?m)^- (O\d+(?:\.\d+)*):\s+(.+)$", texto(raiz, "curso.md"))}
+    paginas, bancos, secciones = {}, {}, {}
+    for d in indice["documentos"]:
+        if d["tipo"] == "bibliografia" and ruta_segura(raiz, f"_procesado/{d['id']}/paginas").is_dir():
+            for archivo in sorted(ruta_segura(raiz, f"_procesado/{d['id']}/paginas").glob("*.md")):
+                paginas[d["id"], int(archivo.stem)] = normal(contenido_pagina(archivo.read_text(encoding="utf-8")))
+            # Sólo títulos numerados («5.6 …»): los encabezados detectados incluyen líneas sueltas del cuerpo.
+            secciones[d["id"]] = [s for s in leer_json(raiz, f"_procesado/{d['id']}/estructura.json", {"secciones": []})["secciones"]
+                                  if re.match(r"\d+(?:\.\d+)+\s", s["titulo"])]
+        if ruta_segura(raiz, f"_procesado/{d['id']}/items.yaml").exists():
+            bancos[d["id"]] = {i["id"]: i for i in cargar_yaml(texto(raiz, f"_procesado/{d['id']}/items.yaml"))["items"]}
+    temas = []
+    for t in indice["temas"]:
+        fuentes = [(o, objetivos.get(o, "")) for o in t["objetivos"]]
+        fuentes += [(f"{r['doc']}/{i}", bancos[r["doc"]][i]["enunciado"]) for clase in ["ejercicios", "evaluaciones"] for r in t.get(clase, []) for i in r["items"]]
+        rango = {(r["doc"], n) for r in t.get("bibliografia", []) for n in range(r["paginas"][0], r["paginas"][1] + 1)}
+        faltan, vistos = [], set()
+        for origen, enunciado in fuentes:
+            # Siglas (ICMP, IPv6) y compuestos con guion («ancho de banda-retardo», Go-Back-N).
+            for termino in re.findall(r"\b[A-Z]{2,}[a-z0-9]*\b|(?:\b[^\W\d_]+ de )?\b[^\W\d_]{2,}(?:-[^\W\d_]+)+", enunciado):
+                patron = re.compile(rf"\b{re.escape(normal(termino))}\b")
+                if patron.pattern in vistos:
+                    continue
+                vistos.add(patron.pattern)
+                menciones = sum(patron.search(paginas[p]) is not None for p in rango if p in paginas)
+                if not menciones:
+                    en = {}
+                    for (doc, n), contenido in paginas.items():
+                        if patron.search(contenido):
+                            en.setdefault(doc, []).append(n)
+                    faltan.append({"termino": termino, "de": origen, "en": {doc: ns[:5] for doc, ns in en.items()}})
+                    continue
+                if menciones >= 0.1 * len(rango):
+                    continue
+                # Mencionado de pasada (en redes, ICMP: 4 de 67 páginas): si un documento le dedica una sección fuera del rango, falta esa sección.
+                for doc, ss in secciones.items():
+                    suyas = [s for s in ss if patron.search(normal(s["titulo"]))]
+                    if suyas and not any((doc, n) in rango for s in suyas for n in range(s["paginas"][0], s["paginas"][1] + 1)):
+                        desde, hasta = suyas[0]["paginas"]
+                        faltan.append({"termino": termino, "de": origen, "en": {doc: list(range(desde, hasta + 1))[:5]}, "seccion": suyas[0]["titulo"]})
+                        break
+        sin_texto = sum(p not in paginas for p in rango)
+        if faltan or sin_texto:
+            temas.append({"tema": t["id"], "paginas_sin_texto": sin_texto, "faltan": faltan})
+    return {"curso": slug, "temas": temas}
+
+
 def publicar_informe(vault: Path, slug: str, max_tokens=1500) -> dict:
     raiz = carpeta(vault, slug)
     resultado = validar(raiz, slug, max_tokens=max_tokens)
@@ -458,7 +518,7 @@ def publicar_informe(vault: Path, slug: str, max_tokens=1500) -> dict:
 
 def main():
     p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument("accion", choices=["validar", "revisar", "aplicar", "informe", "manifiesto"])
+    p.add_argument("accion", choices=["validar", "revisar", "aplicar", "informe", "manifiesto", "cruzar"])
     p.add_argument("--curso", required=True)
     p.add_argument("--vault", type=Path, default=Path.cwd())
     p.add_argument("--propuesta", type=Path)
@@ -477,6 +537,8 @@ def main():
         resultado = revisar(vault, args.curso, args.propuesta, limite)[0] if args.accion == "revisar" else aplicar(vault, args.curso, args.propuesta, args.base, args.huella, limite)
     elif args.accion == "manifiesto":
         resultado = manifiesto(vault, args.curso, args.todo, limite)
+    elif args.accion == "cruzar":
+        resultado = cruzar(vault, args.curso, limite)
     else:
         resultado = validar(carpeta(vault, args.curso), args.curso, max_tokens=limite) if args.accion == "validar" else publicar_informe(vault, args.curso, limite)
     print(json.dumps(resultado, ensure_ascii=False, indent=2))

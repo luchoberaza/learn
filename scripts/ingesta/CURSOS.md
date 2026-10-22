@@ -32,7 +32,10 @@ Desde la raíz del vault:
 .pi/.venv/bin/python .pi/scripts/ingesta/cursos.py revisar --curso ejemplo --propuesta _procesado/propuesta.json
 .pi/.venv/bin/python .pi/scripts/ingesta/cursos.py validar --curso ejemplo
 .pi/.venv/bin/python .pi/scripts/ingesta/cursos.py informe --curso ejemplo
+.pi/.venv/bin/python .pi/scripts/ingesta/cursos.py cruzar --curso ejemplo
 ```
+
+`cruzar` toma, por tema, las siglas y los términos con guion de cada objetivo y de cada ítem asignado («ancho de banda-retardo», ICMP) y los busca en las páginas transcriptas de su bibliografía. Lista los que no aparecen, con las páginas del libro donde sí están, y los que el rango sólo menciona de pasada cuando el libro les dedica una sección numerada fuera del rango. `paginas_sin_texto` cuenta páginas del rango sin transcripción: con ellas el cruce es incompleto. Es una ayuda de curación, no un error de validación.
 
 `aplicar --base <huella devuelta> --huella <huella propuesta>` es la operación interna usada por `guardar_curso` tras la confirmación. No es un atajo del agente para eludirla. El CLI sirve también al usuario local, que ya tiene permisos de edición del vault.
 

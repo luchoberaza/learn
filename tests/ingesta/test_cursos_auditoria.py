@@ -8,6 +8,7 @@ import sys
 import unittest
 from unittest.mock import patch
 
+import pymupdf
 import yaml
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts/ingesta"))
 from almacen import Conflicto, bloquear, sha256
@@ -17,7 +18,7 @@ import test_vision
 from test_vision import TEXTO
 import vision
 from pipeline import ejecutar
-from cursos import manifiesto, revisar, validar
+from cursos import cruzar, manifiesto, revisar, validar
 
 
 def cortar(entrada, salida):
@@ -168,6 +169,40 @@ class CursosAuditoriaTest(unittest.TestCase):
         self.assertEqual(json.loads(salida.stdout)["paginas"], 3)
         self.assertEqual(json.loads(archivo.read_text())["documentos"][0]["paginas"], "todas")
         self.assertFalse((self.raiz / "_procesado/manifiesto-ejemplo.json").exists())
+
+    def test_h21_cruzar_senala_terminos_fuera_del_rango_y_donde_estan(self):
+        self.contrato = self.contrato.replace("- O1.1: Comprender la derivación.", "- O1.1: Calcular el producto ancho de banda-retardo y usar ICMP (programa, PDF 2).")
+        with pymupdf.open() as pdf:
+            for _ in range(12):
+                pdf.new_page()
+            pdf.save(self.fuente)
+        self.indice["documentos"][0]["paginas"] = 12
+        self.indice["temas"][0]["bibliografia"][0]["paginas"] = [1, 11]
+        self.escribir()
+        self.crear()
+        i = copy.deepcopy(self.indice)
+        destino = self.raiz / "fuentes/evaluaciones/parcial.pdf"
+        destino.parent.mkdir(parents=True)
+        destino.write_bytes(self.fuente.read_bytes())
+        i["documentos"].append({"id": "parcial", "titulo": "Parcial", "tipo": "evaluaciones", "archivo": "fuentes/evaluaciones/parcial.pdf", "paginas": 12})
+        i["temas"][0]["evaluaciones"] = [{"doc": "parcial", "items": ["2"]}]
+        (self.raiz / "_procesado/parcial").mkdir(parents=True)
+        (self.raiz / "_procesado/parcial/items.yaml").write_text(yaml.safe_dump({"doc": "parcial", "items": [
+            {"id": "2", "paginas": [1], "enunciado": "Explique Go-Back-N con una ventana de 3 (8 puntos)."},
+            {"id": "2-sol", "paginas": [1], "enunciado": "Usa TCP y RDT.", "solucion_de": "2"}]}))
+        self.assertTrue(self.guardar_indice(i)["ok"])
+        paginas = self.raiz / "_procesado/libro/paginas"
+        paginas.mkdir(parents=True)
+        for n, texto in [(1, "Los routers usan mensajes ICMP (véase la Sección 5.6)."), (12, "5.6 Protocolo de mensajes de control (ICMP)\nCalcule el producto ancho de banda-\n  retardo, R · dprop.")]:
+            (paginas / f"{n:04}.md").write_text(f"<!-- p. PDF {n} · [[cursos/ejemplo/x.pdf#page={n}]] -->\n\n{texto}\n")
+        (self.raiz / "_procesado/libro/estructura.json").write_text(json.dumps({"secciones": [
+            {"nivel": 1, "titulo": "Los routers usan mensajes ICMP", "paginas": [1, 1]},
+            {"nivel": 1, "titulo": "5.6 Protocolo de mensajes de control (ICMP)", "paginas": [12, 12]}]}))
+        r = cruzar(self.vault, "ejemplo")
+        self.assertEqual(r["temas"], [{"tema": "derivacion", "paginas_sin_texto": 10, "faltan": [
+            {"termino": "ancho de banda-retardo", "de": "O1.1", "en": {"libro": [12]}},
+            {"termino": "ICMP", "de": "O1.1", "en": {"libro": [12]}, "seccion": "5.6 Protocolo de mensajes de control (ICMP)"},
+            {"termino": "Go-Back-N", "de": "parcial/2", "en": {}}]}])
 
     def test_h05_pagina_transcripta_sin_registro_es_pendiente_y_no_falta(self):
         self.crear()
