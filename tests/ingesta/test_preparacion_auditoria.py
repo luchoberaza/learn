@@ -1,11 +1,16 @@
 """Preparación por tema y pedidos de visión/curación, con PDFs sintéticos y sin red ni LLM."""
+from contextlib import ExitStack
 import json
 from pathlib import Path
+import subprocess
 import sys
+import threading
 import unittest
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts/ingesta"))
 from almacen import Conflicto, bloquear
+from cursos import bloquear_breve
 from pipeline import adoptar
 import test_vision
 import vision
@@ -43,6 +48,18 @@ class VisionPedidosTest(unittest.TestCase):
         salida = self.guardar(texto=limpio)
         self.assertEqual((salida["ruta"], salida["pendiente"]), ("vision", False))
         self.assertEqual(self.guardar(texto=limpio + " $x = ")["ruta"], "pendiente")
+
+    def test_vision_espera_una_escritura_breve_en_vez_de_fallar(self):
+        retenido = ExitStack()
+        retenido.enter_context(bloquear(self.raiz, self.vault))
+        threading.Timer(1, retenido.close).start()
+        r = subprocess.run([sys.executable, str(Path(vision.__file__)), "preparar"], capture_output=True, text=True, timeout=30,
+                           input=json.dumps({**self.datos, "vault": str(self.vault), "salida": str(self.raiz)}))
+        self.assertEqual(r.returncode, 0, r.stderr)
+        with patch("cursos.ESPERA", 0.3), bloquear(self.raiz, self.vault):
+            with self.assertRaisesRegex(Conflicto, "Ya hay una ingesta"):
+                with bloquear_breve(self.raiz, self.vault):
+                    pass
 
 
 if __name__ == "__main__":

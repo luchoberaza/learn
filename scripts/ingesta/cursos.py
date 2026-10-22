@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 from collections import Counter
+from contextlib import ExitStack, contextmanager
 from datetime import date
 import difflib
 import hashlib
@@ -14,11 +15,12 @@ from pathlib import Path
 import re
 import shutil
 import sys
+import time
 
 import pymupdf
 import yaml
 
-from almacen import Conflicto, atomico, bloquear, guardar_json, leer_json, ruta_segura, sha256
+from almacen import ESPERA, Conflicto, atomico, bloquear, guardar_json, leer_json, ruta_segura, sha256
 from extraccion import normalizar
 from pipeline import TIPOS, cita, contenido_pagina, firma
 
@@ -52,6 +54,22 @@ def cargar_yaml(texto: str):
 
 def puntos_validos(p) -> bool:
     return (type(p) in (int, float) and p >= 0 and isfinite(p)) or (isinstance(p, str) and bool(p.strip()) and len(p) <= 40)
+
+
+@contextmanager
+def bloquear_breve(salida: Path, vault: Path):
+    """bloquear con espera acotada: otra escritura breve (visión, informe, adoptar) libera la salida en segundos."""
+    limite = time.monotonic() + ESPERA
+    with ExitStack() as pila:
+        while True:
+            try:
+                raiz = pila.enter_context(bloquear(salida, vault))
+                break
+            except Conflicto as e:
+                if "Ya hay una ingesta" not in str(e) or time.monotonic() >= limite:
+                    raise
+                time.sleep(0.1)
+        yield raiz
 
 
 def carpeta(vault: Path, slug: str) -> Path:
@@ -509,7 +527,7 @@ def publicar_informe(vault: Path, slug: str, max_tokens=1500) -> dict:
                 lineas.append(f"- Dudosa: {cita(f'cursos/{slug}/{d['archivo']}', int(p))} — {'; '.join(q.get('avisos', []))}")
     lineas += ["", "## Páginas referidas aún pendientes", ""]
     lineas += [f"- {i['doc']}: {cita(f'cursos/{slug}/{docs[i['doc']]['archivo']}', i['pagina'])}" for i in resultado["pendientes"]]
-    with bloquear(raiz / "_procesado", vault) as salida:
+    with bloquear_breve(raiz / "_procesado", vault) as salida:
         destino = ruta_segura(raiz, "informe-ingesta.md")
         control = leer_json(salida, "informe-curso.json")
         actual = sha256(destino) if destino.exists() else None

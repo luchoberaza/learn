@@ -10,8 +10,8 @@ import sys
 import pymupdf
 import yaml
 
-from almacen import Conflicto, atomico, bloquear, guardar_json, leer_json, ruta_segura, sha256
-from cursos import puntos_validos
+from almacen import Conflicto, atomico, guardar_json, leer_json, ruta_segura, sha256
+from cursos import bloquear_breve, puntos_validos
 from extraccion import calidad
 from pipeline import ahora, cita, construir_busqueda, firma, informe, pagina_verificada, recuperar_registro
 
@@ -223,7 +223,7 @@ def main():
     accion = sys.argv[1]
     datos = json.load(sys.stdin)
     vault = Path(datos["vault"]).resolve()
-    with bloquear(Path(datos["salida"]).absolute(), vault) as raiz:
+    with bloquear_breve(Path(datos["salida"]).absolute(), vault) as raiz:
         if accion == "preparar":
             return preparar(raiz, vault, datos)
         if accion in {"guardar", "fallar"}:
