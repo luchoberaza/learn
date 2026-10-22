@@ -30,12 +30,12 @@ function datos() {
       soluciones: [{ id: "2", paginas: [1], enunciado: "SOLUCION SEPARADA retardo de propagación" }] },
     progreso: { temas: {}, historial: [] }, avisos: [], validacion: { errores: [], avisos: [], pendientes: [] } };
 }
-function curso(t, d = datos()) {
+function curso(t, d = datos(), paginas = PAGINAS) {
   const vault = mkdtempSync(join(tmpdir(), "pi-fuga-")), recursos = join(vault, ".pi"), raiz = join(vault, "cursos/calculo");
   t.after(() => rmSync(vault, { recursive: true, force: true }));
   mkdirSync(join(raiz, "sesiones"), { recursive: true });
   const fragmentos = [], df = {};
-  for (const [doc, paginas] of Object.entries(PAGINAS)) paginas.forEach((texto, i) => {
+  for (const [doc, textos] of Object.entries(paginas)) textos.forEach((texto, i) => {
     const p = i + 1, tipo = d.documentos.find(x => x.id === doc).tipo, frecuencias = {};
     mkdirSync(join(raiz, `_procesado/${doc}/paginas`), { recursive: true });
     mkdirSync(join(raiz, `_procesado/${doc}/render`), { recursive: true });
@@ -106,6 +106,19 @@ test("leer_paginas: cada pregunta del documento necesita su marca de solución; 
     ["Pregunta 1\nUno.\nSolución\nSECRETO\nPregunta 2\nDos.", "Rta: SECRETO"]]) assert.throws(() => leerParcial(paginas), /leer_items/, paginas[0]);
   const texto = leerParcial(["Solución del parcial\nEjercicio Nº 1\nUno.\n| **Solución** |\n| SECRETO |\nEjercicio Nº 2\nDos.\n- Solución: SECRETO"]);
   assert.match(texto, /Uno\.[^]*Dos\./); assert.doesNotMatch(texto, /SECRETO/);
+});
+
+test("un práctico con ítems solucion_de se reserva como un parcial", async t => {
+  const d = datos();
+  d.documentos.push({ id: "practico", titulo: "Práctico", tipo: "ejercicios", archivo: "fuentes/ejercicios/practico.pdf", paginas: 1 });
+  d.items.practico = [{ id: "1", paginas: [1], enunciado: "Calculá el retardo de propagación de 1 km." }, { id: "1-sol", paginas: [1], enunciado: "RESPUESTA 5 us", solucion_de: "1" }];
+  const e = curso(t, d, { ...PAGINAS, practico: ["Ejercicio 1\nCalculá el retardo de propagación de 1 km.\nRespuesta\nRESPUESTA 5 us"] });
+  const r = buscarMaterial(e.raiz, d, "retardo de propagación", "ejercicios");
+  assert.equal(r[0].doc, "practico"); assert.doesNotMatch(JSON.stringify(r), /RESPUESTA|#page=/);
+  assert.doesNotMatch(leerItems(d, "practico", ["1"]), /#page=/);
+  assert.doesNotMatch(leerPaginas(e.raiz, d, "practico", 1, 1), /RESPUESTA|#page=/);
+  await e.activar();
+  await assert.rejects(() => e.tools.ver_pagina({ doc: "practico", pagina: 1 }), /solución/);
 });
 
 test("leer_items de evaluaciones cita sin enlace antes del intento y con enlace después", () => {

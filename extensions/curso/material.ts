@@ -64,8 +64,8 @@ export function ordenarTemas(datos: DatosCurso): Tema[] {
   const nivel = (t: Tema) => datos.progreso.temas[t.id]?.estado === "en_curso" ? 0 : datos.progreso.temas[t.id]?.estado === "repasar" ? 1 : datos.progreso.temas[t.id]?.estado === "dominado" ? 4 : (t.prerequisitos || []).every(p => datos.progreso.temas[p]?.estado === "dominado") ? 2 : 3;
   return [...datos.temas].sort((a, b) => nivel(a) - nivel(b) || a.unidad - b.unidad);
 }
-// Evaluaciones y soluciones traen la solución en sus páginas: antes del intento, sin texto ni enlace.
-const conSolucion = (d: Documento) => d.tipo === "evaluaciones" || d.tipo === "soluciones";
+// Evaluaciones, soluciones y documentos con ítems solucion_de traen la solución en sus páginas: antes del intento, sin texto ni enlace.
+export const conSolucion = (datos: DatosCurso, d: Documento) => d.tipo === "evaluaciones" || d.tipo === "soluciones" || (datos.items[d.id] || []).some(i => i.solucion_de !== undefined);
 const sinEnlace = (paginas: number[]) => `PDF p. ${paginas.join(", ")} (el enlace va después del intento)`;
 const esSolucion = (d: Documento, i: Item) => d.tipo === "soluciones" || i.solucion_de !== undefined;
 export function buscarMaterial(raiz: string, datos: DatosCurso, consulta: string, tipo?: string) {
@@ -73,7 +73,7 @@ export function buscarMaterial(raiz: string, datos: DatosCurso, consulta: string
   return buscar(indice, consulta, 5, tipo).flatMap(r => {
     const d = datos.documentos.find(d => d.id === r.doc);
     if (!d) return [];
-    if (!conSolucion(d)) return [{ doc: r.doc, pagina: r.pagina, seccion: r.seccion, fragmento: r.fragmento, pendiente: r.pendiente, cita: cita(datos, r.doc, r.pagina) }];
+    if (!conSolucion(datos, d)) return [{ doc: r.doc, pagina: r.pagina, seccion: r.seccion, fragmento: r.fragmento, pendiente: r.pendiente, cita: cita(datos, r.doc, r.pagina) }];
     const items = (datos.items[r.doc] || []).filter(i => !esSolucion(d, i) && i.paginas.includes(r.pagina)).map(i => i.id);
     const como = d.tipo === "soluciones" ? "son soluciones: pedilas con leer_items e incluir_solucion después del intento" : items.length ? `leé el enunciado con leer_items (ítems: ${items.join(", ")})` : "leé el enunciado con leer_paginas, que omite la parte resuelta";
     return [{ doc: r.doc, pagina: r.pagina, seccion: /^(pregunta|ejercicio|problema)\b/i.test(r.seccion || "") ? r.seccion : null, pendiente: r.pendiente, cita: sinEnlace([r.pagina]),
@@ -103,7 +103,7 @@ function sinSoluciones(raiz: string, d: Documento, noSeparable: Error): string[]
 export function leerPaginas(raiz: string, datos: DatosCurso, doc: string, desde: number, hasta: number, despuesDelIntento = false): string {
   const d = documento(datos, doc);
   if (![desde, hasta].every(Number.isInteger) || desde < 1 || hasta < desde || hasta > d.paginas) throw new Error("Rango PDF inválido (base 1, extremos incluidos).");
-  const reservadas = !despuesDelIntento && conSolucion(d) ? sinSoluciones(raiz, d, new Error(`No se puede separar el enunciado de la solución en ${doc}: leé el enunciado con leer_items; el texto completo va con despues_del_intento:true.`)) : undefined;
+  const reservadas = !despuesDelIntento && conSolucion(datos, d) ? sinSoluciones(raiz, d, new Error(`No se puede separar el enunciado de la solución en ${doc}: leé el enunciado con leer_items; el texto completo va con despues_del_intento:true.`)) : undefined;
   let salida = "";
   for (let p = desde; p <= hasta && Buffer.byteLength(salida) < 30000; p++) {
     try { salida += reservadas ? `\n${reservadas[p - 1]}\n${sinEnlace([p])}\n` : `\n${leer(raiz, `_procesado/${doc}/paginas/${String(p).padStart(4, "0")}.md`, 200_000)}\n${cita(datos, doc, p)}\n`; }
@@ -123,7 +123,7 @@ export function leerItems(datos: DatosCurso, doc: string, ids: string[], incluir
     const i = datos.items[doc]?.find(i => i.id === id);
     if (!i) return `${doc}/${id}: ítem no preparado.`;
     if (!incluirSolucion && esSolucion(d, i)) return `${doc}/${id}: es una solución; pedila con incluir_solucion después del intento.`;
-    let t = `${doc}/${i.id}${typeof i.puntos === "number" ? ` (${i.puntos} punto${i.puntos === 1 ? "" : "s"})` : ""}\n${i.enunciado}\n${incluirSolucion || !conSolucion(d) ? i.paginas.map(p => cita(datos, doc, p)).join(" ") : sinEnlace(i.paginas)}\nRevisión humana pendiente.`;
+    let t = `${doc}/${i.id}${typeof i.puntos === "number" ? ` (${i.puntos} punto${i.puntos === 1 ? "" : "s"})` : ""}\n${i.enunciado}\n${incluirSolucion || !conSolucion(datos, d) ? i.paginas.map(p => cita(datos, doc, p)).join(" ") : sinEnlace(i.paginas)}\nRevisión humana pendiente.`;
     if (incluirSolucion) {
       const ref = i.solucion;
       const s = ref && datos.items[ref.doc]?.find(i => i.id === ref.id);
