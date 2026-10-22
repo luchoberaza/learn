@@ -32,9 +32,14 @@ import { createHash } from "node:crypto";
 import { homedir } from "node:os";
 
 const QA_TOOLS = new Set(["quiz", "ask_user_question"]);
+type Nota = { ino: number; dev: number; nacimiento: number };
+type Vinculo = { file: string | null; origen?: string } & Partial<Nota>;
 
 export default function mdLog(pi: ExtensionAPI) {
 	let logFile: string | null = null;
+	// Ruta con la que se vinculó (la que conoce quien pide desvincular) e identidad del archivo, que sobrevive a un renombre.
+	let origen: string | null = null;
+	let nota: Nota | undefined;
 	let contexto: ExtensionContext | undefined;
 
 	// --- State restoration on session restart ---
@@ -43,14 +48,17 @@ export default function mdLog(pi: ExtensionAPI) {
 		contexto = ctx;
 		logFile = null;
 		ctx.ui.setStatus("md-log", undefined);
-		let lastLinkData: { file: string | null } | undefined;
+		let lastLinkData: Vinculo | undefined;
 		for (const entry of ctx.sessionManager.getBranch()) {
 			if (entry.type === "custom" && entry.customType === "md-log") {
-				lastLinkData = entry.data as { file: string | null } | undefined;
+				lastLinkData = entry.data as Vinculo | undefined;
 			}
 		}
-		if (lastLinkData?.file && fs.existsSync(lastLinkData.file) && fs.lstatSync(lastLinkData.file).isFile()) {
+		// Si la nota ya no está en su ruta, la próxima escritura la busca o la recrea.
+		if (lastLinkData?.file && (!fs.existsSync(lastLinkData.file) || fs.lstatSync(lastLinkData.file).isFile())) {
 			logFile = lastLinkData.file;
+			origen = lastLinkData.origen ?? logFile;
+			nota = lastLinkData.ino === undefined ? undefined : { ino: lastLinkData.ino, dev: lastLinkData.dev!, nacimiento: lastLinkData.nacimiento! };
 			ctx.ui.setStatus("md-log", `🗒 ${path.basename(logFile)}`);
 		}
 	};
@@ -69,9 +77,43 @@ export default function mdLog(pi: ExtensionAPI) {
 		return prev.then(fn).finally(() => release!());
 	}
 
+	const identidad = (file: string): Nota => { const s = fs.statSync(file); return { ino: s.ino, dev: s.dev, nacimiento: s.birthtimeMs }; };
+	// Busca la nota renombrada o movida en Obsidian: primero en su carpeta, después en todo el vault (sin carpetas ocultas).
+	function buscar(id: Nota, dir: string, profundo: boolean): string | undefined {
+		let entradas: fs.Dirent[] = [];
+		try { entradas = fs.readdirSync(dir, { withFileTypes: true }); } catch { return undefined; }
+		for (const e of entradas) {
+			if (e.name.startsWith(".")) continue;
+			const ruta = path.join(dir, e.name);
+			if (e.isFile() && e.name.endsWith(".md")) {
+				const n = identidad(ruta);
+				if (n.ino === id.ino && n.dev === id.dev && n.nacimiento === id.nacimiento) return ruta;
+			} else if (profundo && e.isDirectory()) {
+				const encontrada = buscar(id, ruta, true);
+				if (encontrada) return encontrada;
+			}
+		}
+		return undefined;
+	}
+	function relocalizar(): void {
+		if (!logFile || fs.existsSync(logFile)) return;
+		const anterior = logFile;
+		const nueva = nota && (buscar(nota, path.dirname(anterior), false) ?? (contexto?.cwd ? buscar(nota, contexto.cwd, true) : undefined));
+		if (nueva) logFile = nueva;
+		else {
+			fs.writeFileSync(anterior, "", { flag: "wx" });
+			nota = identidad(anterior);
+			contexto?.ui.notify(`La nota del log no estaba; la recreé en ${path.basename(anterior)} y sigo escribiendo ahí.`, "warning");
+		}
+		pi.appendEntry("md-log", { file: logFile, origen, ...nota });
+		contexto?.ui.setStatus("md-log", `🗒 ${path.basename(logFile)}`);
+		if (nueva) pi.events.emit("md-log:movido", { anterior, actual: nueva });
+	}
+
 	function appendToFile(text: string): void {
 		if (!logFile) return;
 		try {
+			relocalizar();
 			if (!fs.lstatSync(logFile).isFile()) throw new Error("El log dejó de ser un archivo regular.");
 			const prefix = fs.statSync(logFile).size > 0 ? "\n\n" : "";
 			fs.appendFileSync(logFile, prefix + text + "\n", "utf-8");
@@ -345,13 +387,17 @@ export default function mdLog(pi: ExtensionAPI) {
 	function vincular(file: string, ctx: ExtensionContext, rellenar: boolean) {
 		if (!fs.lstatSync(file).isFile()) throw new Error("El log debe ser un archivo regular, no un enlace.");
 		logFile = file;
-		pi.appendEntry("md-log", { file });
+		origen = file;
+		nota = identidad(file);
+		pi.appendEntry("md-log", { file, origen, ...nota });
 		const written = rellenar ? backfill(ctx) : 0;
 		ctx.ui.setStatus("md-log", `🗒 ${path.basename(file)}`);
 		return written;
 	}
 	function desvincular() {
 		logFile = null;
+		origen = null;
+		nota = undefined;
 		pi.appendEntry("md-log", { file: null });
 		contexto?.ui.setStatus("md-log", undefined);
 	}
@@ -368,7 +414,9 @@ export default function mdLog(pi: ExtensionAPI) {
 		const d = data as { file?: string; onComplete?: (error?: string) => void } | undefined;
 		try {
 			await withLock(() => {
-				if (d?.file && logFile !== d.file) throw new Error("El log activo cambió; se preservó su vínculo.");
+				// Ya desvinculado cuenta como éxito; la nota renombrada se reconoce por su ruta de origen.
+				if (!logFile) return;
+				if (d?.file && logFile !== d.file && origen !== d.file) throw new Error("El log activo cambió; se preservó su vínculo.");
 				desvincular();
 			});
 			d?.onComplete?.();
