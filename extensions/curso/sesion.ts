@@ -1,5 +1,5 @@
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { mkdirSync, openSync, closeSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { mkdirSync, openSync, closeSync, readdirSync, readFileSync, renameSync, rmSync, statfsSync, statSync, writeFileSync } from "node:fs";
 import { basename, join, relative } from "node:path";
 import { piDir, vaultDir } from "../../scripts/lib/pi-sdk.mjs";
 import { normalizar } from "../../scripts/ingesta/bm25.ts";
@@ -21,6 +21,11 @@ const conRespuestas = (t: string) => /^> \[!quote\] VOS\n\n(?!Empecemos con «|T
   && !/Prueba técnica|Ensayo técnico|SINTÉTICO/.test(t);
 const cerrado = (d: DatosCurso, log: string) => (d.progreso.historial || []).some(h => typeof h === "object" && h !== null && "log" in h && basename(String(h.log)) === basename(log) && (!("cierre" in h) || h.cierre !== false));
 const vivo = (pid: unknown) => { try { return Number.isInteger(pid) && (pid as number) > 0 && process.kill(pid as number, 0); } catch (e) { return (e as NodeJS.ErrnoException).code === "EPERM"; } };
+// Un errno de Node no es un mensaje para el alumno.
+function mensaje(e: unknown, defecto: string) {
+  const { code, syscall } = (e ?? {}) as NodeJS.ErrnoException;
+  return code === "ENOSPC" ? "Disco lleno: liberá espacio y repetí /estudiar." : code && syscall ? `${defecto} (${code}).` : e instanceof Error ? e.message : `${defecto}.`;
+}
 function escribir(file: string, texto: string) {
   const temporal = `${file}.${process.pid}.tmp`;
   try { writeFileSync(temporal, texto); renameSync(temporal, file); } catch (e) { rmSync(temporal, { force: true }); throw e; }
@@ -30,12 +35,21 @@ export const ordenar = (pi: ExtensionAPI, content: string) => pi.sendMessage({ c
 export function registrarSesion(pi: ExtensionAPI, vault = vaultDir, recursos = piDir) {
   let activo: Activo | undefined;
   let datos: DatosCurso | undefined;
-  let resumen = "", teach = "", modo = "", pendiente: string | undefined, sinLog = false;
+  let resumen = "", teach = "", modo = "", pendiente: string | undefined, sinLog = false, religar = false;
   const cursos = () => readdirSync(rutaSegura(vault, "cursos"), { withFileTypes: true }).filter(d => d.isDirectory() && esSlug(d.name)).map(d => d.name);
   const raiz = (curso: string) => {
     if (!esSlug(curso)) throw new Error("Curso inválido: usá su slug.");
     return rutaSegura(vault, `cursos/${curso}`);
   };
+  // Registro propio del curso activo, fuera del archivo de sesión de pi, que con el disco lleno pierde entradas (X01).
+  const registro = (curso: string) => rutaSegura(raiz(curso), ".sesion-activa.json");
+  function registrarActivo(ctx: ExtensionContext, estado: Activo) {
+    try { escribir(registro(estado.curso), JSON.stringify({ sesion: ctx.sessionManager.getSessionId(), pid: process.pid, ...estado })); }
+    catch (e) { ctx.ui.notify(`No se guardó el registro del curso activo (${(e as NodeJS.ErrnoException).code === "ENOSPC" ? "disco lleno" : "error de archivo"}): si pi se corta, repetí /estudiar.`, "warning"); }
+  }
+  function olvidarActivo(ctx: ExtensionContext, curso: string) {
+    try { if (JSON.parse(readFileSync(registro(curso), "utf8")).sesion === ctx.sessionManager.getSessionId()) rmSync(registro(curso)); } catch { /* sin registro propio */ }
+  }
   // Sin Python, la última carga buena del curso mantiene teach, modo-curso y dossier.
   async function cargar(curso: string, validar = false, signal?: AbortSignal, timeout = 10000): Promise<DatosCurso> {
     const copia = rutaSegura(raiz(curso), ".sesion-cargada.json");
@@ -82,38 +96,52 @@ export function registrarSesion(pi: ExtensionAPI, vault = vaultDir, recursos = p
     activo = a; datos = d; resumen = nuevo;
     return tema;
   }
-  async function restaurar(_event: unknown, ctx: ExtensionContext) {
-    activo = undefined; datos = undefined; resumen = ""; pendiente = undefined; sinLog = false;
+  async function restaurar(ctx: ExtensionContext, inicio: boolean) {
+    activo = undefined; datos = undefined; resumen = ""; pendiente = undefined; sinLog = false; religar = false;
     ctx.ui.setStatus("curso", undefined);
-    const entradas = ctx.sessionManager.getBranch();
-    const ultimo = [...entradas].reverse().find(e => e.type === "custom" && e.customType === "curso");
-    if (ultimo?.type !== "custom" || !ultimo.data) { ctx.ui.setStatus("curso", undefined); return; }
+    const ultimo = ctx.sessionManager.getBranch().findLast(e => e.type === "custom" && e.customType === "curso");
+    let estado = ultimo?.type === "custom" ? ultimo.data : undefined;
+    // Si el archivo de pi ya no tiene ninguna entrada del curso, vale el registro propio de esta sesión; md-log se revincula en el próximo turno.
+    if (!ultimo && inicio) try {
+      if (!ctx.sessionManager.getEntries().some(e => e.type === "custom" && e.customType === "curso")) for (const curso of cursos()) try {
+        const { sesion, pid: _pid, ...guardado } = JSON.parse(readFileSync(registro(curso), "utf8"));
+        if (sesion === ctx.sessionManager.getSessionId()) { estado = guardado; pi.appendEntry("curso", estado); religar = !guardado.sinLog; }
+      } catch { /* sin registro en ese curso */ }
+    } catch { /* sin registro utilizable */ }
+    if (!estado) return;
     try {
-      const a = ultimo.data as Activo;
+      const a = estado as Activo;
       if (!esSlug(a.curso) || !esSlug(a.tema) || typeof a.log !== "string" || !a.log.startsWith(`cursos/${a.curso}/sesiones/`) || !a.log.endsWith(".md")) throw new Error("Estado de curso inválido.");
       rutaSegura(vault, a.log);
       const d = await cargar(a.curso, false, undefined, 30000);
       for (const aviso of d.avisos.filter(a => a.startsWith("Progreso") || a === COPIA)) ctx.ui.notify(aviso, "warning");
       const tema = preparar(a, d);
       sinLog = !!(a as { sinLog?: boolean }).sinLog;
+      registrarActivo(ctx, a);
       ctx.ui.setStatus("curso", `📚 ${a.curso} › ${tema.nombre}`);
-    } catch (e) { ctx.ui.notify(`No se restauró el curso: ${e instanceof Error ? e.message : "estado inválido"}`, "warning"); }
+    } catch (e) { ctx.ui.notify(`No se restauró el curso: ${mensaje(e, "estado inválido")}`, "warning"); }
   }
-  pi.on("session_start", restaurar);
-  pi.on("session_tree", restaurar);
-  pi.on("before_agent_start", event => {
+  pi.on("session_start", (_event, ctx) => restaurar(ctx, true));
+  pi.on("session_tree", (_event, ctx) => restaurar(ctx, false));
+  pi.on("before_agent_start", (event, ctx) => {
     if (!activo) {
       for (const clave of ["teach", "modo_curso", "curso"]) delete event.systemPromptOptions.sections[clave];
       return;
     }
     Object.assign(event.systemPromptOptions.sections, { teach, modo_curso: modo, curso: resumen });
+    if (religar) {
+      religar = false;
+      pi.events.emit("md-log:link", { file: rutaSegura(vault, activo.log), backfill: false,
+        onComplete(error?: string) { if (error) ctx.ui.notify("No se reabrió la nota del curso: seguimos sin nota de Obsidian.", "warning"); } });
+    }
   });
   // pi muestra el error del proveedor en inglés: se suma una línea con la causa probable y qué hacer.
   pi.on("agent_settled", (event, ctx) => {
     const ultimo = activo && !event.aborted ? ctx.sessionManager.getBranch().findLast(e => e.type === "message") : undefined;
     if (ultimo?.type !== "message" || ultimo.message.role !== "assistant" || ultimo.message.stopReason !== "error") return;
     const error = ultimo.message.errorMessage || "";
-    const causa = /usage limit|quota|rate.?limit|\b429\b|too many requests/i.test(error) ? "El proveedor rechazó el pedido por cuota o límite de uso: esperá o cambiá de modelo con /model"
+    const causa = /ENOSPC|no space left/i.test(error) ? "Disco lleno: liberá espacio"
+      : /usage limit|quota|rate.?limit|\b429\b|too many requests/i.test(error) ? "El proveedor rechazó el pedido por cuota o límite de uso: esperá o cambiá de modelo con /model"
       : /api key|unauthori[sz]ed|\b40[13]\b|authenticat|credential|expired|\/login/i.test(error) ? "Faltan o vencieron las credenciales del modelo: ejecutá /login"
       : /fetch failed|network|ENOTFOUND|EAI_AGAIN|ECONN|ETIMEDOUT|socket|timed? ?out/i.test(error) ? "Sin conexión con el proveedor del modelo: revisá la red"
       : "El modelo devolvió un error";
@@ -154,6 +182,11 @@ export function registrarSesion(pi: ExtensionAPI, vault = vaultDir, recursos = p
         if (!ctx.modelRegistry.hasConfiguredAuth(modelo) && !(await ctx.modelRegistry.getProviderAuth(modelo.provider).catch(() => true))) {
           ctx.ui.notify(`Sin credenciales para ${modelo.provider}/${modelo.id}: ejecutá /login y repetí /estudiar.`, "error"); return;
         }
+        // Con el disco lleno pi corta su archivo de sesión: por debajo de 200 MB no se arranca.
+        let libres = Infinity;
+        try { const disco = statfsSync(vault); libres = disco.bavail * disco.bsize; } catch { /* sin datos del disco */ }
+        if (libres < 2e8) { ctx.ui.notify(`Disco casi lleno (${Math.floor(libres / 1e6)} MB libres): liberá espacio y repetí /estudiar.`, "error"); return; }
+        if (libres < 1e9) ctx.ui.notify(`Queda poco disco (${Math.floor(libres / 1e6)} MB libres): liberá espacio pronto para no perder la sesión.`, "warning");
         const d = await cargar(curso, true);
         for (const aviso of d.avisos.filter(a => a.startsWith("Progreso") || a === COPIA)) ctx.ui.notify(aviso, "warning");
         let candidatos = consulta ? resolverTemas(d.temas, consulta) : ordenarTemas(d), resultados: ReturnType<typeof buscarMaterial> = [];
@@ -183,7 +216,7 @@ export function registrarSesion(pi: ExtensionAPI, vault = vaultDir, recursos = p
             bibliografia: seleccionado ? [{ doc: seleccionado.doc, seccion: seleccionado.seccion || consulta, paginas: [seleccionado.pagina, seleccionado.pagina] }] : [] };
         }
         if (!esSlug(tema.id)) throw new Error("Id del tema inválido; revisá el índice.");
-        const a: Activo = { curso, tema: tema.id, log: "", ...(tema.id === "ad-hoc" ? { adHoc: tema } : {}) };
+        const a: Activo = { curso, tema: tema.id, log: "", ...(tema.id === "ad-hoc" ? { adHoc: tema } : {}) }, previo = activo;
         pendiente = undefined;
         preparar(a, d);
         // La nota es deseable, no imprescindible: sin ella la clase sigue y no queda un .md vacío.
@@ -210,14 +243,17 @@ export function registrarSesion(pi: ExtensionAPI, vault = vaultDir, recursos = p
           try { const file = rutaSegura(vault, a.log); if (statSync(file).size === 0) rmSync(file); } catch { /* no quedó archivo */ }
         }
         sinLog = !!sinNota;
-        pi.appendEntry("curso", sinLog ? { ...a, sinLog } : a);
+        const estado = sinLog ? { ...a, sinLog } : a;
+        pi.appendEntry("curso", estado);
+        registrarActivo(ctx, estado);
+        if (previo && previo.curso !== curso) olvidarActivo(ctx, previo.curso);
         pi.setSessionName(`${d.nombre || curso} · ${tema.nombre}`);
         // Los avisos del curso van al dossier; la preparación por tema informa al alumno lo que le toca.
         ctx.ui.setStatus("curso", `📚 ${curso} › ${tema.nombre}`);
         if (sinNota) ctx.ui.notify(`${sinNota.replace(/[.;]\s*$/, "")}: seguimos sin nota de Obsidian.`, "warning");
-        const previo = d.progreso.temas[tema.id]?.estado;
-        ordenar(pi, `Empecemos con «${tema.nombre}» (${curso}). ${previo && previo !== "sin_empezar" ? "Abrí con una línea de dónde quedamos (borde y próximo paso del dossier) y enseguida la primera pregunta" : "Iniciá el probe con la primera pregunta, sin preámbulo"}, sin esperar una nueva orden del estudiante.`);
-      } catch (e) { ctx.ui.notify(e instanceof Error ? e.message : "No se pudo activar el curso.", "error"); }
+        const estudiado = d.progreso.temas[tema.id]?.estado;
+        ordenar(pi, `Empecemos con «${tema.nombre}» (${curso}). ${estudiado && estudiado !== "sin_empezar" ? "Abrí con una línea de dónde quedamos (borde y próximo paso del dossier) y enseguida la primera pregunta" : "Iniciá el probe con la primera pregunta, sin preámbulo"}, sin esperar una nueva orden del estudiante.`);
+      } catch (e) { ctx.ui.notify(mensaje(e, "No se pudo activar el curso"), "error"); }
     },
   });
   pi.registerCommand("cursos", {
@@ -242,6 +278,7 @@ export function registrarSesion(pi: ExtensionAPI, vault = vaultDir, recursos = p
         pi.events.emit("md-log:unlink", { file: rutaSegura(vault, a.log), onComplete(error?: string) { clearTimeout(timer); error ? reject(new Error(error)) : resolve(); } });
       });
       pi.appendEntry("curso", null);
+      olvidarActivo(ctx, a.curso);
       activo = undefined; datos = undefined; resumen = ""; pendiente = undefined; sinLog = false;
       ctx.ui.setStatus("curso", undefined);
     },

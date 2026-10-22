@@ -16,7 +16,7 @@ async function entorno(t) {
   const d={curso:'ejemplo',nombre:'Ejemplo',contrato:'Contrato',documentos:[],temas:[{id:'derivacion',nombre:'Derivación',unidad:1,alias:[],objetivos:[],prerequisitos:[]}],items:{},progreso:{temas:{},historial:[]},avisos:[]};
   const comandos=new Map(),eventos=new Map(),entradas=[],avisos=[],bus=[],mensajes=[],llamadas=[];
   const pi={registerCommand:(n,c)=>comandos.set(n,c),registerTool:()=>{},on:(n,h)=>eventos.set(n,h),appendEntry:(customType,data)=>entradas.push({type:'custom',customType,data}),setSessionName:()=>{},sendUserMessage:m=>mensajes.push(m),sendMessage:m=>mensajes.push(m.content),exec:async()=>({code:0,stdout:JSON.stringify(d)}),events:{emit:(n,p)=>{bus.push(n);p.onComplete?.();}}};
-  const ctx={isIdle:()=>true,hasUI:true,sessionManager:{getBranch:()=>entradas},model:{provider:'prueba',id:'modelo'},modelRegistry:{hasConfiguredAuth:()=>true},ui:{notify:m=>avisos.push(m),setStatus:()=>{},confirm:async()=>true}};
+  const ctx={isIdle:()=>true,hasUI:true,sessionManager:{getBranch:()=>entradas,getSessionId:()=>'prueba'},model:{provider:'prueba',id:'modelo'},modelRegistry:{hasConfiguredAuth:()=>true},ui:{notify:m=>avisos.push(m),setStatus:()=>{},confirm:async()=>true}};
   const sesion=registrarSesion(pi,vault,recursos),progreso=registrarProgreso(pi,sesion,vault);await comandos.get('estudiar').handler('ejemplo derivacion',ctx);
   const args={estado:'en_curso',borde:{domina:['Derivar un polinomio'],falla:[]},conceptos_firmes:[],errores_de_concepto:[],ejercicios:[],discrepancias:[],resumen:'Intento sintético',proximo_paso:'Composición'};
   const guardar=(extra={})=>progreso.registrar('prueba',{...args,...extra},undefined,undefined,ctx);

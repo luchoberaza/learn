@@ -1,6 +1,7 @@
 import { test, mock } from "node:test";
 import assert from "node:assert/strict";
-import { chmodSync, mkdtempSync, mkdirSync, writeFileSync, readdirSync, rmSync } from "node:fs";
+import fs, { chmodSync, existsSync, mkdtempSync, mkdirSync, readFileSync, writeFileSync, readdirSync, rmSync } from "node:fs";
+import { syncBuiltinESMExports } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { registrarSesion } from "../extensions/curso/sesion.ts";
@@ -43,7 +44,7 @@ function entorno(t, d = datos()) {
     sendUserMessage: m => usuario.push(m), sendMessage: (m, o) => ordenes.push({ ...m, ...o }),
     exec: async () => ({ code: 0, stdout: JSON.stringify(d), stderr: "", killed: false }),
     events: { emit: (_n, p) => p.onComplete?.() } };
-  const ctx = { hasUI: true, isIdle: () => true, sessionManager: { getBranch: () => entradas },
+  const ctx = { hasUI: true, isIdle: () => true, sessionManager: { getBranch: () => entradas, getEntries: () => entradas, getSessionId: () => "sesion-1" },
     model: { provider: "prueba", id: "modelo" }, modelRegistry: { hasConfiguredAuth: () => true },
     ui: { notify: (m, tipo) => avisos.push([tipo, m]), setStatus: (k, v) => { estados[k] = v; }, select: async (_t, o) => o[0], confirm: async () => true } };
   return { vault, raiz, pi, ctx, comandos, eventos, entradas, avisos, ordenes, usuario, estados, sesion: registrarSesion(pi, vault, recursos),
@@ -260,10 +261,51 @@ test("H02: un turno que termina en error del proveedor agrega una línea en espa
   assert.equal(e.avisos.length, 0, "sin curso activo no es una clase");
   await e.estudiar("calculo derivacion");
   for (const [error, causa] of [["fetch failed", /^Sin conexión con el proveedor/], ["429 You have reached your Subscription Sharing usage limit", /^El proveedor rechazó el pedido por cuota/],
-    ['No API key found for "openai-codex"', /^Faltan o vencieron las credenciales del modelo: ejecutá \/login/], ["Internal server error", /^El modelo devolvió un error/]]) {
+    ['No API key found for "openai-codex"', /^Faltan o vencieron las credenciales del modelo: ejecutá \/login/], ["Internal server error", /^El modelo devolvió un error/],
+    ["ENOSPC: no space left on device, write", /^Disco lleno: liberá espacio;/]]) {
     e.avisos.length = 0; turno(error); await settled();
     assert.equal(e.avisos.length, 1); assert.match(e.avisos[0][1], causa); assert.match(e.avisos[0][1], /escribí «seguí» para reintentar o \/fin para guardar\.$/);
   }
   e.avisos.length = 0; await settled(true);
   assert.equal(e.avisos.length, 0);
+});
+test("X01: con menos de 200 MB libres /estudiar no arranca; con menos de 1 GB avisa y sigue", async t => {
+  let mb = 150;
+  const disco = mock.method(fs, "statfsSync", () => ({ bsize: 4096, bavail: mb * 1e6 / 4096 })); syncBuiltinESMExports();
+  t.after(() => { disco.mock.restore(); syncBuiltinESMExports(); });
+  const e = entorno(t);
+  await e.estudiar("calculo derivacion");
+  assert.deepEqual(e.avisos, [["error", "Disco casi lleno (150 MB libres): liberá espacio y repetí /estudiar."]]);
+  assert.deepEqual([e.entradas.length, readdirSync(join(e.raiz, "sesiones")).length], [0, 0]);
+  mb = 800; e.avisos.length = 0;
+  await e.estudiar("calculo derivacion");
+  assert.deepEqual(e.avisos, [["warning", "Queda poco disco (800 MB libres): liberá espacio pronto para no perder la sesión."]]);
+  assert.equal(e.ordenes.length, 1);
+});
+test("X01: un registro propio restaura curso, tema y log si pi perdió sus entradas; se borra al cerrar", async t => {
+  const e = entorno(t), registro = join(e.raiz, ".sesion-activa.json"), eventos = [];
+  e.pi.events.emit = (n, p) => { eventos.push(n); p.onComplete?.(); };
+  await e.estudiar("calculo derivacion");
+  const estado = e.entradas.at(-1).data;
+  assert.deepEqual(JSON.parse(readFileSync(registro, "utf8")), { sesion: "sesion-1", pid: process.pid, ...estado });
+  e.entradas.length = 0;
+  await e.eventos.get("session_tree")({ type: "session_tree" }, e.ctx);
+  assert.equal(e.sesion.actual(), undefined, "navegar el árbol a antes del curso no lo restaura");
+  e.ctx.sessionManager.getSessionId = () => "otra";
+  await e.eventos.get("session_start")({ type: "session_start", reason: "resume" }, e.ctx);
+  assert.equal(e.sesion.actual(), undefined, "el registro es de otra sesión");
+  e.ctx.sessionManager.getSessionId = () => "sesion-1";
+  await e.eventos.get("session_start")({ type: "session_start", reason: "startup" }, e.ctx);
+  assert.deepEqual(e.sesion.actual().a, estado);
+  assert.deepEqual(e.entradas.map(x => x.customType), ["curso"]);
+  eventos.length = 0; dossierDe(e);
+  assert.deepEqual(eventos, ["md-log:link"]);
+  await e.sesion.cerrar(e.ctx);
+  assert.ok(!existsSync(registro));
+});
+test("X01: un disco lleno al anotar el curso se informa en español, sin el error crudo", async t => {
+  const e = entorno(t);
+  e.pi.appendEntry = () => { throw Object.assign(new Error("ENOSPC: no space left on device, write"), { code: "ENOSPC", syscall: "write" }); };
+  await e.estudiar("calculo derivacion");
+  assert.deepEqual(e.avisos.at(-1), ["error", "Disco lleno: liberá espacio y repetí /estudiar."]);
 });
