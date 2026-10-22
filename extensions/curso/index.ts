@@ -9,6 +9,7 @@ import { registrarSesion } from "./sesion.ts";
 import { registrarPresentacion } from "./presentacion.ts";
 import { registrarResearcher } from "./researcher.ts";
 import { registrarProgreso } from "./progreso.ts";
+import { registrarPreparacion } from "./preparacion.ts";
 
 const slug = Type.String({ pattern: "^[a-z0-9]+(?:-[a-z0-9]+)*$" });
 const paginas = Type.Array(Type.Integer({ minimum: 1 }), { minItems: 1 });
@@ -23,6 +24,7 @@ function salida(curso: string): string {
 export default function (pi: ExtensionAPI) {
   registrarCuracion(pi);
   const sesion = registrarSesion(pi);
+  registrarPreparacion(pi, sesion);
   const progreso = registrarProgreso(pi, sesion);
   registrarPresentacion(pi, sesion.actual);
   const textoProgreso = Type.String({ minLength: 1, maxLength: 2000 });

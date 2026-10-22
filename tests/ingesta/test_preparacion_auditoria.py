@@ -15,6 +15,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts/ingesta"))
 from almacen import Conflicto, bloquear
 from cursos import bloquear_breve, publicar_informe
 from pipeline import adoptar, ejecutar
+import preparacion
 import test_cursos
 import test_vision
 import vision
@@ -125,6 +126,56 @@ class ValidarPedidosTest(CursoPreparacion):
             adoptar(self.raiz / "_procesado", "libro", 3)
         publicar_informe(self.vault, "ejemplo")
         self.assertIn("manual: 1 (33.3 %)", (self.raiz / "informe-ingesta.md").read_text())
+
+
+class TrabajoTest(CursoPreparacion):
+    def trabajo(self, tema="derivacion", maximo=150):
+        return preparacion.trabajo(self.vault, "ejemplo", tema, maximo)
+
+    def test_prioriza_el_tema_luego_parciales_y_practicos_con_tope(self):
+        t = self.trabajo()
+        self.assertEqual([(x["doc"], x["paginas"]) for x in t["paginas"]], [("libro", [1, 2]), ("parcial", [1, 2, 3]), ("practico", [1, 2, 3])])
+        self.assertEqual([(s["doc"], s["listo"]) for s in t["segmentar"]], [("parcial", False), ("practico", False)])
+        t = self.trabajo(maximo=4)
+        self.assertEqual([(x["doc"], x["paginas"]) for x in t["paginas"]], [("libro", [1, 2]), ("parcial", [1, 2])])
+        self.assertEqual(t["restantes"], 4)
+        self.assertEqual(self.trabajo("integracion")["paginas"][0]["doc"], "parcial")  # la página 3 del libro ya es digital buena
+
+    def test_parcial_sin_soluciones_se_segmenta_otra_vez_y_se_clasifica_lo_que_el_indice_no_asigna(self):
+        self.segmentar("parcial", [{"id": "1", "paginas": [1], "enunciado": "Derive."}])
+        practico = [{"id": "1", "paginas": [1], "enunciado": "Integre."}, {"id": "2", "paginas": [2], "enunciado": "Grafique."}]
+        self.segmentar("practico", practico)
+        self.indice["temas"][0]["evaluaciones"] = [{"doc": "parcial", "items": ["1"]}]
+        self.indice["temas"][0]["ejercicios"] = [{"doc": "practico", "items": ["1"]}]
+        self.guardar_indice(self.indice)
+        t = self.trabajo()
+        self.assertEqual(t["paginas"], [{"doc": "libro", "paginas": [1, 2]}])
+        self.assertEqual([(s["doc"], s["listo"], s["requeridos"]) for s in t["segmentar"]], [("parcial", True, ["1"])])
+        self.assertEqual([(c["doc"], c["id"]) for c in t["clasificar"]], [("practico", "2")])
+        preparacion.registrar(self.vault, "ejemplo", {"documento": {"id": "parcial", "segmentado": True, "items": 1}})
+        preparacion.asignar(self.vault, "ejemplo", [{"doc": "practico", "id": "2", "tema": None}])
+        t = self.trabajo()
+        self.assertEqual((t["segmentar"], t["clasificar"]), ([], []))
+        self.segmentar("practico", [practico[0], {**practico[1], "enunciado": "Grafique la derivada."}])
+        self.assertEqual([(c["doc"], c["id"]) for c in self.trabajo()["clasificar"]], [("practico", "2")])
+
+    def test_asignar_valida_y_nunca_toca_el_indice(self):
+        self.segmentar("parcial", [{"id": "1", "paginas": [1], "enunciado": "Derive."}, {"id": "1-solucion", "paginas": [2], "enunciado": "R.", "solucion_de": "1"}])
+        antes = (self.raiz / "indice.yaml").read_bytes()
+        for mala in [{"doc": "parcial", "id": "1-solucion", "tema": "derivacion"}, {"doc": "parcial", "id": "1", "tema": "inexistente"},
+                     {"doc": "libro", "id": "1", "tema": None}, {"doc": "parcial", "id": "9", "tema": None}]:
+            with self.subTest(mala=mala), self.assertRaises(ValueError):
+                preparacion.asignar(self.vault, "ejemplo", [mala])
+        archivo = self.raiz / "_procesado/asignaciones.json"
+        archivo.write_text("{roto")
+        preparacion.asignar(self.vault, "ejemplo", [{"doc": "parcial", "id": "1", "tema": "integracion"}])
+        datos = json.loads(archivo.read_text())
+        self.assertEqual((datos["version"], datos["automatico"]), (1, True))
+        self.assertEqual([(a["doc"], a["id"], a["tema"], len(a["huella"])) for a in datos["items"]], [("parcial", "1", "integracion", 64)])
+        self.assertEqual((self.raiz / "indice.yaml").read_bytes(), antes)
+        preparacion.registrar(self.vault, "ejemplo", {"tema": {"id": "derivacion", "estado": "incompleta", "pendientes": 2}})
+        estado = preparacion.registrar(self.vault, "ejemplo", {"documento": {"id": "parcial", "segmentado": True}})
+        self.assertEqual((estado["temas"]["derivacion"]["estado"], estado["documentos"]["parcial"]["segmentado"]), ("incompleta", True))
 
 
 if __name__ == "__main__":

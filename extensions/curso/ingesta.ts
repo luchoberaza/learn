@@ -1,12 +1,12 @@
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
-import type { Usage } from "@earendil-works/pi-ai";
+import type { Api, Model, Usage } from "@earendil-works/pi-ai";
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { piDir } from "../../scripts/lib/pi-sdk.mjs";
 
-export function python(accion: string, datos: object, signal?: AbortSignal, script: "vision.py" | "progreso.py" = "vision.py"): Promise<any> {
+export function python(accion: string, datos: object, signal?: AbortSignal, script: "vision.py" | "progreso.py" | "preparacion.py" = "vision.py"): Promise<any> {
   return new Promise((resolve, reject) => {
     const hijo = spawn(join(piDir, ".venv/bin/python"), [join(piDir, "scripts/ingesta", script), accion],
       { stdio: ["pipe", "pipe", "pipe"], signal, timeout: 30000 });
@@ -26,6 +26,16 @@ export function python(accion: string, datos: object, signal?: AbortSignal, scri
 type Solicitud = { vault: string; salida: string; doc: string; paginas: number[] };
 type Config = { modelo_vision: string; max_paginas_vision_sin_confirmar: number; umbral_calidad_pagina: number };
 
+// El modelo de visión configurado, o por qué no se puede usar (sin llamarlo).
+export async function modeloVision(ctx: Pick<ExtensionContext, "modelRegistry">, nombre: string): Promise<{ modelo: Model<Api> } | { motivo: string }> {
+  const separador = nombre.indexOf("/");
+  const modelo = ctx.modelRegistry.find(nombre.slice(0, separador), nombre.slice(separador + 1));
+  // hasConfiguredAuth lee un snapshot que puede estar viejo; como pi, se confirma con la resolución real (un error lo informa la llamada).
+  const credenciales = modelo && (ctx.modelRegistry.hasConfiguredAuth(modelo) || await ctx.modelRegistry.getProviderAuth(modelo.provider).catch(() => true));
+  if (!modelo?.input.includes("image")) return { motivo: `${nombre} no existe o no acepta imágenes; revisá modelo_vision en curso.config.json` };
+  return credenciales ? { modelo } : { motivo: `no hay credenciales para ${modelo.provider}; ejecutá /login` };
+}
+
 export async function transcribir(ctx: Pick<ExtensionContext, "modelRegistry" | "hasUI" | "ui">,
   solicitud: Solicitud, config: Config, signal?: AbortSignal, informar?: (texto: string) => void) {
   if (!Array.isArray(solicitud.paginas) || !solicitud.paginas.length || solicitud.paginas.some(n => !Number.isSafeInteger(n) || n < 1)) {
@@ -38,16 +48,13 @@ export async function transcribir(ctx: Pick<ExtensionContext, "modelRegistry" | 
   if (typeof config.modelo_vision !== "string" || config.modelo_vision.indexOf("/") < 1) throw new Error("Modelo de visión inválido en curso.config.json.");
   const paginas = [...new Set(solicitud.paginas)].sort((a, b) => a - b);
   const resumen = { solicitadas: paginas.length, transcritas: 0, cache: 0, fallidas: [] as number[], pendientes: [] as number[], avisos: [] as string[], cancelada: false };
-  const separador = config.modelo_vision.indexOf("/");
-  const modelo = ctx.modelRegistry.find(config.modelo_vision.slice(0, separador), config.modelo_vision.slice(separador + 1));
-  // hasConfiguredAuth lee un snapshot que puede estar viejo; como pi, se confirma con la resolución real (un error lo informa la llamada).
-  const credenciales = modelo && (ctx.modelRegistry.hasConfiguredAuth(modelo) || await ctx.modelRegistry.getProviderAuth(modelo.provider).catch(() => true));
-  if (!modelo?.input.includes("image") || !credenciales) {
+  const vision = await modeloVision(ctx, config.modelo_vision);
+  if ("motivo" in vision) {
     resumen.fallidas.push(...paginas);
-    resumen.avisos.push(modelo?.input.includes("image") ? `Visión no disponible: no hay credenciales para ${modelo.provider}; ejecutá /login y repetí la transcripción.`
-      : `Visión no disponible: ${config.modelo_vision} no existe o no acepta imágenes; revisá modelo_vision en curso.config.json.`);
+    resumen.avisos.push(`Visión no disponible: ${vision.motivo}.`);
     return { resumen, usage: undefined };
   }
+  const { modelo } = vision;
   if (paginas.length > config.max_paginas_vision_sin_confirmar) {
     if (!ctx.hasUI) throw new Error(`La tanda de ${paginas.length} páginas necesita confirmación interactiva; no se envió ninguna página.`);
     resumen.cancelada = !(await ctx.ui.confirm("Confirmar gasto de visión",

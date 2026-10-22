@@ -1,10 +1,12 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { spawnSync } from "node:child_process";
 import { acotar, dossier, leerPaginas } from "../extensions/curso/material.ts";
-import { agentDir, loadProject } from "../scripts/lib/pi-sdk.mjs";
+import { registrarPreparacion } from "../extensions/curso/preparacion.ts";
+import { agentDir, loadProject, piDir } from "../scripts/lib/pi-sdk.mjs";
 
 function curso(t) {
   const vault = mkdtempSync(join(tmpdir(), "pi-preparacion-")), raiz = join(vault, "cursos/redes");
@@ -102,4 +104,174 @@ test("H55, H31: la preparación se informa por tema y no por avisos del curso ni
   c.escribir("_procesado/libro/calidad.json", JSON.stringify({ paginas: { 1: { pendiente: false }, 2: { pendiente: true } } }));
   c.tema.ejercicios.push({ doc: "practico", items: ["2", "3"] });
   assert.match(dossier(c.raiz, c.d, c.tema, 3000, 1500), /Preparación del tema: sin texto confiable todavía en libro PDF 1–3 \(2 de 3 páginas\); practico: ítems 2, 3\. Se preparan solos en segundo plano/);
+});
+
+// Curso real de punta a punta (ingesta base sin modelo) con un modelo simulado: visión, segmentación y clasificación.
+const CURSO = `from pathlib import Path
+import sys, yaml, pymupdf
+from test_ingesta import crear_pdf
+from pipeline import ejecutar
+v = Path(sys.argv[1]); raiz = v / "cursos/ejemplo"
+for tipo in ["bibliografia", "evaluaciones", "ejercicios"]:
+    (raiz / f"fuentes/{tipo}").mkdir(parents=True)
+crear_pdf(raiz / "fuentes/bibliografia/libro.pdf")
+for tipo, doc, texto in [("evaluaciones", "parcial", "Pregunta 1 (8 puntos) Calcule la derivada. Solución: dos equis."), ("ejercicios", "practico", "Ejercicio 1. Derive la composición de funciones.")]:
+    with pymupdf.open() as pdf:
+        pdf.new_page(width=500, height=700).insert_textbox(pymupdf.Rect(45, 100, 450, 400), texto, fontsize=12)
+        pdf.save(raiz / f"fuentes/{tipo}/{doc}.pdf")
+docs = [{"id": "libro", "titulo": "Libro", "tipo": "bibliografia", "archivo": "fuentes/bibliografia/libro.pdf", "paginas": 3, "prioridad": "principal"},
+        {"id": "parcial", "titulo": "Parcial con soluciones", "tipo": "evaluaciones", "archivo": "fuentes/evaluaciones/parcial.pdf", "paginas": 1},
+        {"id": "practico", "titulo": "Práctico", "tipo": "ejercicios", "archivo": "fuentes/ejercicios/practico.pdf", "paginas": 1}]
+tema = lambda i, n, p: {"id": i, "nombre": n, "unidad": 1, "alias": [], "prerequisitos": [], "objetivos": ["O1.1"], "bibliografia": [{"doc": "libro", "seccion": n, "paginas": p}], "ejercicios": [], "evaluaciones": []}
+(raiz / "indice.yaml").write_text(yaml.safe_dump({"version": 1, "documentos": docs, "temas": [tema("derivacion", "Derivación", [1, 2]), tema("integracion", "Integración", [3, 3])]}, allow_unicode=True))
+(raiz / "curso.md").write_text("---\\nnombre: Ejemplo\\nslug: ejemplo\\n---\\n# Objetivos\\n- O1.1: Derivar.\\n")
+(raiz / "progreso.yaml").write_text("version: 1\\ntemas: {}\\nhistorial: []\\n")
+ejecutar({"version": 1, "motores": {c: "pymupdf" for c in ["digital", "escaneada", "mixta"]},
+          "documentos": [{**d, "archivo": f"cursos/ejemplo/{d['archivo']}", "paginas": list(range(1, d["paginas"] + 1))} for d in docs]}, v, raiz / "_procesado")`;
+const USO = { input: 1, output: 1, cacheRead: 0, cacheWrite: 0, totalTokens: 2, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } };
+const TRANSCRIPCION = "El ejercicio solicita calcular la derivada de una función y justificar el procedimiento. ".repeat(3);
+const respuesta = texto => ({ stopReason: "stop", content: [{ type: "text", text: texto }], usage: structuredClone(USO) });
+function modeloSimulado(llamadas, guion = {}) {
+  return (_modelo, contexto) => ({ result: async () => {
+    const pedido = contexto.messages[0].content, texto = pedido.map(b => b.text || "").join("");
+    const tipo = pedido.some(b => b.type === "image") ? "vision" : contexto.systemPrompt.startsWith("Segmentás") ? "segmentar" : "clasificar";
+    llamadas.push({ tipo, texto });
+    const guionada = guion[tipo]?.(texto);
+    if (guionada) return guionada;
+    if (tipo === "vision") return respuesta(TRANSCRIPCION);
+    if (tipo === "segmentar") return respuesta(JSON.stringify({ items: texto.includes("Documento parcial") ?
+      [{ id: "1", paginas: [1], enunciado: "Calcule la derivada.", puntos: 8 }, { id: "1-solucion", paginas: [1], enunciado: "Dos equis.", solucion_de: "1" }] :
+      [{ id: "1", paginas: [1], enunciado: "Derive la composición de funciones." }] }));
+    const { items } = JSON.parse(texto.slice(0, texto.lastIndexOf("}") + 1));
+    return respuesta(JSON.stringify({ asignaciones: items.map(i => ({ doc: i.doc, id: i.id, tema: i.doc === "parcial" ? "derivacion" : "integracion" })) }));
+  } });
+}
+function preparacion(t) {
+  const vault = mkdtempSync(join(tmpdir(), "pi-preparacion-e2e-")), recursos = join(vault, ".pi"), raiz = join(vault, "cursos/ejemplo");
+  t.after(() => rmSync(vault, { recursive: true, force: true }));
+  const r = spawnSync(join(piDir, ".venv/bin/python"), ["-c", CURSO, vault], { encoding: "utf8", env: { ...process.env, PYTHONPATH: join(piDir, "tests/ingesta"), PYTHONDONTWRITEBYTECODE: "1" }, timeout: 30000 });
+  assert.equal(r.status, 0, r.stderr);
+  mkdirSync(recursos);
+  writeFileSync(join(recursos, "curso.config.json"), JSON.stringify({ modelo_vision: "openai/gpt-6-luna", max_paginas_vision_sin_confirmar: 1, umbral_calidad_pagina: 0.6 }));
+  const cargar = () => JSON.parse(spawnSync(join(piDir, ".venv/bin/python"), [join(piDir, "scripts/ingesta/sesion.py"), "cargar", "--vault", vault, "--curso", "ejemplo"], { encoding: "utf8" }).stdout);
+  const e = { activo: { a: { curso: "ejemplo", tema: "derivacion", log: "cursos/ejemplo/sesiones/1.md" }, d: cargar(), r: raiz }, refrescos: 0, estados: [], avisos: [], mensajes: [], llamadas: [], eventos: new Map() };
+  const pi = { on: (n, h) => e.eventos.set(n, h), sendMessage: (m, o) => e.mensajes.push([m, o]) };
+  e.ctx = { hasUI: true, ui: { setStatus: (k, v) => e.estados.push([k, v]), notify: (m, tipo) => e.avisos.push([tipo, m]), confirm: assert.fail },
+    modelRegistry: { find: (provider, id) => ({ provider, id, input: ["text", "image"] }), hasConfiguredAuth: () => true, getProviderAuth: async () => undefined, streamSimple: modeloSimulado(e.llamadas) } };
+  e.prep = registrarPreparacion(pi, { actual: () => e.activo, refrescar: () => { e.refrescos++; return ""; } }, vault, recursos);
+  e.turno = async (log = e.activo.a.log) => { e.activo.a.log = log; await e.eventos.get("before_agent_start")({}, e.ctx); await e.prep.ultima(); };
+  e.json = f => JSON.parse(readFileSync(join(raiz, "_procesado", f), "utf8"));
+  e.yaml = f => JSON.parse(spawnSync(join(piDir, ".venv/bin/python"), ["-c", "import sys,yaml,json; print(json.dumps(yaml.safe_load(open(sys.argv[1]))))", join(raiz, "_procesado", f)], { encoding: "utf8" }).stdout);
+  e.vault = vault; e.raiz = raiz;
+  return e;
+}
+
+test("preparación: la primera vez transcribe, segmenta con soluciones y puntos, clasifica y avisa sin turno ni confirmación", async t => {
+  const e = preparacion(t), indice = readFileSync(join(e.raiz, "indice.yaml"), "utf8");
+  await e.turno();
+  assert.deepEqual(e.llamadas.map(l => l.tipo), ["vision", "vision", "vision", "vision", "segmentar", "segmentar", "clasificar"]);
+  assert.deepEqual(e.estados[0], ["preparacion", "⏳ Preparando material de Derivación: 0/4 páginas"]);
+  assert.ok(e.estados.some(([, v]) => v === "⏳ Preparando material de Derivación: 4/4 páginas"));
+  assert.deepEqual(e.estados.at(-1), ["preparacion", undefined]);
+  assert.deepEqual(e.avisos, [["info", "Material de Derivación listo: 4 páginas transcriptas, 2 ítems nuevos."]]);
+  const parcial = e.yaml("parcial/items.yaml").items;
+  assert.deepEqual(parcial.map(i => [i.id, i.puntos, i.solucion_de]), [["1", 8, undefined], ["1-solucion", undefined, "1"]]);
+  const asignaciones = e.json("asignaciones.json");
+  assert.equal(asignaciones.automatico, true);
+  assert.deepEqual(asignaciones.items.map(a => [a.doc, a.id, a.tema, a.huella.length]), [["parcial", "1", "derivacion", 64], ["practico", "1", "integracion", 64]]);
+  assert.equal(readFileSync(join(e.raiz, "indice.yaml"), "utf8"), indice);
+  assert.equal(e.json("preparacion.json").temas.derivacion.estado, "completa");
+  assert.equal(e.json("preparacion.json").documentos.parcial.segmentado, true);
+  assert.equal(e.mensajes.length, 1);
+  assert.deepEqual(e.mensajes[0][1], { deliverAs: "nextTurn" });
+  assert.equal(e.mensajes[0][0].customType, "curso-preparacion");
+  assert.equal(e.mensajes[0][0].display, false);
+  assert.match(e.mensajes[0][0].content, /1 ítems asignados a este tema/);
+  assert.equal(e.activo.d.items.parcial.length, 2);
+  assert.equal(e.refrescos, 1);
+  assert.ok(!existsSync(join(e.raiz, "_procesado/.preparacion.lock")));
+  const r = dossier(e.raiz, e.activo.d, e.activo.d.temas[0], 3000, 1500);
+  assert.match(r, /evaluaciones: parcial\/1 \(asignado automáticamente\) · Calcule la derivada\./);
+  assert.doesNotMatch(r, /Dos equis|practico\/1/);
+  const muchos = { ...e.activo.d, items: { ...e.activo.d.items, parcial: Array.from({ length: 300 }, (_, i) => ({ id: String(i + 1), paginas: [1], enunciado: "Calcule la derivada de la función compuesta. ".repeat(4) })) } };
+  const reales = readFileSync(join(e.raiz, "_procesado/asignaciones.json"), "utf8");
+  writeFileSync(join(e.raiz, "_procesado/asignaciones.json"), JSON.stringify({ items: muchos.items.parcial.map(i => ({ doc: "parcial", id: i.id, tema: "derivacion" })) }));
+  const lista = dossier(e.raiz, muchos, muchos.temas[0], 3000, 1500).split("\n\n").filter(l => /^(evaluaciones|Más ítems)/.test(l));
+  assert.ok(Buffer.byteLength(lista.join("\n\n")) < 3300);
+  assert.match(lista.at(-1), /^Más ítems del tema \(leelos con leer_items\): asignados automáticamente: parcial\/\d+, /);
+  assert.ok(Buffer.byteLength(lista.at(-1)) <= 800);
+  writeFileSync(join(e.raiz, "_procesado/asignaciones.json"), reales);
+  await e.turno("cursos/ejemplo/sesiones/2.md");
+  assert.equal(e.llamadas.length, 7);
+  e.activo.a.tema = "integracion";
+  await e.turno("cursos/ejemplo/sesiones/3.md");
+  assert.equal(e.llamadas.length, 7);
+  assert.equal(e.json("preparacion.json").temas.integracion.estado, "completa");
+  assert.equal(e.avisos.length, 1);
+});
+
+test("preparación: no demora el turno, y sin credenciales avisa una línea y no llama al modelo", async t => {
+  const e = preparacion(t);
+  e.ctx.modelRegistry.hasConfiguredAuth = () => false;
+  const inicio = performance.now();
+  e.eventos.get("before_agent_start")({}, e.ctx);
+  assert.ok(performance.now() - inicio < 100, "el handler no espera a la preparación");
+  await e.prep.ultima();
+  assert.deepEqual(e.llamadas, []);
+  assert.deepEqual(e.avisos, [["warning", "Preparación del material no disponible: no hay credenciales para openai; ejecutá /login; seguimos con lo que hay."]]);
+  assert.ok(e.estados.every(([, v]) => v === undefined));
+  assert.ok(!existsSync(join(e.raiz, "_procesado/.preparacion.lock")));
+  await e.turno();
+  assert.equal(e.avisos.length, 1, "un solo aviso por /estudiar");
+});
+
+test("preparación: JSON inválido se reintenta una vez y queda para la próxima, sin repetir visión", async t => {
+  const e = preparacion(t);
+  e.ctx.modelRegistry.streamSimple = modeloSimulado(e.llamadas, { segmentar: texto => texto.includes("Documento parcial") && respuesta("Acá van los ítems: …") });
+  await e.turno();
+  const segmentar = e.llamadas.filter(l => l.tipo === "segmentar" && l.texto.includes("Documento parcial"));
+  assert.equal(segmentar.length, 2);
+  assert.match(segmentar[1].texto, /Tu respuesta anterior se rechazó: la respuesta no es JSON válido/);
+  assert.ok(!existsSync(join(e.raiz, "_procesado/parcial/items.yaml")));
+  assert.equal(e.json("preparacion.json").temas.derivacion.estado, "incompleta");
+  assert.deepEqual(e.avisos, [["warning", "Material de Derivación preparado en parte: 4 páginas transcriptas, 1 ítems nuevos; no se pudieron separar los ítems de parcial (la respuesta no es JSON válido), sigue la próxima vez."]]);
+  e.llamadas.length = 0;
+  e.ctx.modelRegistry.streamSimple = modeloSimulado(e.llamadas);
+  await e.turno("cursos/ejemplo/sesiones/2.md");
+  assert.deepEqual(e.llamadas.map(l => l.tipo), ["segmentar", "clasificar"]);
+  assert.equal(e.json("preparacion.json").temas.derivacion.estado, "completa");
+});
+
+test("preparación: con la ingesta base corriendo u otro pi preparando espera sin avisos y retoma un lock de un pi muerto", async t => {
+  const e = preparacion(t), estado = join(e.raiz, "_procesado/estado-ingesta.json"), lock = join(e.raiz, "_procesado/.preparacion.lock");
+  const original = readFileSync(estado, "utf8");
+  writeFileSync(estado, JSON.stringify({ ...JSON.parse(original), estado: "en_curso", pid: process.pid }));
+  await e.turno();
+  writeFileSync(estado, original);
+  writeFileSync(lock, JSON.stringify({ pid: process.pid, inicio: Date.now() }));
+  await e.turno();
+  assert.deepEqual([e.llamadas, e.avisos], [[], []]);
+  assert.ok(e.estados.every(([, v]) => v === undefined));
+  const muerto = spawnSync("true").pid;
+  writeFileSync(lock, JSON.stringify({ pid: muerto, inicio: Date.now() }));
+  await e.turno();
+  assert.equal(e.llamadas.filter(l => l.tipo === "vision").length, 4);
+  assert.ok(!existsSync(lock));
+});
+
+test("preparación: un kill a mitad no rompe nada y la próxima vez sigue sin repetir páginas", async t => {
+  const e = preparacion(t);
+  // Corte en la tercera página: lo que quedó guardado es atómico y queda en caché.
+  e.ctx.modelRegistry.streamSimple = (...args) => ({ result: async () => {
+    if (e.llamadas.length === 2) { e.eventos.get("session_shutdown")(); return { stopReason: "aborted", errorMessage: "Request was aborted", content: [], usage: structuredClone(USO) }; }
+    return modeloSimulado(e.llamadas)(...args).result();
+  } });
+  await e.turno();
+  assert.deepEqual([e.avisos, e.estados.at(-1)], [[], ["preparacion", undefined]]);
+  writeFileSync(join(e.raiz, "_procesado/.preparacion.lock"), JSON.stringify({ pid: spawnSync("true").pid, inicio: Date.now() }));
+  e.llamadas.length = 0;
+  e.ctx.modelRegistry.streamSimple = modeloSimulado(e.llamadas);
+  await e.turno("cursos/ejemplo/sesiones/2.md");
+  assert.deepEqual(e.llamadas.map(l => l.tipo), ["vision", "vision", "segmentar", "segmentar", "clasificar"]);
+  assert.deepEqual(e.avisos, [["info", "Material de Derivación listo: 2 páginas transcriptas, 2 ítems nuevos."]]);
 });

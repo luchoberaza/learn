@@ -192,12 +192,31 @@ export function dossier(raiz: string, datos: DatosCurso, tema: Tema, maxTokens: 
     try { const d = documento(datos, ref.doc); lineas.push(`${ref.doc} · ${d.titulo} · ${d.prioridad} · ${ref.seccion} · PDF ${ref.paginas.join("–")} · ${cita(datos, ref.doc, ref.paginas[0])}`); }
     catch { lineas.push("Referencia bibliográfica no disponible; no reconstruirla desde memoria."); }
   }
-  for (const clase of ["ejercicios", "evaluaciones"] as const) for (const ref of tema[clase] || []) for (const id of ref.items) {
-    const i = datos.items[ref.doc]?.find(i => i.id === id), d = datos.documentos.find(d => d.id === ref.doc);
+  const items: { linea: string; id: string; automatico: boolean }[] = [], vistos = new Set<string>();
+  const agregar = (clase: string, doc: string, id: string, marca = "") => {
+    const i = datos.items[doc]?.find(i => i.id === id), d = datos.documentos.find(d => d.id === doc);
     // Una solución nunca entra al prompt antes del intento, aunque el índice la referencie.
-    if (d && i ? esSolucion(d, i) : d?.tipo === "soluciones") continue;
-    lineas.push(`${clase}: ${ref.doc}/${id} · ${i?.enunciado.replace(/\s+/g, " ").slice(0, 140) || "sin preparar"}`);
+    if ((d && i ? esSolucion(d, i) : d?.tipo === "soluciones") || vistos.has(`${doc}/${id}`)) return;
+    vistos.add(`${doc}/${id}`);
+    items.push({ id: `${doc}/${id}`, automatico: !!marca, linea: `${clase}: ${doc}/${id}${marca} · ${i?.enunciado.replace(/\s+/g, " ").slice(0, 140) || "sin preparar"}` });
+  };
+  for (const clase of ["ejercicios", "evaluaciones"] as const) for (const ref of tema[clase] || []) for (const id of ref.items) agregar(clase, ref.doc, id);
+  // Lo que la preparación automática asignó al tema; el índice curado manda y va primero.
+  let automaticas: { doc?: string; id?: string; tema?: string | null }[] = [];
+  try { automaticas = JSON.parse(leer(raiz, "_procesado/asignaciones.json")).items || []; } catch { /* Sin preparación automática todavía. */ }
+  for (const clase of ["evaluaciones", "ejercicios"]) for (const a of automaticas) {
+    const d = datos.documentos.find(d => d.id === a?.doc);
+    if (a?.tema === tema.id && d?.tipo === clase && datos.items[d.id]?.some(i => i.id === a.id)) agregar(clase, d.id, String(a.id), " (asignado automáticamente)");
   }
+  // Las vistas previas ocupan hasta 2400 B; el resto va sólo con su id (leer_items lo trae).
+  let bytes = 0;
+  const resto: typeof items = [];
+  for (const i of items) {
+    bytes += Buffer.byteLength(i.linea);
+    if (bytes > 2400) resto.push(i); else lineas.push(i.linea);
+  }
+  const ids = (automatico: boolean) => resto.filter(i => i.automatico === automatico).map(i => i.id).join(", ");
+  if (resto.length) lineas.push(acotar(`Más ítems del tema (leelos con leer_items): ${[ids(false), ids(true) && `asignados automáticamente: ${ids(true)}`].filter(Boolean).join("; ")}`, 800));
   const faltan = faltantesTema(raiz, datos, tema);
   if (faltan.length) lineas.push(`Preparación del tema: sin texto confiable todavía en ${faltan.join("; ")}. Se preparan solos en segundo plano; mientras, cotejá esas páginas con ver_pagina antes de citarlas.`);
   // Lo que puede cortarse va al final: el progreso de los prerequisitos.
