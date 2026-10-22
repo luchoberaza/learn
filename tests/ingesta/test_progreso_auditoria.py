@@ -156,6 +156,12 @@ class ProgresoAuditoriaTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.guardar({'borde': {'domina': ['sin resumen']}})
 
+    def test_h10_el_estado_omitido_sigue_a_la_evidencia(self):
+        self.guardar({'resumen': 'Cierre sin respuestas'})
+        self.assertEqual(self.tema()['estado'], 'sin_empezar')
+        self.guardar({'resumen': 'Probe', 'borde': {'domina': ['derivar un polinomio']}})
+        self.assertEqual(self.tema()['estado'], 'en_curso')
+
     def test_h27_falla_resuelta_y_falla_nueva_sacan_lo_contradicho(self):
         self.guardar()
         r = self.guardar({'resumen': 'Supera la falla', 'falla_resuelta': ['composición', 'algo que no estaba']})

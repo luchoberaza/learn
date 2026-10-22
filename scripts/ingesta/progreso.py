@@ -114,7 +114,10 @@ def fusionar(anterior, nuevo, previo=False):
         raise ValueError("Ya hay evidencia del tema: conservá su estado previo o usá repasar, no sin_empezar.")
     avisos = [f"falla_resuelta '{s}' no coincide con ninguna falla del borde; textos exactos: " + ("; ".join(f"'{x}'" for x in falla) or "ninguno") + "."
               for s in nuevo["falla_resuelta"] if s not in falla]
-    r = {"estado": "en_curso", **deepcopy(anterior), **deepcopy({k: v for k, v in nuevo.items() if k != "falla_resuelta"})}
+    r = {"estado": "sin_empezar", **deepcopy(anterior), **deepcopy({k: v for k, v in nuevo.items() if k != "falla_resuelta"})}
+    # Sin estado explícito, un tema sigue sin_empezar hasta que llega evidencia del alumno.
+    if r["estado"] == "sin_empezar" and "estado" not in nuevo and any([*nuevo["borde"].values(), nuevo["conceptos_firmes"], nuevo["errores_de_concepto"], nuevo["ejercicios"]]):
+        r["estado"] = "en_curso"
     for k in ["conceptos_firmes", "ejercicios", "discrepancias"]:
         r[k] = unicos(anterior.get(k, []) + nuevo[k])
     r["conceptos_firmes"] = [s for s in r["conceptos_firmes"] if s not in nuevo["borde"]["falla"]]
