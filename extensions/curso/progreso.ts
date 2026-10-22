@@ -5,6 +5,7 @@ import { python } from "./ingesta.ts";
 import { acotar, leer, ordenarTemas, type DatosCurso } from "./material.ts";
 import { ordenar, type registrarSesion } from "./sesion.ts";
 import { vaultDir } from "../../scripts/lib/pi-sdk.mjs";
+import { normalizar } from "../../scripts/ingesta/bm25.ts";
 
 export function proximoTema(d: DatosCurso) {
   return ordenarTemas(d).find(t => d.progreso.temas[t.id]?.estado !== "dominado" && t.prerequisitos.every(p => d.progreso.temas[p]?.estado === "dominado"));
@@ -44,7 +45,7 @@ export function registrarProgreso(pi: ExtensionAPI, sesion: ReturnType<typeof re
     description: "Mostrar el progreso por tema y sugerir el próximo tema con prerequisitos firmes",
     async handler(args, ctx) {
       try {
-        const curso = args.trim() || sesion.actual()?.a.curso;
+        const curso = normalizar(args.trim()) || sesion.actual()?.a.curso;
         if (!curso) throw new Error("Uso: /progreso <curso>, o activá un curso con /estudiar.");
         const d = await sesion.cargar(curso);
         const filas = d.temas.map(t => { const p = d.progreso.temas[t.id]; return `${t.nombre}: ${p?.estado || "sin_empezar"}${p?.proximo_paso ? ` · ${p.proximo_paso}` : ""}`; });

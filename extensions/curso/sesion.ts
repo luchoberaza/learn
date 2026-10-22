@@ -89,9 +89,14 @@ export function registrarSesion(pi: ExtensionAPI, vault = vaultDir, recursos = p
     },
     async handler(args, ctx) {
       if (!ctx.isIdle()) { ctx.ui.notify("Esperá a que termine el turno antes de cambiar de tema.", "warning"); return; }
-      const [curso, ...resto] = args.trim().split(/\s+/), consulta = resto.join(" ");
-      if (!curso) { ctx.ui.notify("Uso: /estudiar <curso> [tema]", "warning"); return; }
       try {
+        const palabras = args.trim().split(/\s+/).filter(Boolean), lista = cursos();
+        let curso = lista.find(c => normalizar(c) === normalizar(palabras[0] || ""));
+        if (curso) palabras.shift();
+        else if (lista.length === 1) curso = lista[0];
+        else if (palabras.length) { ctx.ui.notify(lista.length ? `No hay un curso «${palabras[0]}»: elegí uno de ${lista.join(", ")}.` : "No hay cursos preparados; usá /curso-nuevo.", "warning"); return; }
+        if (!curso) { ctx.ui.notify("Uso: /estudiar <curso> [tema]", "warning"); return; }
+        const consulta = palabras.join(" ");
         const d = await cargar(curso, true);
         for (const aviso of d.avisos.filter(a => a.startsWith("Progreso"))) ctx.ui.notify(aviso, "warning");
         cacheCompletar.delete(curso);

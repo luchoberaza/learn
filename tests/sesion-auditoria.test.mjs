@@ -74,3 +74,17 @@ test("H55/H31: los avisos del curso van al dossier, no al alumno, y la barra es 
   await e.eventos.get("session_start")({ type: "session_start", reason: "resume" }, e.ctx);
   assert.equal(e.estados.curso, barra);
 });
+test("H71: con un solo curso alcanza el tema, y el curso se acepta sin mayúsculas ni tildes", async t => {
+  for (const args of ["derivada", "Calculo derivada", "Cálculo derivacion"]) {
+    const e = entorno(t);
+    await e.estudiar(args);
+    assert.equal(e.entradas.at(-1)?.data.tema, "derivacion", args);
+  }
+  const e = entorno(t);
+  registrarProgreso(e.pi, e.sesion, e.vault);
+  await e.comandos.get("progreso").handler("Cálculo", e.ctx);
+  assert.match(e.avisos.at(-1)[1], /Derivación: sin_empezar/);
+  mkdirSync(join(e.vault, "cursos/fisica"));
+  await e.estudiar("retardos");
+  assert.match(e.avisos.at(-1)[1], /No hay un curso «retardos»: elegí uno de calculo, fisica/);
+});
