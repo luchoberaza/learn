@@ -1,5 +1,6 @@
 """Preparación por tema y pedidos de visión/curación, con PDFs sintéticos y sin red ni LLM."""
 from contextlib import ExitStack
+import copy
 import json
 from pathlib import Path
 import subprocess
@@ -8,10 +9,13 @@ import threading
 import unittest
 from unittest.mock import patch
 
+import yaml
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts/ingesta"))
 from almacen import Conflicto, bloquear
-from cursos import bloquear_breve
-from pipeline import adoptar
+from cursos import bloquear_breve, publicar_informe
+from pipeline import adoptar, ejecutar
+import test_cursos
 import test_vision
 import vision
 
@@ -60,6 +64,67 @@ class VisionPedidosTest(unittest.TestCase):
             with self.assertRaisesRegex(Conflicto, "Ya hay una ingesta"):
                 with bloquear_breve(self.raiz, self.vault):
                     pass
+
+
+class CursoPreparacion(unittest.TestCase):
+    """Curso con libro, parcial y práctico ingeridos sin modelo, como lo deja `manifiesto --todo` + `iniciar`."""
+    setUp_base, tearDown = test_cursos.CursosTest.setUp, test_cursos.CursosTest.tearDown
+    crear, guardar_indice = test_cursos.CursosTest.crear, test_cursos.CursosTest.guardar_indice
+    escribir = test_cursos.CursosTest.escribir
+
+    def setUp(self):
+        self.setUp_base()
+        self.crear()
+        self.indice = copy.deepcopy(self.indice)
+        for doc, tipo in [("parcial", "evaluaciones"), ("practico", "ejercicios")]:
+            destino = self.raiz / f"fuentes/{tipo}/{doc}.pdf"
+            destino.parent.mkdir(parents=True)
+            destino.write_bytes(self.fuente.read_bytes())
+            self.indice["documentos"].append({"id": doc, "titulo": doc.capitalize(), "tipo": tipo, "archivo": f"fuentes/{tipo}/{doc}.pdf", "paginas": 3})
+        otro = copy.deepcopy(self.indice["temas"][0])
+        otro.update(id="integracion", nombre="Integración", alias=[], bibliografia=[{"doc": "libro", "seccion": "Aplicaciones", "paginas": [3, 3]}])
+        self.indice["temas"].append(otro)
+        self.guardar_indice(self.indice)
+        ejecutar({"version": 1, "motores": {c: "pymupdf" for c in ["digital", "escaneada", "mixta"]},
+                  "documentos": [{"id": d["id"], "titulo": d["titulo"], "tipo": d["tipo"], "archivo": f"cursos/ejemplo/{d['archivo']}", "paginas": [1, 2, 3]}
+                                 for d in self.indice["documentos"]]}, self.vault, self.raiz / "_procesado")
+
+    def segmentar(self, doc, items, paginas=(1, 2, 3)):
+        salida = self.raiz / "_procesado"
+        for n in paginas:
+            with bloquear(salida, self.vault):
+                datos = {"doc": doc, "pagina": n, "modelo": "openai/gpt-6-luna", "umbral": 0.6}
+                vision.guardar(salida, self.vault, {**datos, **vision.preparar(salida, self.vault, datos), "texto": test_vision.TEXTO, "completa": True})
+        with bloquear(salida, self.vault):
+            return vision.guardar_items(salida, self.vault, {"doc": doc, "items": items})
+
+
+class ValidarPedidosTest(CursoPreparacion):
+    def test_avisos_dicen_que_la_preparacion_es_automatica_y_cuentan_las_asignaciones(self):
+        avisos = "\n".join(self.guardar_indice(self.indice)["avisos"])
+        self.assertIn("Documento parcial (evaluaciones) sin segmentar: se transcribe y segmenta solo la primera vez que se estudia un tema del curso.", avisos)
+        self.assertIn("Tema integracion sin preguntas de evaluaciones: se asignan solas la primera vez que se estudia el tema.", avisos)
+        self.assertNotIn("/curso-agregar", avisos)
+        self.segmentar("parcial", [{"id": "1", "paginas": [1], "enunciado": "Derive.", "puntos": 8},
+                                   {"id": "1-solucion", "paginas": [2], "enunciado": "Respuesta.", "solucion_de": "1"}])
+        asignaciones = self.raiz / "_procesado/asignaciones.json"
+        asignaciones.write_text(json.dumps({"version": 1, "items": [{"doc": "parcial", "id": "1", "tema": "integracion"}, {"doc": "parcial", "id": "1-solucion", "tema": "derivacion"}]}))
+        r = self.guardar_indice(self.indice)
+        self.assertNotIn("Tema integracion sin preguntas", "\n".join(r["avisos"]))
+        self.assertIn("Tema derivacion sin preguntas", "\n".join(r["avisos"]))
+        self.assertNotIn({"doc": "parcial", "id": "1"}, r["items_sin_asignar"])
+        asignaciones.write_text("{roto")
+        self.assertIn("asignaciones.json ilegible", "\n".join(self.guardar_indice(self.indice)["avisos"]))
+
+    def test_edicion_cita_adoptar_e_informe_cuenta_la_ruta_manual(self):
+        pagina = self.raiz / "_procesado/libro/paginas/0003.md"
+        pagina.write_text(pagina.read_text() + "\nCorrección a mano.\n")
+        errores = " ".join(self.guardar_indice(self.indice)["errores"])
+        self.assertIn("ingestar.py adoptar --salida cursos/ejemplo/_procesado --doc libro --pagina 3", errores)
+        with bloquear(self.raiz / "_procesado", self.vault):
+            adoptar(self.raiz / "_procesado", "libro", 3)
+        publicar_informe(self.vault, "ejemplo")
+        self.assertIn("manual: 1 (33.3 %)", (self.raiz / "informe-ingesta.md").read_text())
 
 
 if __name__ == "__main__":

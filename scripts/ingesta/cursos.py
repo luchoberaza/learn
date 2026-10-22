@@ -180,8 +180,24 @@ def validar(raiz: Path, slug: str, *, indice=None, contrato=None, origenes=None,
                 if not q or q.get("pendiente") or q.get("ruta") == "pendiente" or not archivo.exists():
                     pendientes.add((doc, p))
                 elif q.get("sha256_markdown") and sha256(archivo) != q["sha256_markdown"]:
-                    errores.append(f"Transcripción editada fuera de la ingesta: {doc}/{p}.")
+                    errores.append(f"Transcripción editada fuera de la ingesta: {doc}/{p}. Para conservarla, desde la raíz del vault: "
+                                   f".pi/.venv/bin/python .pi/scripts/ingesta/ingestar.py adoptar --salida cursos/{slug}/_procesado --doc {doc} --pagina {p}")
         hay_evaluaciones = any(d["tipo"] == "evaluaciones" for d in documentos.values())
+        # La preparación automática asigna los ítems que el índice no asigna; el índice curado manda igual.
+        evaluados = set()
+        try:
+            automaticas = leer_json(raiz, "_procesado/asignaciones.json", {}).get("items", [])
+        except (ValueError, AttributeError):
+            automaticas = []
+            avisos.append("_procesado/asignaciones.json ilegible: se ignora y la próxima preparación lo rehace.")
+        for a in automaticas if isinstance(automaticas, list) else []:
+            if not isinstance(a, dict) or not all(isinstance(a.get(k), str) for k in ["doc", "id", "tema"]):
+                continue
+            item = items.get(a["doc"], {}).get(a["id"])
+            if item is not None and "solucion_de" not in item and a["tema"] in temas:
+                usados.add((a["doc"], a["id"]))
+                if documentos[a["doc"]]["tipo"] == "evaluaciones":
+                    evaluados.add(a["tema"])
         for t in temas.values():
             if set(t["prerequisitos"]) - temas.keys():
                 errores.append(f"Tema {t['id']}: prerequisito inexistente.")
@@ -219,8 +235,8 @@ def validar(raiz: Path, slug: str, *, indice=None, contrato=None, origenes=None,
                                 evaluado = evaluado or clase == "evaluaciones"
             if not tiene_material:
                 avisos.append(f"Tema sin material: {t['id']}.")
-            if hay_evaluaciones and not evaluado:
-                avisos.append(f"Tema {t['id']} sin preguntas de evaluaciones: segmentá los parciales y asignale las suyas con /curso-agregar.")
+            if hay_evaluaciones and not evaluado and t["id"] not in evaluados:
+                avisos.append(f"Tema {t['id']} sin preguntas de evaluaciones: se asignan solas la primera vez que se estudia el tema.")
         # DFS con colores: un nodo gris indica un ciclo, incluso en componentes desconectados.
         colores = {}
         def visitar(n):
@@ -249,7 +265,7 @@ def validar(raiz: Path, slug: str, *, indice=None, contrato=None, origenes=None,
         resultado["items_sin_asignar"] = sin_asignar
         for d in documentos.values():
             if d["tipo"] in {"ejercicios", "evaluaciones", "soluciones"} and d["id"] not in items:
-                avisos.append(f"Documento {d['id']} ({d['tipo']}) sin segmentar: transcribilo y segmentalo con /curso-agregar.")
+                avisos.append(f"Documento {d['id']} ({d['tipo']}) sin segmentar: se transcribe y segmenta solo la primera vez que se estudia un tema del curso.")
         resultado.update(documentos=len(documentos), temas=len(temas))
     except (OSError, ValueError, KeyError, TypeError, RecursionError, RuntimeError) as e:
         errores.append(f"No se pudo validar: {e}")
@@ -521,7 +537,7 @@ def publicar_informe(vault: Path, slug: str, max_tokens=1500) -> dict:
         qs = leer_json(raiz, f"_procesado/{d['id']}/calidad.json", {"paginas": {}})["paginas"]
         rutas = Counter(q.get("ruta", "pendiente") for q in qs.values())
         lineas += [f"### {d['titulo']}", "", f"- {d['paginas']} páginas totales; {len(qs)} con registro; {d['paginas'] - len(qs)} sin preparar.",
-                   "- Rutas sobre el PDF completo: " + ", ".join(f"{k}: {rutas[k]} ({100 * rutas[k] / d['paginas']:.1f} %)" for k in ["digital", "ocr", "vision", "pendiente"]) + ".", ""]
+                   "- Rutas sobre el PDF completo: " + ", ".join(f"{k}: {rutas[k]} ({100 * rutas[k] / d['paginas']:.1f} %)" for k in ["digital", "ocr", "vision", "manual", "pendiente"]) + ".", ""]
         for p, q in qs.items():
             if q.get("pendiente"):
                 lineas.append(f"- Dudosa: {cita(f'cursos/{slug}/{d['archivo']}', int(p))} — {'; '.join(q.get('avisos', []))}")

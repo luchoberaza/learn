@@ -142,7 +142,7 @@ class CursosAuditoriaTest(unittest.TestCase):
         avisos = "\n".join(r["avisos"])
         self.assertIn("Tema integracion sin preguntas de evaluaciones", avisos)
         self.assertNotIn("Tema derivacion sin preguntas", avisos)
-        self.assertIn("Documento practico (ejercicios) sin segmentar: transcribilo y segmentalo con /curso-agregar.", avisos)
+        self.assertIn("Documento practico (ejercicios) sin segmentar: se transcribe y segmenta solo la primera vez que se estudia un tema del curso.", avisos)
         self.assertNotIn("Documento parcial", avisos)
         self.assertFalse(r["listo_estudio"])
 
