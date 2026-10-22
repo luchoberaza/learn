@@ -58,7 +58,7 @@ interface AskUserQuestionResultDetails {
 const OptionSchema = Type.Object({
 	label: Type.String({
 		description:
-			'Display label for the option. If you recommend an option, place it first and append "(Recommended)" to the label.',
+			'Display label for the option. If you recommend an option, place it first and append "(recomendado)" to the label.',
 	}),
 	value: Type.Optional(
 		Type.String({
@@ -80,7 +80,7 @@ const AskUserQuestionParams = Type.Object({
 	options: Type.Optional(
 		Type.Array(OptionSchema, {
 			description:
-				"Optional multiple-choice options. Omit or pass an empty array for free-form text input. Users will always be able to choose Other and type a custom answer when options are provided.",
+				"Optional multiple-choice options. Omit or pass an empty array for free-form text input. Users will always be able to choose «Otra» and type a custom answer when options are provided.",
 		}),
 	),
 	multiSelect: Type.Optional(
@@ -101,7 +101,7 @@ function normalizeOptions(options: Array<{ label: string; value?: string; descri
 }
 
 function getOtherLabel(options: AskOption[]): string {
-	return options.some((option) => option.label.toLowerCase() === "other") ? "Other (custom)" : "Other";
+	return options.some((option) => option.label.toLowerCase() === "otra") ? "Otra (escribir)" : "Otra";
 }
 
 function createEditorTheme(theme: any): EditorTheme {
@@ -129,7 +129,7 @@ function formatAnswerForModel(answer: AskAnswer): string {
 		case "text":
 			return answer.label;
 		case "other":
-			return `Other: ${answer.label}`;
+			return `Otra: ${answer.label}`;
 		case "option":
 			return `${answer.index}. ${answer.label}`;
 	}
@@ -169,7 +169,7 @@ function buildStructuredResult(
 }
 
 function cancelledResult(question: string, mode: AskUserQuestionMode, context?: string) {
-	const message = "User cancelled the question";
+	const message = "Pregunta cancelada sin respuesta.";
 	return {
 		content: [{ type: "text" as const, text: message }],
 		details: buildStructuredResult("cancelled", question, mode, [], context, message),
@@ -187,11 +187,11 @@ function buildResult(question: string, context: string | undefined, mode: AskUse
 	let text: string;
 	if (mode === "text") {
 		const answer = answers[0];
-		text = answer.label.trim().length > 0 ? `User answered: ${answer.label}` : "User submitted an empty response";
+		text = answer.label.trim().length > 0 ? `Respuesta del alumno: ${answer.label}` : "El alumno envió una respuesta vacía.";
 	} else if (mode === "single-select") {
-		text = `User selected: ${formatAnswerForModel(answers[0])}`;
+		text = `El alumno eligió: ${formatAnswerForModel(answers[0])}`;
 	} else {
-		text = `User selected:\n${answers.map((answer) => `- ${formatAnswerForModel(answer)}`).join("\n")}`;
+		text = `El alumno eligió:\n${answers.map((answer) => `- ${formatAnswerForModel(answer)}`).join("\n")}`;
 	}
 
 	return {
@@ -306,15 +306,15 @@ async function askSingleChoice(
 
 			if (editMode) {
 				lines.push("");
-				add(theme.fg("muted", " Write your custom answer:"));
+				add(theme.fg("muted", " Escribí tu respuesta:"));
 				for (const line of editor.render(Math.max(1, width - 2))) {
 					add(` ${line}`);
 				}
 				lines.push("");
-				add(theme.fg("dim", " Enter to submit • Esc to go back"));
+				add(theme.fg("dim", " Enter enviar • Esc volver"));
 			} else {
 				lines.push("");
-				add(theme.fg("dim", " ↑↓ navigate • Enter select • Esc cancel"));
+				add(theme.fg("dim", " ↑↓ moverse • Enter elegir • Esc cancelar"));
 			}
 
 			add(theme.fg("accent", "─".repeat(width)));
@@ -345,7 +345,7 @@ async function askMultiChoice(
 		id: `option:${index}`,
 		index: index + 1,
 	}));
-	const submitItem: DisplayOption = { id: "submit", label: "Submit", value: "__submit__", isSubmit: true };
+	const submitItem: DisplayOption = { id: "submit", label: "Enviar", value: "__submit__", isSubmit: true };
 	const allItems: DisplayOption[] = [
 		...choiceItems,
 		{ id: "other", label: otherLabel, value: "__other__", isOther: true },
@@ -475,7 +475,7 @@ async function askMultiChoice(
 				const prefix = isFocused ? theme.fg("accent", "> ") : "  ";
 
 				if (item.isSubmit) {
-					const label = selected.size > 0 ? `✓ ${item.label} (${selected.size} selected)` : `○ ${item.label}`;
+					const label = selected.size > 0 ? `✓ ${item.label} (${selected.size} elegidas)` : `○ ${item.label}`;
 					const styled = isFocused
 						? theme.fg("accent", label)
 						: theme.fg(selected.size > 0 ? "success" : "dim", label);
@@ -508,18 +508,18 @@ async function askMultiChoice(
 
 			if (editMode) {
 				lines.push("");
-				add(theme.fg("muted", " Write your custom answer:"));
+				add(theme.fg("muted", " Escribí tu respuesta:"));
 				for (const line of editor.render(Math.max(1, width - 2))) {
 					add(` ${line}`);
 				}
 				lines.push("");
-				add(theme.fg("dim", " Enter to save • Esc to go back"));
+				add(theme.fg("dim", " Enter guardar • Esc volver"));
 			} else {
 				lines.push("");
 				if (selected.size === 0) {
-					add(theme.fg("warning", " Select at least one answer before submitting."));
+					add(theme.fg("warning", " Elegí al menos una respuesta antes de enviar."));
 				}
-				add(theme.fg("dim", " ↑↓ navigate • Space toggle • Enter edit/submit • Esc cancel"));
+				add(theme.fg("dim", " ↑↓ moverse • Espacio marcar • Enter editar/enviar • Esc cancelar"));
 			}
 
 			add(theme.fg("accent", "─".repeat(width)));
@@ -576,9 +576,9 @@ export default function askUserQuestion(pi: ExtensionAPI) {
 		promptGuidelines: [
 			"Ask exactly one question per tool call.",
 			"If you need answers to multiple questions, make multiple separate ask_user_question tool calls instead of combining them into one prompt.",
-			'Users will always be able to select "Other" to provide custom text input when options are provided.',
+			'Users will always be able to select "Otra" to provide custom text input when options are provided.',
 			"Use multiSelect: true only when you need multiple answers to the same question.",
-			'If you recommend a specific option, make it the first option in the list and add "(Recommended)" at the end of the label.',
+			'If you recommend a specific option, make it the first option in the list and add "(recomendado)" at the end of the label.',
 			"Prefer this tool over guessing when requirements, preferences, or implementation choices are unclear.",
 			"Use this tool when multiple valid implementation paths exist and the preferred path depends on user choice.",
 		],
@@ -594,7 +594,7 @@ export default function askUserQuestion(pi: ExtensionAPI) {
 			}
 
 			if (!ctx.hasUI) {
-				return unavailableResult(params.question, mode, "ask_user_question requires interactive mode UI", context);
+				return unavailableResult(params.question, mode, "Pregunta no disponible: hace falta la interfaz interactiva.", context);
 			}
 
 			return withUILock(async () => {
@@ -627,13 +627,13 @@ export default function askUserQuestion(pi: ExtensionAPI) {
 
 		renderCall(args, theme) {
 			const options = normalizeOptions(args.options as Array<{ label: string; value?: string; description?: string }> | undefined);
-			let text = theme.fg("toolTitle", theme.bold("ask_user_question ")) + theme.fg("muted", args.question);
+			let text = theme.fg("toolTitle", theme.bold("pregunta ")) + theme.fg("muted", args.question);
 			if (args.multiSelect) {
-				text += theme.fg("dim", " [multi-select]");
+				text += theme.fg("dim", " [varias respuestas]");
 			}
 			if (options.length > 0) {
 				const labels = [...options.map((option) => option.label), getOtherLabel(options)].join(", ");
-				text += `\n${theme.fg("dim", `  Options: ${labels}`)}`;
+				text += `\n${theme.fg("dim", `  Opciones: ${labels}`)}`;
 			}
 			return new Text(text, 0, 0);
 		},
@@ -646,19 +646,19 @@ export default function askUserQuestion(pi: ExtensionAPI) {
 			}
 
 			if (details.status === "cancelled") {
-				return new Text(theme.fg("warning", details.message || "Cancelled"), 0, 0);
+				return new Text(theme.fg("warning", details.message || "Cancelada"), 0, 0);
 			}
 
 			if (details.status === "unavailable") {
-				return new Text(theme.fg("warning", details.message || "ask_user_question unavailable"), 0, 0);
+				return new Text(theme.fg("warning", details.message || "Pregunta no disponible"), 0, 0);
 			}
 
 			const lines = details.answers.map((answer) => {
 				switch (answer.type) {
 					case "text":
-						return `${theme.fg("success", "✓ ")}${theme.fg("accent", answer.label || "(empty response)")}`;
+						return `${theme.fg("success", "✓ ")}${theme.fg("accent", answer.label || "(respuesta vacía)")}`;
 					case "other":
-						return `${theme.fg("success", "✓ ")}${theme.fg("muted", "Other: ")}${theme.fg("accent", answer.label)}`;
+						return `${theme.fg("success", "✓ ")}${theme.fg("muted", "Otra: ")}${theme.fg("accent", answer.label)}`;
 					case "option":
 						return `${theme.fg("success", "✓ ")}${theme.fg("accent", `${answer.index}. ${answer.label}`)}`;
 				}

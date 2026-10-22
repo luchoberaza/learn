@@ -46,7 +46,7 @@ interface OptionAnswer {
 // distinct signal (dontKnow) rather than a right/wrong grade — so an honest
 // "I don't know" is never confused with a lucky or unlucky guess.
 const DONT_KNOW_VALUE = "__dont_know__";
-const DONT_KNOW_LABEL = "I don't know";
+const DONT_KNOW_LABEL = "No sé";
 const DONT_KNOW_INDEX = 0; // real options are 1-based; submit uses -1
 
 // Unified response from either ask* component. answers holds the real
@@ -132,7 +132,7 @@ function normalizeOptions(
 		}))
 		.filter((option) => {
 			if (option.label.length === 0) return false;
-			if (seen.has(option.value)) throw new Error(`duplicate option value "${option.value}"`);
+			if (seen.has(option.value)) throw new Error(`value repetido "${option.value}"`);
 			seen.add(option.value);
 			return true;
 		});
@@ -177,9 +177,9 @@ function resolveCorrect(
 	correctAnswer: string | string[] | undefined,
 	options: QuizOption[],
 ): { indices: number[]; error?: string } {
-	if (correctAnswer === undefined) return { indices: [], error: "correctAnswer is required" };
+	if (correctAnswer === undefined) return { indices: [], error: "falta correctAnswer" };
 	const arr = coerceCorrectAnswer(correctAnswer);
-	if (arr.length === 0) return { indices: [], error: "correctAnswer is required" };
+	if (arr.length === 0) return { indices: [], error: "falta correctAnswer" };
 	const byValue = new Map(options.map((o, i) => [o.value, i + 1]));
 	const indices: number[] = [];
 	for (const raw of arr) {
@@ -187,7 +187,7 @@ function resolveCorrect(
 		const idx = byValue.get(v);
 		if (idx === undefined) {
 			const known = options.map((o) => `"${o.value}"`).join(", ");
-			return { indices: [], error: `correctAnswer "${v}" does not match any option value (${known})` };
+			return { indices: [], error: `correctAnswer "${v}" no coincide con ningún value (${known})` };
 		}
 		indices.push(idx);
 	}
@@ -239,7 +239,7 @@ function buildStructuredResult(
 }
 
 function cancelledResult(question: string, mode: QuizMode, correctIndices: number[], context?: string) {
-	const message = "User cancelled the quiz";
+	const message = "Quiz cancelado sin respuesta.";
 	return {
 		content: [{ type: "text" as const, text: message }],
 		details: buildStructuredResult("cancelled", question, mode, [], correctIndices, undefined, undefined, context, message),
@@ -255,7 +255,7 @@ function unavailableResult(question: string, mode: QuizMode, message: string, co
 
 function formatOptionRef(options: QuizOption[], index: number): string {
 	const opt = options.find((o, i) => i + 1 === index);
-	return `${index}. ${opt ? opt.label : "(unknown)"}`;
+	return `${index}. ${opt ? opt.label : "(desconocida)"}`;
 }
 
 function buildResult(
@@ -278,16 +278,16 @@ function buildResult(
 	if (dontKnow) {
 		// Make the signal explicit for the agent: the user did NOT guess, so this
 		// is a genuine knowledge gap, not a wrong answer to correct against.
-		text = `User selected "I don't know" — they did not attempt an answer (a genuine knowledge gap, not a wrong guess).`;
-		text += `\nCorrect: ${correctStr}`;
-		if (note) text += `\nUser's note: ${note}`;
+		text = `El alumno eligió «No sé»: no intentó responder (es un hueco real, no un error).`;
+		text += `\nCorrecta: ${correctStr}`;
+		if (note) text += `\nNota del alumno: ${note}`;
 	} else {
-		const verdict = correct ? "correctly" : "incorrectly";
+		const verdict = correct ? "bien" : "mal";
 		const selectedStr = answers.map((a) => `${a.index}. ${a.label}`).join(", ");
-		text = `User answered ${verdict}.\nSelected: ${selectedStr}\nCorrect: ${correctStr}`;
-		if (note) text += `\nUser's note: ${note}`;
+		text = `El alumno respondió ${verdict}.\nEligió: ${selectedStr}\nCorrecta: ${correctStr}`;
+		if (note) text += `\nNota del alumno: ${note}`;
 	}
-	if (explanation) text += `\nExplanation: ${explanation}`;
+	if (explanation) text += `\nExplicación: ${explanation}`;
 
 	return {
 		content: [{ type: "text" as const, text }],
@@ -356,25 +356,25 @@ function renderFeedback(
 
 	lines.push("");
 	if (dontKnow) {
-		add(theme.fg("warning", " · You said: I don't know"));
+		add(theme.fg("warning", " · Respondiste: No sé"));
 		const correctStr = correctIndices.map((i) => formatOptionRef(options, i)).join(", ");
-		addWrapped(lines, theme.fg("muted", `Correct answer: ${correctStr}`), width, " ");
+		addWrapped(lines, theme.fg("muted", `Respuesta correcta: ${correctStr}`), width, " ");
 	} else if (correct) {
-		add(theme.fg("success", " ✓ Correct!"));
+		add(theme.fg("success", " ✓ ¡Correcto!"));
 	} else {
-		add(theme.fg("error", " ✗ Incorrect."));
+		add(theme.fg("error", " ✗ Incorrecto."));
 		const correctStr = correctIndices.map((i) => formatOptionRef(options, i)).join(", ");
-		addWrapped(lines, theme.fg("muted", `Correct answer: ${correctStr}`), width, " ");
+		addWrapped(lines, theme.fg("muted", `Respuesta correcta: ${correctStr}`), width, " ");
 	}
 	if (note) {
-		addWrapped(lines, theme.fg("muted", `Your note: ${note}`), width, " ");
+		addWrapped(lines, theme.fg("muted", `Tu nota: ${note}`), width, " ");
 	}
 	if (explanation) {
 		lines.push("");
 		addWrapped(lines, theme.fg("text", explanation), width, " ");
 	}
 	lines.push("");
-	add(theme.fg("dim", " Enter/Esc to continue"));
+	add(theme.fg("dim", " Enter o Esc para seguir"));
 }
 
 // Top border + question + optional context. Shared by both components.
@@ -401,7 +401,7 @@ function pushDontKnowRow(lines: string[], theme: any, width: number, focused: bo
 // surfaced to the agent when non-empty.
 function pushNoteField(lines: string[], theme: any, width: number, editor: Editor, focused: boolean): void {
 	lines.push("");
-	const label = focused ? theme.fg("accent", "Note (optional):") : theme.fg("muted", "Note (optional):");
+	const label = focused ? theme.fg("accent", "Nota (opcional):") : theme.fg("muted", "Nota (opcional):");
 	addWrapped(lines, label, width, " ");
 	for (const line of editor.render(width)) lines.push(line);
 }
@@ -573,9 +573,9 @@ async function askSingleChoice(
 
 				lines.push("");
 				if (focus === "note") {
-					add(theme.fg("dim", " Type note • Ctrl+J newline • Enter back to options • Tab options • Esc back"));
+					add(theme.fg("dim", " Escribí la nota • Ctrl+J nueva línea • Enter o Esc vuelve a las opciones • Tab opciones"));
 				} else {
-					add(theme.fg("dim", " ↑↓ navigate • Enter answer • Tab note • Esc cancel"));
+					add(theme.fg("dim", " ↑↓ moverse • Enter responder • Tab nota • Esc cancelar"));
 				}
 				add(theme.fg("accent", "─".repeat(width)));
 				// Not cached when the note is focused: the editor renders a live cursor.
@@ -618,7 +618,7 @@ async function askMultiChoice(
 		value: DONT_KNOW_VALUE,
 		index: DONT_KNOW_INDEX,
 	};
-	const submitItem: DisplayOption = { id: "submit", label: "Submit", value: "__submit__", index: -1, isSubmit: true };
+	const submitItem: DisplayOption = { id: "submit", label: "Enviar", value: "__submit__", index: -1, isSubmit: true };
 	const allItems: DisplayOption[] = [...choiceItems, dontKnowItem, submitItem];
 
 	return ctx.ui.custom<QuizResponse | null>(
@@ -783,7 +783,7 @@ async function askMultiChoice(
 					const prefix = isFocused ? theme.fg("accent", "> ") : "  ";
 
 					if (item.isSubmit) {
-						const label = selected.size > 0 ? `✓ ${item.label} (${selected.size} selected)` : `○ ${item.label}`;
+						const label = selected.size > 0 ? `✓ ${item.label} (${selected.size} elegidas)` : `○ ${item.label}`;
 						const styled = isFocused
 							? theme.fg("accent", label)
 							: theme.fg(selected.size > 0 ? "success" : "dim", label);
@@ -814,12 +814,12 @@ async function askMultiChoice(
 
 				lines.push("");
 				if (selected.size === 0) {
-					add(theme.fg("warning", " Select at least one answer before submitting."));
+					add(theme.fg("warning", " Elegí al menos una respuesta antes de enviar."));
 				}
 				if (focus === "note") {
-					add(theme.fg("dim", " Type note • Ctrl+J newline • Enter back to options • Tab options • Esc back"));
+					add(theme.fg("dim", " Escribí la nota • Ctrl+J nueva línea • Enter o Esc vuelve a las opciones • Tab opciones"));
 				} else {
-					add(theme.fg("dim", " ↑↓ navigate • Space toggle • Enter submit • Tab note • Esc cancel"));
+					add(theme.fg("dim", " ↑↓ moverse • Espacio marcar • Enter enviar • Tab nota • Esc cancelar"));
 				}
 				add(theme.fg("accent", "─".repeat(width)));
 				// Not cached when the note is focused: the editor renders a live cursor.
@@ -878,7 +878,7 @@ export default function quiz(pi: ExtensionAPI) {
 		name: "quiz",
 		label: "quiz",
 		description:
-			"Ask the user a GRADED question with a known correct answer, then instantly grade and give feedback. Unlike ask_user_question (which collects preferences/decisions with no right answer), quiz always has a correct answer supplied by you, marks the user's selection right/wrong (✓/✗), reveals the correct answer, and can show an explanation. Use it to (1) assess what the learner already understands before teaching, and (2) run tight practice/retrieval loops after explaining, or probe understanding whenever you're unsure they've got it. Options-only: single-select or multi-select, plus an automatic 'I don't know' choice so the user can signal a genuine gap instead of guessing. An always-present optional note field (Tab to focus it) lets the user attach a free-text note to ANY answer; it reaches you only when non-empty. No free-text answers — for non-graded questions use ask_user_question instead.",
+			"Ask the user a GRADED question with a known correct answer, then instantly grade and give feedback. Unlike ask_user_question (which collects preferences/decisions with no right answer), quiz always has a correct answer supplied by you, marks the user's selection right/wrong (✓/✗), reveals the correct answer, and can show an explanation. Use it to (1) assess what the learner already understands before teaching, and (2) run tight practice/retrieval loops after explaining, or probe understanding whenever you're unsure they've got it. Options-only: single-select or multi-select, plus an automatic 'No sé' (I don't know) choice so the user can signal a genuine gap instead of guessing. An always-present optional note field (Tab to focus it) lets the user attach a free-text note to ANY answer; it reaches you only when non-empty. No free-text answers — for non-graded questions use ask_user_question instead.",
 		promptSnippet:
 			"Use the quiz tool to test the user with a graded multiple-choice or multi-select question (required correct answer + required explanation). For non-graded questions, use ask_user_question.",
 		promptGuidelines: [
@@ -887,9 +887,9 @@ export default function quiz(pi: ExtensionAPI) {
 			"Always pass the option's `value` string as correctAnswer — it is self-checking and prevents miscounting positions. A value that matches no option is a hard error.",
 			"explanation is REQUIRED — always say why the correct answer is correct.",
 			"Multi-select is graded as an exact-set match: the user is correct only if they select every correct option and no incorrect ones.",
-			"There is no free-text mode. An 'I don't know' choice is ALWAYS added automatically — provide ONLY the real, gradable options (at least two). Never add your own uncertainty/opt-out option like 'I don't know', 'I'm not sure', or 'Not sure'; that is handled for you and a manual one would be redundant or gradable-as-wrong.",
+			"There is no free-text mode. A 'No sé' (I don't know) choice is ALWAYS added automatically, always last — provide ONLY the real, gradable options (at least two). Never add your own uncertainty/opt-out option like 'No sé', 'No estoy seguro', or 'Ni idea'; that is handled for you and a manual one would be redundant or gradable-as-wrong.",
 			"If a result comes back as dontKnow, the user honestly did not know and did NOT guess — treat it as a genuine knowledge gap to teach into, not as a wrong answer.",
-			"Any answer (right, wrong, or 'I don't know') may carry an optional free-text `note` the user typed in the always-present note field. When present it reflects what they were thinking or unsure about — read it and let it steer your follow-up. It is omitted entirely when empty.",
+			"Any answer (right, wrong, or 'No sé') may carry an optional free-text `note` the user typed in the always-present note field. When present it reflects what they were thinking or unsure about — read it and let it steer your follow-up. It is omitted entirely when empty.",
 			"Treat each wrong answer (distractor) as a diagnostic probe, not just filler: make it a specific, believable mistake the user might actually hold — a common misconception, or an adjacent/easily-confused concept — so that WHICH wrong answer they pick reveals WHICH nuance of their understanding is off. You learn far more from a targeted wrong choice than from a binary right/wrong, and the choice tells you exactly which gap to teach into next (and what the explanation should address).",
 			"Guardrail: every distractor must be unambiguously wrong on the intended reading — tempting, but a real error, not a defensible alternative. Don't drift into trick questions.",
 			"Anti-guessing hygiene: don't let the correct answer stand out by form (longest, most precise, most hedged, or the only one in the right format). Keep options similar in length, specificity, and phrasing so it can't be picked from shape alone.",
@@ -909,7 +909,7 @@ export default function quiz(pi: ExtensionAPI) {
 			try {
 				options = normalizeOptions(params.options);
 			} catch (e) {
-				return unavailableResult(params.question, mode, `quiz ${(e as Error).message}`, [], context);
+				return unavailableResult(params.question, mode, `quiz: ${(e as Error).message}`, [], context);
 			}
 
 			// Shuffle for display (default on) BEFORE resolving correct indices, so
@@ -925,7 +925,7 @@ export default function quiz(pi: ExtensionAPI) {
 			// Deliberately omits correctIndices/explanation — this fires before the
 			// user has answered and must not leak the answer.
 			onUpdate?.({
-				content: [{ type: "text", text: "Awaiting user response..." }],
+				content: [{ type: "text", text: "Esperando respuesta…" }],
 				details: { options: options.map((o, i) => ({ index: i + 1, label: o.label })) },
 			});
 
@@ -942,18 +942,18 @@ export default function quiz(pi: ExtensionAPI) {
 				return unavailableResult(
 					params.question,
 					mode,
-					"quiz requires at least two options",
+					"quiz: hacen falta al menos dos opciones.",
 					correctIndices,
 					context,
 				);
 			}
 
 			if (correctError) {
-				return unavailableResult(params.question, mode, `quiz ${correctError}`, correctIndices, context);
+				return unavailableResult(params.question, mode, `quiz: ${correctError}`, correctIndices, context);
 			}
 
 			if (!ctx.hasUI) {
-				return unavailableResult(params.question, mode, "quiz requires interactive mode UI", correctIndices, context);
+				return unavailableResult(params.question, mode, "quiz: hace falta la interfaz interactiva.", correctIndices, context);
 			}
 
 			return withUILock(async () => {
@@ -980,10 +980,10 @@ export default function quiz(pi: ExtensionAPI) {
 			);
 			let text = theme.fg("toolTitle", theme.bold("quiz ")) + theme.fg("muted", args.question);
 			if (args.multiSelect) {
-				text += theme.fg("dim", " [multi-select]");
+				text += theme.fg("dim", " [varias respuestas]");
 			}
 			if (options.length > 0) {
-				const noun = options.length === 1 ? "option" : "options";
+				const noun = options.length === 1 ? "opción" : "opciones";
 				text += theme.fg("dim", ` (${options.length} ${noun})`);
 			}
 			return new Text(text, 0, 0);
@@ -995,12 +995,14 @@ export default function quiz(pi: ExtensionAPI) {
 				const first = result.content[0];
 				return new Text(first?.type === "text" ? first.text : "", 0, 0);
 			}
+			// Resultado parcial (el onUpdate previo a la respuesta): sólo trae options.
+			if (!details.answers) return new Text(theme.fg("dim", "Esperando respuesta…"), 0, 0);
 
 			if (details.status === "cancelled") {
-				return new Text(theme.fg("warning", details.message || "Cancelled"), 0, 0);
+				return new Text(theme.fg("warning", details.message || "Cancelado"), 0, 0);
 			}
 			if (details.status === "unavailable") {
-				return new Text(theme.fg("warning", details.message || "quiz unavailable"), 0, 0);
+				return new Text(theme.fg("warning", details.message || "Quiz no disponible"), 0, 0);
 			}
 
 			const correctSet = new Set(details.correctIndices);
@@ -1042,14 +1044,14 @@ export default function quiz(pi: ExtensionAPI) {
 
 			lines.push("");
 			const verdict = details.dontKnow
-				? theme.fg("warning", "I don't know")
+				? theme.fg("warning", "No sé")
 				: details.correct
-					? theme.fg("success", "Correct!")
-					: theme.fg("error", "Incorrect");
+					? theme.fg("success", "¡Correcto!")
+					: theme.fg("error", "Incorrecto");
 			lines.push(verdict);
 
 			if (details.note) {
-				lines.push(theme.fg("muted", `Note: ${details.note}`));
+				lines.push(theme.fg("muted", `Nota: ${details.note}`));
 			}
 
 			if (details.explanation) {
