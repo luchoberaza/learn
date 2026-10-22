@@ -125,7 +125,7 @@ function guardar(vault: string, p: Pedido, texto: string): string {
   mkdirSync(carpeta, { recursive: true, mode: 0o700 });
   const canonico = rutaSegura(carpeta, `${p.tema}.md`);
   const file = existsSync(canonico) ? rutaSegura(carpeta, `${p.tema}-${p.huella}.md`) : canonico;
-  const body = `Fecha: ${new Date().toISOString()} · Modelo: ${p.modelo}\nRevisión humana: pendiente. La caché no certifica fidelidad de las fuentes.\n\n${texto}\n`;
+  const body = `Fecha: ${new Date().toLocaleString("sv-SE")} · Modelo: ${p.modelo}\nRevisión humana: pendiente. La caché no certifica fidelidad de las fuentes.\n\n${texto}\n`;
   const raw = `<!-- pi-learning-verificacion ${JSON.stringify({ version: 1, entrada: p.huella, sha256: sha(body) })} -->\n${body}`;
   const temporal = rutaSegura(carpeta, `.${randomUUID()}.tmp`);
   const fd = openSync(temporal, "wx", 0o600);

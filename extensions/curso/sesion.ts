@@ -125,7 +125,7 @@ export function registrarSesion(pi: ExtensionAPI, vault = vaultDir, recursos = p
         try {
           const carpeta = rutaSegura(vault, `cursos/${curso}/sesiones`);
           mkdirSync(carpeta, { recursive: true });
-          const fecha = new Date().toISOString().slice(0, 10);
+          const fecha = new Date().toLocaleDateString("sv-SE");
           for (let n = 1; ; n++) {
             const file = rutaSegura(vault, `cursos/${curso}/sesiones/${fecha}-${tema.id}${n === 1 ? "" : `-${n}`}.md`);
             try { closeSync(openSync(file, "wx")); a.log = relative(vault, file); break; }

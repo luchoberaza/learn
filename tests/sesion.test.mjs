@@ -75,7 +75,7 @@ test("las cuatro tools de lectura rechazan el estado sin curso activo", async t 
   await assert.rejects(() => e.tools.ver_pagina({ doc: "libro", pagina: 1 }), /No hay curso activo/);
 });
 test("activar enlaza un log nuevo sin historial anterior y arranca solo", async t => {
-  const e = entorno(t), fecha = new Date().toISOString().slice(0, 10);
+  const e = entorno(t), fecha = new Date().toLocaleDateString("sv-SE");
   const viejo = join(e.raiz, "sesiones", `${fecha}-derivacion.md`);
   writeFileSync(viejo, "NOTA DEL USUARIO");
   await e.comandos.get("estudiar").handler("calculo derivada", e.ctx);
