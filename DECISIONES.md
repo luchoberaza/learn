@@ -16,7 +16,9 @@
 
 **Fase 6 aprobada:** «Aprobado, continuá», commit `f9aeea7`. Researcher anclado, modos y caché; 71 tests Node / 56 Python y doctor completo correcto en pi 1.4.0 al cierre. Ensayo final: probes en 20,62 s / 7,42 s sin nuevo hijo; A1/A3 discrepan y A2 concuerda. Fallos semánticos anteriores conservados; estructura/caché no certifican verdad. Detalle: `informes/fase6.md`.
 
-**Fase 7 implementada, aprobación pendiente:** progreso validado/fusionado/atómico con `.bak`, `/fin`, `/progreso`, reconstrucción confirmada y sugerencia. 83 tests Node / 67 Python, doctor completo en verde. Dos sesiones con Sol y alumno virtual aislado: segundo probe confirma el borde en tres preguntas. Sin progreso ficticio en Redes. El usuario autorizó «Usar openai-codex» al faltar credenciales para el proveedor anterior; se verificaron Sol/Luna texto y Luna imagen antes de cambiar sólo configuración local del proyecto. Fase 8 no iniciada. Detalle: `informes/fase7.md`.
+**Fase 7 aprobada:** «Aprobado, continuá», commit `29cdb0c`. progreso validado/fusionado/atómico con `.bak`, `/fin`, `/progreso`, reconstrucción confirmada y sugerencia. 83 tests Node / 67 Python, doctor completo en verde. Dos sesiones con Sol y alumno virtual aislado: segundo probe confirma el borde en tres preguntas. Sin progreso ficticio en Redes. El usuario autorizó «Usar openai-codex» al faltar credenciales para el proveedor anterior; se verificaron Sol/Luna texto y Luna imagen antes de cambiar sólo configuración local del proyecto. Detalle: `informes/fase7.md`.
+
+**Fase 8 autorizada y en preparación:** se creó `../fricciones.md` para registrar 3–5 sesiones reales y priorizar/reprobar sus tres trabas principales. Todavía hay 0 sesiones reales del piloto registradas; el alumno virtual no cuenta. Doctor completo volvió a verde; plan, teach y progreso de Redes intactos. Sin cambios de código ni traducción opcional de UI anticipada. Se espera uso real antes de arreglos y del único commit/checkpoint de cierre de esta fase.
 
 ## D0.1 — Conservar el upstream y fijar los subagentes
 

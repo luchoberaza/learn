@@ -1,6 +1,6 @@
 # Fase 7 — progreso persistente y reanudación desde el borde
 
-**Implementada y probada; aprobación del checkpoint pendiente. Fase 8 no iniciada.** El usuario aprobó Fase 6 (`f9aeea7`) con «Aprobado, continuá». El plan original y `skills/teach/SKILL.md` permanecen intactos.
+**Aprobada por el usuario con «Aprobado, continuá», commit `29cdb0c`; autorizó Fase 8.** Este informe conserva los resultados históricos; el piloto humano se registra en [[fricciones]]. El usuario aprobó Fase 6 (`f9aeea7`) con «Aprobado, continuá». El plan original y `skills/teach/SKILL.md` permanecen intactos.
 
 ## Contra el plan
 
@@ -83,4 +83,4 @@ Respondé realmente el probe; el registro debe describir sólo tus respuestas. U
 
 Ensayo opcional aislado, **consume modelo y genera nuevos artefactos**: `node .pi/scripts/probar-progreso`. No hace falta repetirlo para estudiar.
 
-**Límites pendientes:** el juicio semántico del modelo y la confirmación del borde no tienen garantía universal; deduplicación textual, no semántica. Los bloqueos protegen procesos cooperativos, no un editor externo que cambie archivos en el último instante. No hubo piloto humano de 3–5 sesiones ni reconstrucción aceptada por un humano real. Materiales/informes siguen con revisión humana pendiente y Redes conserva 268 páginas referidas pendientes. Se espera tu aprobación antes de Fase 8.
+**Límites pendientes:** el juicio semántico del modelo y la confirmación del borde no tienen garantía universal; deduplicación textual, no semántica. Los bloqueos protegen procesos cooperativos, no un editor externo que cambie archivos en el último instante. No hubo piloto humano de 3–5 sesiones ni reconstrucción aceptada por un humano real. Materiales/informes siguen con revisión humana pendiente y Redes conserva 268 páginas referidas pendientes. La aprobación posterior autoriza el piloto de Fase 8, pero no lo convierte en realizado ni modifica las revisiones humanas pendientes.
