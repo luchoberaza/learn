@@ -88,9 +88,12 @@ def bloquear(salida: Path, vault: Path):
             raise Conflicto("Ya hay una ingesta escribiendo en esta salida.") from None
         marca = leer_json(salida, "control.json")
         if marca is None:
-            ajenos = [p.name for p in salida.iterdir() if p.name != ".ingesta.lock"]
+            ajenos = sorted(p.name for p in salida.iterdir() if p.name != ".ingesta.lock")
             if ajenos:
-                raise Conflicto("La salida no está vacía y no pertenece a la ingesta; no se sobrescribió.")
+                lista = ", ".join(ajenos[:5]) + (" …" if len(ajenos) > 5 else "")
+                if all(n.endswith(".json") for n in ajenos):
+                    raise Conflicto(f"La salida no está vacía: mové {lista} a _procesado/ de la raíz del vault.")
+                raise Conflicto(f"La salida no está vacía y no pertenece a la ingesta: mové {lista} fuera de {salida.relative_to(vault)}/.")
             guardar_json(salida, "control.json", {"generador": "pi-learning-ingesta", "version": 1})
         elif marca != {"generador": "pi-learning-ingesta", "version": 1}:
             raise Conflicto("La salida pertenece a otra herramienta o versión.")

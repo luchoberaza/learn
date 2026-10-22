@@ -75,6 +75,20 @@ class ProgresoAuditoriaTest(unittest.TestCase):
             self.assertEqual(p.wait(30), 0, p.stderr.read())
         self.assertEqual(set(self.tema()['borde']['domina']), {'primera evidencia', 'segunda evidencia'})
 
+    def test_h40_salida_ajena_nombra_archivos_y_no_bloquea_progreso(self):
+        salida = self.vault / 'cursos/nuevo/_procesado'
+        salida.mkdir(parents=True)
+        (salida / 'manifiesto.json').write_text('{}')
+        with self.assertRaisesRegex(RuntimeError, r'mové manifiesto\.json a _procesado/ de la raíz del vault'):
+            with bloquear(salida, self.vault): pass
+        (salida / 'apuntes.md').write_text('x')
+        with self.assertRaisesRegex(RuntimeError, r'apuntes\.md, manifiesto\.json'):
+            with bloquear(salida, self.vault): pass
+        (self.raiz / '_procesado/control.json').unlink()
+        (self.raiz / '_procesado/manifiesto.json').write_text('{}')
+        self.assertTrue(leer(self.vault, 'ejemplo')['disponible'])
+        self.guardar()
+
 
 class SesionAuditoriaTest(unittest.TestCase):
     def setUp(self):
