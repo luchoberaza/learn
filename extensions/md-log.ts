@@ -238,6 +238,12 @@ export default function mdLog(pi: ExtensionAPI) {
 		);
 	}
 
+	// Lo que el tutor muestra con ver_pagina también queda en la nota, como enlace a la página.
+	function paginaMostrada(content: any): string | null {
+		const cita = Array.isArray(content) ? content.find((c: any) => c.type === "text")?.text?.trim() : undefined;
+		return cita ? callout("info", "Página mostrada", [cita]) : null;
+	}
+
 	function assistantBlock(text: string): string {
 		return `> [!abstract] PI\n\n${text}`;
 	}
@@ -413,6 +419,11 @@ export default function mdLog(pi: ExtensionAPI) {
 	pi.on("tool_result", async (event, _ctx) => {
 		if (!logFile) return;
 		const toolName = (event as any).toolName;
+		if (toolName === "ver_pagina") {
+			const bloque = (event as any).isError ? null : paginaMostrada((event as any).content);
+			if (bloque) await withLock(() => appendToFile(bloque));
+			return;
+		}
 		if (!QA_TOOLS.has(toolName)) return;
 		const details = (event as any).details;
 		// Rechazado por forma antes de mostrarse: el alumno no vio ninguna pregunta.
@@ -554,6 +565,8 @@ export default function mdLog(pi: ExtensionAPI) {
 			}
 
 			if (msg.role === "toolResult") {
+				const pagina = msg.toolName === "ver_pagina" && !msg.isError ? paginaMostrada(msg.content) : null;
+				if (pagina) blocks.push(pagina);
 				if (!QA_TOOLS.has(msg.toolName)) continue;
 				// Un quiz no disponible nunca llegó a mostrarse.
 				if (msg.toolName === "quiz" && msg.details?.status === "unavailable") continue;

@@ -150,3 +150,17 @@ test("H70: sin conversor, una foto HEIC avisa en una línea y el aviso no rompe 
   await e.enviar(`Mi intento: ${join(e.dir, "pi-clipboard-11111111-2222-4333-8444-555555555555.png")} listo.`);
   assert.match(readFileSync(e.file, "utf8"), /Mi intento: \n\n> \[!warning\] Imagen 1 no guardada\n> [^\n]+\n\n\/.*pi-clipboard-[^ ]+ listo\./);
 });
+
+test("H48: la página que el tutor muestra con ver_pagina queda enlazada en la nota, salvo si se rechazó", async t => {
+  const e = entorno(t); await e.handlers.get("session_start")({}, e.ctx); await e.vincular();
+  const cita = "[[cursos/redes/fuentes/kurose-7.pdf#page=56]]", imagen = { type: "image", mimeType: "image/png", data: png.toString("base64") };
+  await e.handlers.get("tool_result")({ toolName: "ver_pagina", isError: false, content: [{ type: "text", text: cita }, imagen] }, e.ctx);
+  await e.handlers.get("tool_result")({ toolName: "ver_pagina", isError: true, content: [{ type: "text", text: "La imagen de esta página trae la solución: [[parcial.pdf#page=3]]" }] }, e.ctx);
+  assert.equal(readFileSync(e.file, "utf8"), `> [!info] Página mostrada\n> ${cita}\n`);
+  e.entradas.push({ type: "message", message: { role: "toolResult", toolName: "ver_pagina", isError: false, content: [{ type: "text", text: cita }, imagen] } },
+    { type: "message", message: { role: "toolResult", toolName: "ver_pagina", isError: true, content: [{ type: "text", text: "rechazada [[parcial.pdf#page=3]]" }] } });
+  const comandos = new Map(); mdLog({ on: () => {}, events: { on: () => {} }, registerCommand: (n, c) => comandos.set(n, c), appendEntry: () => {} });
+  e.ctx.hasUI = true; e.ctx.ui.confirm = async () => true;
+  await comandos.get("md-log").handler(e.file, e.ctx);
+  assert.equal(readFileSync(e.file, "utf8"), `> [!info] Página mostrada\n> ${cita}\n`);
+});
