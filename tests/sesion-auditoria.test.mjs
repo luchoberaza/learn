@@ -5,6 +5,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { registrarSesion } from "../extensions/curso/sesion.ts";
 import { registrarProgreso } from "../extensions/curso/progreso.ts";
+import { resolverTemas } from "../extensions/curso/material.ts";
+import { tokenizar } from "../scripts/ingesta/bm25.ts";
 
 // Regresiones de la auditoría de sesión: vault sintético, pi simulado, sin modelos.
 function datos() {
@@ -13,6 +15,18 @@ function datos() {
   return { curso: "calculo", nombre: "Cálculo", contrato: "Contrato", temas: [tema],
     documentos: [{ id: "libro", titulo: "Libro", tipo: "bibliografia", archivo: "fuentes/bibliografia/libro.pdf", paginas: 3, prioridad: "principal" }],
     items: {}, progreso: { temas: {}, historial: [] }, avisos: [], validacion: { errores: [], avisos: [], pendientes: [] } };
+}
+// busqueda.json mínimo con una página de bibliografía por texto.
+function indice(raiz, textos) {
+  const df = {}, fragmentos = textos.map((texto, i) => {
+    const frecuencias = {};
+    for (const w of tokenizar(texto)) frecuencias[w] = (frecuencias[w] || 0) + 1;
+    for (const w of Object.keys(frecuencias)) df[w] = (df[w] || 0) + 1;
+    return { doc: "libro", titulo: "Libro", tipo: "bibliografia", pagina: i + 1, seccion: null, texto, cita: "", calidad: 1, pendiente: false, largo: tokenizar(texto).length, frecuencias };
+  });
+  mkdirSync(join(raiz, "_procesado"), { recursive: true });
+  writeFileSync(join(raiz, "_procesado/busqueda.json"), JSON.stringify({ version: 1, normalizacion: "NFD-sin-tildes-v1", k1: 1.2, b: 0.75,
+    cantidad: fragmentos.length, largo_promedio: fragmentos.reduce((s, f) => s + f.largo, 0) / fragmentos.length, df, fragmentos }));
 }
 function entorno(t, d = datos()) {
   const vault = mkdtempSync(join(tmpdir(), "pi-sesion-aud-")), recursos = join(vault, ".pi"), raiz = join(vault, "cursos/calculo");
@@ -87,4 +101,19 @@ test("H71: con un solo curso alcanza el tema, y el curso se acepta sin mayúscul
   mkdirSync(join(e.vault, "cursos/fisica"));
   await e.estudiar("retardos");
   assert.match(e.avisos.at(-1)[1], /No hay un curso «retardos»: elegí uno de calculo, fisica/);
+});
+test("H24: un subtema que sólo encuentra BM25 resuelve al tema cuyo rango contiene esas páginas", async t => {
+  const d = datos();
+  d.documentos[0].paginas = 4;
+  d.temas.push({ id: "integracion", nombre: "Integración", alias: [], unidad: 2, prerequisitos: [], objetivos: [], bibliografia: [{ doc: "libro", seccion: "Integrales", paginas: [3, 4] }] });
+  assert.deepEqual(resolverTemas(d.temas, "regla de la cadena", [{ doc: "libro", pagina: 2 }]).map(t => t.id), ["derivacion"]);
+  const e = entorno(t, d);
+  indice(e.raiz, ["Derivadas de polinomios.", "La regla de la cadena deriva funciones compuestas.", "Sustitución: la regla de la cadena al revés.", "Integración por partes y sustitución."]);
+  await e.estudiar("calculo funciones compuestas");
+  assert.equal(e.entradas.at(-1).data.tema, "derivacion");
+  let opciones;
+  e.ctx.ui.select = async (_t, o) => (opciones = o, o[0]);
+  await e.estudiar("calculo cadena sustitucion");
+  assert.match(opciones[0], /^Integración \[integracion\]/); assert.match(opciones[1], /^Derivación \[derivacion\]/); assert.match(opciones.at(-1), /ad hoc/);
+  assert.equal(e.entradas.at(-1).data.tema, "integracion");
 });

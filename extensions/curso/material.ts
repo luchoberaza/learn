@@ -40,7 +40,8 @@ export function documento(datos: DatosCurso, id: string) {
   return d;
 }
 export const cita = (datos: DatosCurso, doc: string, p: number) => `[[cursos/${datos.curso}/${documento(datos, doc).archivo}#page=${p}]]`;
-export function resolverTemas(temas: Tema[], consulta: string): Tema[] {
+// Sin coincidencia por nombre, los temas cuya bibliografía contiene las páginas que encontró BM25, de más a menos páginas.
+export function resolverTemas(temas: Tema[], consulta: string, resultados: { doc: string; pagina: number }[] = []): Tema[] {
   const q = normalizar(consulta.trim());
   const exacto = temas.find(t => t.id === q);
   if (exacto) return [exacto];
@@ -55,10 +56,12 @@ export function resolverTemas(temas: Tema[], consulta: string): Tema[] {
     }
     return fila[b.length];
   }
-  return temas.map(t => ({ t, puntaje: Math.max(...[t.id, t.nombre, ...(t.alias || [])].map(s => {
+  const parecidos = temas.map(t => ({ t, puntaje: Math.max(...[t.id, t.nombre, ...(t.alias || [])].map(s => {
     const a = normalizar(s);
     return a.includes(q) ? 1 : Math.max(0, 1 - distancia(a, q) / Math.max(a.length, q.length));
   })) })).filter(r => q && r.puntaje >= 0.65).sort((a, b) => b.puntaje - a.puntaje).slice(0, 5).map(r => r.t);
+  return parecidos.length ? parecidos : temas.map(t => ({ t, puntaje: resultados.filter(r => (t.bibliografia || []).some(b => b.doc === r.doc && b.paginas[0] <= r.pagina && r.pagina <= b.paginas.at(-1)!)).length }))
+    .filter(r => r.puntaje).sort((a, b) => b.puntaje - a.puntaje).map(r => r.t);
 }
 export function ordenarTemas(datos: DatosCurso): Tema[] {
   const nivel = (t: Tema) => datos.progreso.temas[t.id]?.estado === "en_curso" ? 0 : datos.progreso.temas[t.id]?.estado === "repasar" ? 1 : datos.progreso.temas[t.id]?.estado === "dominado" ? 4 : (t.prerequisitos || []).every(p => datos.progreso.temas[p]?.estado === "dominado") ? 2 : 3;

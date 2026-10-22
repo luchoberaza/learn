@@ -100,19 +100,21 @@ export function registrarSesion(pi: ExtensionAPI, vault = vaultDir, recursos = p
         const d = await cargar(curso, true);
         for (const aviso of d.avisos.filter(a => a.startsWith("Progreso"))) ctx.ui.notify(aviso, "warning");
         cacheCompletar.delete(curso);
-        const candidatos = consulta ? resolverTemas(d.temas, consulta) : ordenarTemas(d);
+        let candidatos = consulta ? resolverTemas(d.temas, consulta) : ordenarTemas(d), resultados: ReturnType<typeof buscarMaterial> = [];
+        if (consulta && !candidatos.length) {
+          try { resultados = buscarMaterial(raiz(curso), d, consulta, "bibliografia"); } catch { /* La falta de BM25 no impide un probe ad hoc. */ }
+          candidatos = resolverTemas(d.temas, consulta, resultados);
+        }
         let tema: Tema | undefined;
         if (consulta && candidatos.length === 1) tema = candidatos[0];
         else if (candidatos.length && ctx.hasUI) {
-          const etiquetas = candidatos.map(t => `${t.nombre} [${t.id}] · ${d.progreso.temas[t.id]?.estado || "sin_empezar"}`);
-          const elegido = await ctx.ui.select(consulta ? "Elegí el tema" : "Temas: en curso, prerequisitos firmes, restantes", etiquetas);
+          const etiquetas = candidatos.map(t => `${t.nombre} [${t.id}] · ${d.progreso.temas[t.id]?.estado || "sin_empezar"}${resultados.length ? " · por material" : ""}`);
+          const elegido = await ctx.ui.select(consulta ? "Elegí el tema" : "Temas: en curso, prerequisitos firmes, restantes", resultados.length ? [...etiquetas, `Estudiar «${consulta}» fuera del índice (ad hoc)`] : etiquetas);
           if (!elegido) return;
           tema = candidatos[etiquetas.indexOf(elegido)];
         } else if (candidatos.length) { ctx.ui.notify("Indicá el id exacto del tema; esta sesión no tiene selector interactivo.", "warning"); return; }
         if (!tema) {
           if (!consulta) { ctx.ui.notify("El índice no tiene temas utilizables; indicá el tema para continuar en modo ad hoc.", "warning"); return; }
-          let resultados: ReturnType<typeof buscarMaterial> = [];
-          try { resultados = buscarMaterial(raiz(curso), d, consulta, "bibliografia"); } catch { /* La falta de BM25 no impide un probe ad hoc. */ }
           let seleccionado = resultados[0];
           if (ctx.hasUI) {
             const etiquetas = resultados.map(r => `${r.doc} · PDF ${r.pagina} · ${r.seccion || r.fragmento.slice(0, 70)}`);
