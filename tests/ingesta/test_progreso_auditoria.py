@@ -1,5 +1,5 @@
 """Regresiones de la auditoría de progreso, con datos sintéticos y sin modelos."""
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import fcntl
 import hashlib
 import json
@@ -191,6 +191,16 @@ class ProgresoAuditoriaTest(unittest.TestCase):
         self.assertEqual(t['errores_de_concepto'], [{'descripcion': 'invierte L/R', 'resuelto': True, 'detectado': t['errores_de_concepto'][0]['detectado']}])
         reconstruir({'resumen': 'Sin respuestas', 'estado': 'sin_empezar'})
         self.assertEqual(self.tema()['estado'], 'en_curso')
+
+    def test_h53_una_reconstruccion_fecha_la_evidencia_con_el_dia_del_log(self):
+        manana = (datetime.now() + timedelta(days=1)).date().isoformat()
+        for log, dia in [('sesiones/2026-01-01-derivacion.md', '2026-01-01'), (f'sesiones/{manana}-derivacion.md', self.b.hoy)]:
+            (self.raiz / log).write_text(f'Log {log} sin cierre.')
+            huella = hashlib.sha256((self.raiz / log).read_bytes()).hexdigest()
+            registrar(self.vault, 'ejemplo', 'derivacion', log, {'resumen': 'Sesión anterior', 'ejercicios': [{'doc': 'practico', 'item': '1', 'resultado': 'correcto'}],
+                      'errores_de_concepto': [{'descripcion': f'error de {log}'}]}, cierre=True, reconstruido=True, huella_log=huella)
+            t = self.tema()
+            self.assertEqual((str(t['ejercicios'][-1]['fecha']), str(t['errores_de_concepto'][-1]['detectado'])), (dia, dia))
 
     def test_h04_log_renombrado_no_impide_guardar(self):
         (self.raiz / self.log).rename(self.raiz / 'sesiones/Clase (renombrada).md')

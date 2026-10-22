@@ -157,7 +157,7 @@ def rango(ids):
     return ", ".join(ids[:30]) + (" …" if len(ids) > 30 else "")
 
 
-def validar_datos(datos, ctx):
+def validar_datos(datos, ctx, dia=None):
     # Delta: sólo resumen es obligatorio; lo omitido se conserva al fusionar.
     listas = ["conceptos_firmes", "errores_de_concepto", "ejercicios", "discrepancias", "falla_resuelta"]
     if not isinstance(datos, dict) or set(datos) - {"estado", "borde", "proximo_paso", "resumen", *listas} or "resumen" not in datos:
@@ -209,7 +209,7 @@ def validar_datos(datos, ctx):
     t = {k: deepcopy(v) for k, v in datos.items() if k != "resumen"}
     t.update(ejercicios=ejercicios, actualizado=hoy.isoformat())
     for e, campo in [(e, "detectado") for e in t["errores_de_concepto"]] + [(e, "fecha") for e in t["ejercicios"]]:
-        f = e.setdefault(campo, hoy.isoformat())
+        f = e.setdefault(campo, min(dia or hoy, hoy).isoformat())
         if not isinstance(f, str) or not re.fullmatch(r"\d{4}-\d{2}-\d{2}", f) or date.fromisoformat(f) > hoy:
             raise ValueError("Fecha de evidencia inválida o futura.")
     return t, avisos
@@ -234,7 +234,8 @@ def registrar(vault: Path, curso: str, tema: str, log: str, datos: dict, cierre=
         raise ValueError("El log de evidencia no existe.")
     with bloqueo(raiz):
         ctx = contexto(raiz)
-        nuevo, observaciones = validar_datos(datos, ctx)
+        # Una reconstrucción fecha su evidencia con el día del log, no con el de hoy.
+        nuevo, observaciones = validar_datos(datos, ctx, date.fromisoformat(orden(log, tema)[0]) if reconstruido else None)
         if reconstruido and (not isinstance(huella_log, str) or hashlib.sha256(archivo_log.read_bytes()).hexdigest() != huella_log):
             raise Conflicto("El log cambió desde su lectura; releelo antes de reconstruir.")
         indice = texto(raiz, "indice.yaml")
