@@ -1,8 +1,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { spawnSync } from "node:child_process";
 import mdLog from "../extensions/md-log.ts";
 
 // Vault falso con la nota de la sesión en cursos/redes/sesiones, como la crea /estudiar.
@@ -112,4 +113,40 @@ test("H49: un quiz rechazado por forma no deja «Quiz — no disponible» en la 
   assert.doesNotMatch(texto, /no disponible|descartada|#page=|\[\[/);
   assert.match(texto, /> \[!question\] Quiz\n> ¿Qué cambia si se duplica R\? Ver p\. 56\n>\n> Con L = 1000 bits\n>\n> 1\. B\n> 2\. A/);
   assert.match(texto, /Quiz — correcto ✓/);
+});
+
+const png = readFileSync(new URL("./fixtures/rojo.png", import.meta.url));
+const convertir = destino => { const r = spawnSync("magick", ["png:-", `${destino}:-`], { input: png }); return r.status === 0 ? r.stdout : undefined; };
+
+test("H70: la firma decide el formato: HEIC y BMP por ruta se convierten y un PNG con extensión .jpg se guarda como .png", async t => {
+  const heic = convertir("heic"), bmp = convertir("bmp");
+  if (!heic || !bmp) return t.skip("sin ImageMagick con HEIC");
+  const e = entorno(t); await e.handlers.get("session_start")({}, e.ctx); await e.vincular();
+  const fotos = { "IMG_0001.HEIC": heic, "captura.bmp": bmp, "mentira.jpg": png };
+  for (const [nombre, bytes] of Object.entries(fotos)) writeFileSync(join(e.dir, nombre), bytes);
+  await e.enviar(Object.keys(fotos).map(n => join(e.dir, n)).join("\n"));
+  const adjuntos = readdirSync(join(e.sesiones, "adjuntos")).sort(), texto = readFileSync(e.file, "utf8");
+  assert.deepEqual(adjuntos.map(n => n.split(".").pop()), ["jpg", "png", "png"]);
+  assert.ok(readFileSync(join(e.sesiones, "adjuntos", adjuntos[0])).subarray(0, 3).equals(Buffer.from("ffd8ff", "hex")));
+  assert.deepEqual(readFileSync(join(e.sesiones, "adjuntos", adjuntos.find(n => n.startsWith("0-3-")))), png);
+  for (const n of adjuntos) assert.ok(texto.includes(`![[cursos/redes/sesiones/adjuntos/${n}]]`), n);
+  assert.deepEqual(e.avisos, []);
+  for (const [nombre, bytes] of Object.entries(fotos)) assert.deepEqual(readFileSync(join(e.dir, nombre)), bytes, "el original queda intacto");
+});
+
+test("H70: sin conversor, una foto HEIC avisa en una línea y el aviso no rompe el texto ni el callout", async t => {
+  const e = entorno(t); await e.handlers.get("session_start")({}, e.ctx); await e.vincular();
+  const foto = join(e.dir, "IMG_0002.heic"), vacio = mkdtempSync(join(tmpdir(), "pi-sin-magick-")), path = process.env.PATH;
+  t.after(() => rmSync(vacio, { recursive: true, force: true }));
+  writeFileSync(foto, Buffer.concat([Buffer.from("000000186674797068656963", "hex"), Buffer.alloc(32)]));
+  process.env.PATH = vacio;
+  try { await e.enviar(foto); } finally { process.env.PATH = path; }
+  assert.equal(e.avisos.length, 1);
+  assert.equal(e.avisos[0][0], "La imagen 1 es HEIC o BMP y no hay ImageMagick para convertirla; mandala en JPEG o PNG.");
+  const texto = readFileSync(e.file, "utf8");
+  assert.match(texto, /\n\n> \[!warning\] Imagen 1 no guardada\n> Revisá[^\n]*\n\n/);
+  assert.ok(texto.includes(foto));
+  // Una ruta de pegado en medio de una línea: el callout empieza su propio párrafo.
+  await e.enviar(`Mi intento: ${join(e.dir, "pi-clipboard-11111111-2222-4333-8444-555555555555.png")} listo.`);
+  assert.match(readFileSync(e.file, "utf8"), /Mi intento: \n\n> \[!warning\] Imagen 1 no guardada\n> [^\n]+\n\n\/.*pi-clipboard-[^ ]+ listo\./);
 });

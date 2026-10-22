@@ -29,9 +29,22 @@ import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-age
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { createHash } from "node:crypto";
+import { execFileSync } from "node:child_process";
 import { homedir } from "node:os";
 
 const QA_TOOLS = new Set(["quiz", "ask_user_question"]);
+const SIN_CONVERSOR = "es HEIC o BMP y no hay ImageMagick para convertirla; mandala en JPEG o PNG.";
+
+// La extensión puede mentir (un PNG guardado como .jpg) y el celular manda HEIC: decide la firma.
+function formato(bytes: Buffer): string | undefined {
+	if (bytes.subarray(0, 8).equals(Buffer.from("89504e470d0a1a0a", "hex"))) return "png";
+	if (bytes.subarray(0, 3).equals(Buffer.from("ffd8ff", "hex"))) return "jpg";
+	if (["GIF87a", "GIF89a"].includes(bytes.subarray(0, 6).toString("ascii"))) return "gif";
+	if (bytes.subarray(0, 4).toString("ascii") === "RIFF" && bytes.subarray(8, 12).toString("ascii") === "WEBP") return "webp";
+	if (bytes.subarray(0, 2).toString("ascii") === "BM") return "bmp";
+	if (bytes.subarray(4, 8).toString("ascii") === "ftyp" && /^(hei[cmsx]|hev[cmsx]|mif1|msf1)$/.test(bytes.subarray(8, 12).toString("ascii"))) return "heic";
+	return undefined;
+}
 type Nota = { ino: number; dev: number; nacimiento: number };
 type Vinculo = { file: string | null; origen?: string } & Partial<Nota>;
 
@@ -134,12 +147,6 @@ export default function mdLog(pi: ExtensionAPI) {
 
 	function guardarImagen(image: any, timestamp: number, numero: number): string {
 		if (!logFile) throw new Error("No hay nota vinculada.");
-		const mime = typeof image === "string"
-			? `image/${path.extname(image).slice(1).toLowerCase().replace(/^jpg$/, "jpeg")}`
-			: String(image.mimeType).split(";")[0].trim().toLowerCase();
-		const formatos: Record<string, string> = { "image/png": "png", "image/jpeg": "jpg", "image/webp": "webp", "image/gif": "gif" };
-		const extension = Object.hasOwn(formatos, mime) ? formatos[mime] : undefined;
-		if (!extension) throw new Error("Formato no compatible.");
 		let bytes: Buffer;
 		if (typeof image === "string") {
 			const fd = fs.openSync(image, fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW | fs.constants.O_NONBLOCK);
@@ -153,11 +160,21 @@ export default function mdLog(pi: ExtensionAPI) {
 			if (!bytes.length || bytes.toString("base64") !== image.data) throw new Error("Base64 inválido.");
 		}
 		// shortcut: sólo se valida la firma; usar un decodificador si se exige certificar integridad del formato.
-		const firmaValida = mime === "image/png" ? bytes.subarray(0, 8).equals(Buffer.from("89504e470d0a1a0a", "hex"))
-			: mime === "image/jpeg" ? bytes.subarray(0, 3).equals(Buffer.from("ffd8ff", "hex"))
-			: mime === "image/gif" ? ["GIF87a", "GIF89a"].includes(bytes.subarray(0, 6).toString("ascii"))
-			: bytes.subarray(0, 4).toString("ascii") === "RIFF" && bytes.subarray(8, 12).toString("ascii") === "WEBP";
-		if (!firmaValida) throw new Error("La firma no coincide con el formato.");
+		let extension = formato(bytes);
+		if (typeof image !== "string") {
+			const formatos: Record<string, string> = { "image/png": "png", "image/jpeg": "jpg", "image/webp": "webp", "image/gif": "gif" };
+			const mime = String(image.mimeType).split(";")[0].trim().toLowerCase();
+			if (!Object.hasOwn(formatos, mime)) throw new Error("Formato no compatible.");
+			if (formatos[mime] !== extension) throw new Error("La firma no coincide con el formato.");
+		}
+		if (extension === "heic" || extension === "bmp") {
+			// shortcut: sólo ImageMagick (convierte los dos); sumar heif-convert o sips si otra máquina no lo tiene.
+			const destino = extension === "heic" ? "jpg" : "png";
+			try { bytes = execFileSync("magick", [`${extension}:-`, "-auto-orient", `${destino}:-`], { input: bytes, timeout: 30000, maxBuffer: 2 ** 28, stdio: ["pipe", "pipe", "ignore"] }); }
+			catch { throw new Error(SIN_CONVERSOR); }
+			extension = destino;
+		}
+		if (!extension) throw new Error("Formato no compatible.");
 		const directorio = path.join(fs.realpathSync(path.dirname(logFile)), "adjuntos");
 		try { fs.mkdirSync(directorio, { mode: 0o700 }); } catch (e: any) { if (e.code !== "EEXIST") throw e; }
 		if (!fs.lstatSync(directorio).isDirectory()) throw new Error("Adjuntos debe ser un directorio, no un enlace.");
@@ -184,9 +201,10 @@ export default function mdLog(pi: ExtensionAPI) {
 		const insertarImagen = (image: any): string => {
 			numero++;
 			try { return guardarImagen(image, timestamp, numero); }
-			catch {
-				contexto?.ui.notify(`No se pudo guardar la imagen ${numero} en el log; el chat continúa. Revisala en la sesión de pi.`, "warning");
-				return `> [!warning] Imagen ${numero} no guardada\n> Revisá el adjunto original en la sesión de pi; no se reemplazaron archivos existentes.${typeof image === "string" ? `\n\n${image}` : ""}`;
+			catch (e) {
+				contexto?.ui.notify(e instanceof Error && e.message === SIN_CONVERSOR ? `La imagen ${numero} ${SIN_CONVERSOR}` : `No se pudo guardar la imagen ${numero} en el log; el chat continúa. Revisala en la sesión de pi.`, "warning");
+				// En su propio párrafo: la ruta puede venir en medio de una línea de texto.
+				return `\n\n> [!warning] Imagen ${numero} no guardada\n> Revisá el adjunto original en la sesión de pi; no se reemplazaron archivos existentes.\n\n${typeof image === "string" ? image : ""}`;
 			}
 		};
 		const partes = contenido.map((c: any) => {
@@ -196,7 +214,7 @@ export default function mdLog(pi: ExtensionAPI) {
 				const adjuntoExplicito = linea.trim().startsWith("@");
 				let ruta = linea.trim().replace(/^@/, "");
 				if ((ruta.startsWith('"') && ruta.endsWith('"')) || (ruta.startsWith("'") && ruta.endsWith("'"))) ruta = ruta.slice(1, -1);
-				if ((adjuntoExplicito || /^(?:\/|~\/|\.{1,2}\/)/.test(ruta)) && /\.(?:png|jpe?g|webp|gif)$/i.test(ruta)) {
+				if ((adjuntoExplicito || /^(?:\/|~\/|\.{1,2}\/)/.test(ruta)) && /\.(?:png|jpe?g|webp|gif|heic|heif|bmp)$/i.test(ruta)) {
 					return insertarImagen(path.resolve(contexto?.cwd || ".", ruta.startsWith("~/") ? path.join(homedir(), ruta.slice(2)) : ruta));
 				}
 				// Pi 1.3 pega una ruta en el editor, también en medio de una respuesta.
