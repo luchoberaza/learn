@@ -33,9 +33,10 @@ export function registrarProgreso(pi: ExtensionAPI, sesion: ReturnType<typeof re
       try { sesion.refrescar(); } catch { ctx.ui.notify("Progreso guardado; reactivá /estudiar para refrescar el dossier.", "warning"); }
       if (!reconstruir_log && final && solicitud?.data?.log !== e.a.log) pi.appendEntry("curso-cierre", { log: e.a.log });
       pi.appendEntry("curso-progreso", { log: e.a.log, origen: log, cierre: !reconstruir_log && final });
-      for (const aviso of r.avisos) ctx.ui.notify(aviso, "warning");
+      // Sólo los avisos «Progreso…» son para el alumno; el resto corrige al modelo en el resultado.
+      for (const aviso of r.avisos.filter((a: string) => a.startsWith("Progreso"))) ctx.ui.notify(aviso, "warning");
       const siguiente = proximoTema(e.d);
-      return { content: [{ type: "text", text: `Progreso ${r.sin_cambios ? "ya registrado, sin cambios" : "guardado con respaldo .bak"}. ${reconstruir_log ? "Reconstrucción identificada; retomá la sesión actual sin repetir el resumen." : final ? "Ofrecé el resumen y próximo paso; el log se cerrará al terminar ese mensaje." : "Continuá desde el borde observado."} Sugerencia: ${siguiente?.nombre || "repasar o elegir objetivo"}.` }], details: { guardado: true, sin_cambios: r.sin_cambios, log, siguiente: siguiente?.id } };
+      return { content: [{ type: "text", text: `Progreso ${r.sin_cambios ? "ya registrado, sin cambios" : "guardado con respaldo .bak"}. ${reconstruir_log ? "Reconstrucción identificada; retomá la sesión actual sin repetir el resumen." : final ? "Ofrecé el resumen y próximo paso; el log se cerrará al terminar ese mensaje." : "Continuá desde el borde observado."}${r.avisos.length ? ` Avisos: ${r.avisos.join(" ")}` : ""} Sugerencia: ${siguiente?.nombre || "repasar o elegir objetivo"}.` }], details: { guardado: true, sin_cambios: r.sin_cambios, log, siguiente: siguiente?.id } };
   }
   pi.registerCommand("progreso", {
     description: "Mostrar el progreso por tema y sugerir el próximo tema con prerequisitos firmes",

@@ -100,7 +100,7 @@ class ProgresoTest(unittest.TestCase):
         self.assertEqual(bak.read_bytes(), b'RESPALDO A REVISAR')
 
     def test_rechaza_esquema_fechas_items_rutas_y_estados(self):
-        for campo, valor in [('estado', 'aprobado'), ('ejercicios', [{'doc': 'practico', 'item': 'inventado', 'fecha': self.hoy, 'resultado': 'correcto'}]), ('errores_de_concepto', [{'descripcion': 'x', 'detectado': '2999-01-01', 'resuelto': False}]), ('borde', {'domina': ['x'], 'falla': ['x']})]:
+        for campo, valor in [('estado', 'aprobado'), ('errores_de_concepto', [{'descripcion': 'x', 'detectado': '2999-01-01', 'resuelto': False}]), ('borde', {'domina': ['x'], 'falla': ['x']})]:
             datos = {**self.datos, campo: valor}
             with self.assertRaises((ValueError, TypeError)):
                 registrar(self.vault, 'ejemplo', 'derivacion', self.log, datos)

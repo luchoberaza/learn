@@ -103,6 +103,22 @@ class ProgresoAuditoriaTest(unittest.TestCase):
         self.assertEqual(t['proximo_paso'], 'Seguir')
         self.assertEqual(t['ejercicios'][0]['item'], '1')
 
+    def test_h13_ids_tolerantes_guardan_el_resto_y_avisan(self):
+        (self.raiz / 'indice.yaml').write_text(yaml.safe_dump({'documentos': [{'id': 'practico', 'tipo': 'ejercicios'}, {'id': 'practico-2', 'tipo': 'ejercicios'}, {'id': 'libro', 'tipo': 'bibliografia'}], 'temas': [{'id': 'derivacion'}, {'id': 'limites'}]}))
+        (self.raiz / '_procesado/practico/items.yaml').write_text(yaml.safe_dump({'items': [{'id': str(n), 'enunciado': 'x'} for n in range(1, 11)]}))
+        ej = lambda doc, item: {'doc': doc, 'item': item, 'fecha': self.b.hoy, 'resultado': 'parcial'}
+        datos = {**self.datos, 'ejercicios': [ej('practico', '2(a–c)'), ej('practico', 'Ejercicio 3'), {**ej('practico', '4g'), 'notas': 'Sin unidades'}, ej('practico', '10'), ej('practico', '99'), ej('practico-2', 'Ejercicio 5'), ej('libro', '1')]}
+        r = self.guardar(datos)
+        guardados = {(e['doc'], e['item']): e for e in self.tema()['ejercicios']}
+        self.assertEqual(set(guardados), {('practico', '2'), ('practico', '3'), ('practico', '4'), ('practico', '10'), ('practico-2', '5')})
+        self.assertIn('(a–c)', guardados[('practico', '2')]['notas'])
+        self.assertIn('Sin unidades', guardados[('practico', '4')]['notas'])
+        self.assertTrue(guardados[('practico-2', '5')]['sin_segmentar'])
+        self.assertIn("item '99' no existe en practico; ids válidos: 1–10", ' '.join(r['avisos']))
+        self.assertIn('libro', ' '.join(r['avisos']))
+        self.assertEqual(self.tema()['borde']['domina'], ['derivar un polinomio'])
+        self.assertFalse([a for a in leer(self.vault, 'ejemplo')['avisos'] if 'huérfano' in a])
+
 
 class SesionAuditoriaTest(unittest.TestCase):
     def setUp(self):

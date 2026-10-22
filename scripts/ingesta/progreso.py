@@ -116,6 +116,28 @@ def fusionar(anterior, nuevo):
     return r
 
 
+ETIQUETA = re.compile(r"^(?:ejercicio|problema|pregunta|[ií]tem|ej)\.?\s*", re.I)
+
+
+def item_base(item, ids):
+    """'2', 'Ejercicio 2', '2(a–c)' o '2g' → ('2', inciso) si el banco tiene '2'; None si no coincide."""
+    if item in ids:
+        return item, ""
+    limpio = ETIQUETA.sub("", item.strip())
+    for i in sorted(ids, key=len, reverse=True):
+        resto = limpio[len(i):]
+        if limpio.startswith(i) and not (resto[:1].isdigit() and i[-1].isdigit()):
+            return i, resto.strip(" .-:")
+    return None
+
+
+def rango(ids):
+    ids = list(ids)
+    if ids and all(i.isdigit() for i in ids) and [int(i) for i in ids] == list(range(int(ids[0]), int(ids[0]) + len(ids))):
+        return f"{ids[0]}–{ids[-1]}"
+    return ", ".join(ids[:30]) + (" …" if len(ids) > 30 else "")
+
+
 def validar_datos(datos, tema, ctx):
     campos = {"estado", "borde", "conceptos_firmes", "errores_de_concepto", "ejercicios", "discrepancias", "proximo_paso", "resumen"}
     if not isinstance(datos, dict) or set(datos) != campos:
@@ -140,20 +162,33 @@ def validar_datos(datos, tema, ctx):
         if not isinstance(e, dict) or set(e) != {"descripcion", "detectado", "resuelto"}:
             raise ValueError("Error de concepto fuera del esquema.")
         cadena(e["descripcion"])
+    ejercicios, avisos = [], []
     for e in datos["ejercicios"]:
         if not isinstance(e, dict) or set(e) - {"doc", "item", "fecha", "resultado", "puntaje", "notas"} or not {"doc", "item", "fecha", "resultado"} <= set(e):
             raise ValueError("Ejercicio fuera del esquema.")
+        cadena(e["item"])
+        e = deepcopy(e)
+        # Un ítem mal identificado no descarta el resto del registro: se omite y se avisa.
         if ctx[1].get(e["doc"], {}).get("tipo") not in {"ejercicios", "evaluaciones"}:
-            raise ValueError("El intento debe corresponder a un ejercicio o evaluación del curso.")
-        if e["item"] not in ctx[2].get(e["doc"], {}):
-            raise ValueError("Ejercicio inválido: el ítem no existe en el banco.")
+            avisos.append(f"'{e['doc']}' no es un práctico ni una evaluación del curso; se omitió el ejercicio '{e['item']}' y se guardó el resto.")
+            continue
+        if e["doc"] not in ctx[2]:
+            e.update(item=ETIQUETA.sub("", e["item"].strip()) or e["item"], sin_segmentar=True)
+        elif (base := item_base(e["item"], ctx[2][e["doc"]])) is None:
+            avisos.append(f"item '{e['item']}' no existe en {e['doc']}; ids válidos: {rango(ctx[2][e['doc']])}. Se guardó el resto.")
+            continue
+        elif base[1]:
+            e.update(item=base[0], notas=f"Inciso {base[1]}" + (f". {e['notas']}" if e.get("notas") else ""))
+        else:
+            e["item"] = base[0]
+        ejercicios.append(e)
     for f in [e.get("detectado") for e in datos["errores_de_concepto"]] + [e.get("fecha") for e in datos["ejercicios"]]:
         if not isinstance(f, str) or not re.fullmatch(r"\d{4}-\d{2}-\d{2}", f) or date.fromisoformat(f) > hoy:
             raise ValueError("Fecha de evidencia inválida o futura.")
     t = {k: deepcopy(v) for k, v in datos.items() if k != "resumen"}
-    t["actualizado"] = hoy.isoformat()
+    t.update(ejercicios=ejercicios, actualizado=hoy.isoformat())
     comprobar({"version": 1, "temas": {tema: t}, "historial": []}, ctx)
-    return t
+    return t, avisos
 
 
 def registrar(vault: Path, curso: str, tema: str, log: str, datos: dict, cierre=False, reconstruido=False, huella_log=None):
@@ -168,11 +203,12 @@ def registrar(vault: Path, curso: str, tema: str, log: str, datos: dict, cierre=
         raise ValueError("El log de evidencia no existe.")
     with bloqueo(raiz):
         ctx = contexto(raiz)
-        nuevo = validar_datos(datos, tema, ctx)
+        nuevo, observaciones = validar_datos(datos, tema, ctx)
         if reconstruido and (not isinstance(huella_log, str) or hashlib.sha256(archivo_log.read_bytes()).hexdigest() != huella_log):
             raise Conflicto("El log cambió desde su lectura; releelo antes de reconstruir.")
         indice = texto(raiz, "indice.yaml")
         p, raw, avisos = cargar(raiz, ctx)
+        avisos += observaciones
         p["temas"][tema] = fusionar(p["temas"].get(tema, {}), nuevo)
         historia = {"fecha": log.split("/")[1][:10], "tema": tema, "log": log, "resumen": datos["resumen"], "cierre": cierre}
         if reconstruido:
