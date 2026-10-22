@@ -6,6 +6,7 @@ import { piDir, vaultDir } from "../../scripts/lib/pi-sdk.mjs";
 import { python, transcribir } from "./ingesta.ts";
 import { guardarCurso, registrarCuracion } from "./curacion.ts";
 import { registrarSesion } from "./sesion.ts";
+import { registrarPresentacion } from "./presentacion.ts";
 import { registrarResearcher } from "./researcher.ts";
 import { registrarProgreso } from "./progreso.ts";
 
@@ -23,6 +24,7 @@ export default function (pi: ExtensionAPI) {
   registrarCuracion(pi);
   const sesion = registrarSesion(pi);
   const progreso = registrarProgreso(pi, sesion);
+  registrarPresentacion(pi, sesion.actual);
   const textoProgreso = Type.String({ minLength: 1, maxLength: 2000 });
   const listaProgreso = Type.Array(textoProgreso, { maxItems: 100 });
   const fecha = Type.String({ pattern: "^\\d{4}-\\d{2}-\\d{2}$" });
