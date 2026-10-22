@@ -61,3 +61,16 @@ test("H54: con progreso previo, el arranque pide una línea de dónde quedamos a
   await e.estudiar("calculo derivacion");
   assert.match(e.ordenes[0].content, /dónde quedamos/);
 });
+test("H55/H31: los avisos del curso van al dossier, no al alumno, y la barra es la misma al restaurar", async t => {
+  const d = datos(); d.avisos = ["Ejercicio huérfano: practico/3 ya no está en el banco."]; d.validacion.avisos = ["Sin segmentación todavía: practico-2."];
+  const e = entorno(t, d);
+  await e.estudiar("calculo derivacion");
+  const barra = e.estados.curso;
+  assert.equal(barra, "📚 calculo › Derivación");
+  assert.ok(!e.avisos.some(([, m]) => /Preparación parcial/.test(m)));
+  const evento = { systemPromptOptions: { sections: {}, skills: [] } };
+  e.eventos.get("before_agent_start")(evento);
+  assert.match(evento.systemPromptOptions.sections.curso, /Ejercicio huérfano/);
+  await e.eventos.get("session_start")({ type: "session_start", reason: "resume" }, e.ctx);
+  assert.equal(e.estados.curso, barra);
+});

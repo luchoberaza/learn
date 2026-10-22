@@ -141,9 +141,8 @@ export function registrarSesion(pi: ExtensionAPI, vault = vaultDir, recursos = p
         } catch (e) { ({ activo, datos, resumen, teach, modo, pendiente } = anterior); throw e; }
         pi.appendEntry("curso", a);
         pi.setSessionName(`${d.nombre || curso} · ${tema.nombre}`);
-        const parcial = d.avisos.length || d.validacion?.errores.length || d.validacion?.avisos.length;
-        ctx.ui.setStatus("curso", `📚 ${curso} › ${tema.nombre}${parcial ? " · preparación parcial" : ""}`);
-        if (parcial) ctx.ui.notify("Preparación parcial: seguimos con el material disponible, cotejando sus páginas dudosas.", "warning");
+        // Los avisos del curso van al dossier; la preparación por tema informa al alumno lo que le toca.
+        ctx.ui.setStatus("curso", `📚 ${curso} › ${tema.nombre}`);
         const previo = d.progreso.temas[tema.id]?.estado;
         ordenar(pi, `Empecemos con «${tema.nombre}» (${curso}). ${previo && previo !== "sin_empezar" ? "Abrí con una línea de dónde quedamos (borde y próximo paso del dossier) y enseguida la primera pregunta" : "Iniciá el probe con la primera pregunta, sin preámbulo"}, sin esperar una nueva orden del estudiante.`);
       } catch (e) { ctx.ui.notify(e instanceof Error ? e.message : "No se pudo activar el curso.", "error"); }
