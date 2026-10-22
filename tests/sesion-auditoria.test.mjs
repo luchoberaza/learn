@@ -46,7 +46,7 @@ function entorno(t, d = datos()) {
     events: { emit: (_n, p) => p.onComplete?.() } };
   const ctx = { hasUI: true, isIdle: () => true, sessionManager: { getBranch: () => entradas, getEntries: () => entradas, getSessionId: () => "sesion-1" },
     model: { provider: "prueba", id: "modelo" }, modelRegistry: { hasConfiguredAuth: () => true },
-    ui: { notify: (m, tipo) => avisos.push([tipo, m]), setStatus: (k, v) => { estados[k] = v; }, select: async (_t, o) => o[0], confirm: async () => true } };
+    ui: { notify: (m, tipo) => avisos.push([tipo, m]), setStatus: (k, v) => { estados[k] = v; }, select: async (_t, o) => o.includes("Cambiar sin guardar") ? "Cambiar sin guardar" : o[0], confirm: async () => true } };
   return { vault, raiz, pi, ctx, comandos, eventos, entradas, avisos, ordenes, usuario, estados, sesion: registrarSesion(pi, vault, recursos),
     estudiar: args => comandos.get("estudiar").handler(args, ctx) };
 }
@@ -115,7 +115,7 @@ test("H24: un subtema que sólo encuentra BM25 resuelve al tema cuyo rango conti
   await e.estudiar("calculo funciones compuestas");
   assert.equal(e.entradas.at(-1).data.tema, "derivacion");
   let opciones;
-  e.ctx.ui.select = async (_t, o) => (opciones = o, o[0]);
+  e.ctx.ui.select = async (_t, o) => o.includes("Cambiar sin guardar") ? "Cambiar sin guardar" : (opciones = o, o[0]);
   await e.estudiar("calculo cadena sustitucion");
   assert.match(opciones[0], /^Integración \[integracion\]/); assert.match(opciones[1], /^Derivación \[derivacion\]/); assert.match(opciones.at(-1), /ad hoc/);
   assert.equal(e.entradas.at(-1).data.tema, "integracion");
@@ -328,4 +328,34 @@ test("H26: /estudiar con el agente ocupado corta el turno y sigue; con una pregu
   ocupado = true; orden.length = 0;
   await e.estudiar("calculo derivacion");
   assert.deepEqual(orden, ["abort", "espera"]);
+});
+test("H25: con un tema activo, /estudiar ofrece guardar y cambiar, cambiar sin guardar o cancelar", async t => {
+  const d = datos();
+  d.temas.push({ id: "integracion", nombre: "Integración", alias: [], unidad: 2, prerequisitos: [], objetivos: [], bibliografia: [] });
+  const e = entorno(t, d);
+  let eleccion = "Guardar y cambiar", titulo;
+  e.ctx.ui.select = async (t, o) => o.includes(eleccion) ? (titulo = t, eleccion) : o[0];
+  e.ctx.waitForIdle = async () => {};
+  await e.estudiar("calculo derivacion");
+  const viejo = e.sesion.actual().a.log;
+  await e.estudiar("calculo integracion");
+  assert.equal(titulo, "Estás en «Derivación»");
+  assert.deepEqual(e.entradas.at(-1), { type: "custom", customType: "curso-cierre", data: { log: viejo, adHoc: false } });
+  assert.match(e.ordenes.at(-1).content, /registrar_progreso con cierre:true/);
+  assert.deepEqual(e.avisos.at(-1), ["warning", "No se confirmó el guardado: seguís en «Derivación»; repetí /estudiar o elegí «Cambiar sin guardar»."]);
+  assert.equal(e.sesion.actual().a.tema, "derivacion");
+  e.ctx.waitForIdle = () => e.sesion.cerrar(e.ctx);
+  await e.estudiar("calculo integracion");
+  assert.equal(e.sesion.actual().a.tema, "integracion");
+  assert.match(e.ordenes.at(-1).content, /^Empecemos con «Integración»/);
+  eleccion = "Cancelar";
+  await e.estudiar("calculo derivacion");
+  assert.equal(e.sesion.actual().a.tema, "integracion");
+  eleccion = "Cambiar sin guardar";
+  const abandonado = e.sesion.actual().a.log;
+  writeFileSync(join(e.vault, abandonado), real);
+  await e.estudiar("calculo derivacion");
+  assert.equal(e.sesion.actual().a.tema, "derivacion");
+  await e.estudiar("calculo integracion");
+  assert.equal(e.sesion.actual().pendiente, undefined, "lo abandonado a propósito no se ofrece reconstruir");
 });

@@ -66,7 +66,7 @@ export function registrarSesion(pi: ExtensionAPI, vault = vaultDir, recursos = p
   // Se ofrece una sola vez (queda en .no-reconstruir.json) la última sesión real del tema sin cierre; no con el progreso dudoso, en ad hoc ni la viva de otro pi.
   function sinCierre(a: Activo, d: DatosCurso, tema: Tema) {
     if (a.adHoc || d.avisos.some(x => /^Progreso (no disponible|inválido)/.test(x) || x === COPIA)) return;
-    const r = raiz(a.curso), lista = rutaSegura(r, ".no-reconstruir.json"), carpeta = rutaSegura(r, "sesiones");
+    const r = raiz(a.curso), carpeta = rutaSegura(r, "sesiones");
     let viva = "";
     try { const o = JSON.parse(readFileSync(rutaSegura(r, ".sesion-activa.json"), "utf8")); if (o.pid !== process.pid && vivo(o.pid)) viva = o.log; } catch { /* sin otra sesión registrada */ }
     const log = readdirSync(carpeta).filter(n => {
@@ -74,11 +74,17 @@ export function registrarSesion(pi: ExtensionAPI, vault = vaultDir, recursos = p
       return sufijo && !d.temas.some(t => t.id === `${tema.id}-${sufijo[1]}`) && ![a.log, viva].includes(`cursos/${a.curso}/sesiones/${n}`);
     }).sort((x, y) => statSync(rutaSegura(carpeta, x)).mtimeMs - statSync(rutaSegura(carpeta, y)).mtimeMs || x.localeCompare(y, undefined, { numeric: true }))
       .findLast(n => { try { return conRespuestas(leer(r, `sesiones/${n}`)); } catch { return false; } });
-    let vistos: string[] = [];
-    try { vistos = JSON.parse(readFileSync(lista, "utf8")); } catch { /* nada ofrecido todavía */ }
-    if (!log || cerrado(d, `sesiones/${log}`) || vistos.includes(`sesiones/${log}`)) return;
-    try { escribir(lista, JSON.stringify([...vistos, `sesiones/${log}`])); } catch { /* Sin disco, la oferta puede repetirse. */ }
+    if (!log || cerrado(d, `sesiones/${log}`) || !noOfrecer(a.curso, `sesiones/${log}`)) return;
     return `sesiones/${log}`;
+  }
+  // Anota un log (relativo al curso) para no ofrecerlo; devuelve si era nuevo.
+  function noOfrecer(curso: string, log: string) {
+    const lista = rutaSegura(raiz(curso), ".no-reconstruir.json");
+    let vistos: string[] = [];
+    try { vistos = JSON.parse(readFileSync(lista, "utf8")); } catch { /* nada anotado todavía */ }
+    if (vistos.includes(log)) return false;
+    try { escribir(lista, JSON.stringify([...vistos, log])); } catch { /* Sin disco, la oferta puede repetirse. */ }
+    return true;
   }
   function preparar(a: Activo, d: DatosCurso) {
     const config: Config = JSON.parse(readFileSync(join(recursos, "curso.config.json"), "utf8"));
@@ -195,7 +201,7 @@ export function registrarSesion(pi: ExtensionAPI, vault = vaultDir, recursos = p
           if (preguntas && !(await ctx.ui.confirm("Cambiar de tema", "Hay una pregunta abierta: ¿la cortamos y cambiamos de tema?"))) return;
           ctx.abort(); await ctx.waitForIdle();
         }
-        const d = await cargar(curso, true);
+        let d = await cargar(curso, true);
         for (const aviso of d.avisos.filter(a => a.startsWith("Progreso") || a === COPIA)) ctx.ui.notify(aviso, "warning");
         let candidatos = consulta ? resolverTemas(d.temas, consulta) : ordenarTemas(d), resultados: ReturnType<typeof buscarMaterial> = [];
         if (consulta && !candidatos.length) {
@@ -224,6 +230,19 @@ export function registrarSesion(pi: ExtensionAPI, vault = vaultDir, recursos = p
             bibliografia: seleccionado ? [{ doc: seleccionado.doc, seccion: seleccionado.seccion || consulta, paginas: [seleccionado.pagina, seleccionado.pagina] }] : [] };
         }
         if (!esSlug(tema.id)) throw new Error("Id del tema inválido; revisá el índice.");
+        // Con un tema activo, lo trabajado se guarda (como /fin, con orden oculta y espera) o se descarta a propósito.
+        if (activo && !activo.adHoc && ctx.hasUI) {
+          const viejo = activo, nombre = datos?.temas.find(t => t.id === viejo.tema)?.nombre || viejo.tema;
+          const eleccion = await ctx.ui.select(`Estás en «${nombre}»`, ["Guardar y cambiar", "Cambiar sin guardar", "Cancelar"]);
+          if (eleccion === "Guardar y cambiar") {
+            pi.appendEntry("curso-cierre", { log: viejo.log, adHoc: false });
+            ordenar(pi, "Cambiamos de tema. Llamá registrar_progreso con cierre:true, resumen y sólo la evidencia observada desde el último guardado; después cerrá con una línea de resumen, sin preguntas.");
+            await ctx.waitForIdle();
+            if (activo === viejo) { ctx.ui.notify(`No se confirmó el guardado: seguís en «${nombre}»; repetí /estudiar o elegí «Cambiar sin guardar».`, "warning"); return; }
+            d = await cargar(curso, true);
+          } else if (eleccion === "Cambiar sin guardar") noOfrecer(viejo.curso, viejo.log.slice(`cursos/${viejo.curso}/`.length));
+          else return;
+        }
         const a: Activo = { curso, tema: tema.id, log: "", ...(tema.id === "ad-hoc" ? { adHoc: tema } : {}) }, previo = activo;
         pendiente = undefined;
         preparar(a, d);
