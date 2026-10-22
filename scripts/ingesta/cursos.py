@@ -274,8 +274,8 @@ def validar_progreso(p, temas, documentos, items):
             if not isinstance(e, dict) or not isinstance(e.get("doc"), str) or not isinstance(e.get("item"), str) or e.get("resultado") not in {"correcto", "parcial", "incorrecto"} or not isinstance(e.get("puntaje", ""), str) or not isinstance(e.get("notas", ""), str):
                 raise ValueError("Ejercicio inválido en progreso.yaml.")
             fecha(e.get("fecha"))
-            # Re-segmentar un banco no invalida intentos previos: se conservan como huérfanos.
-            if e["item"] not in items.get(e["doc"], {}) and not (e.get("sin_segmentar") is True and e["doc"] not in items):
+            # Re-segmentar no invalida intentos previos: quedan huérfanos (los sin_segmentar nunca tuvieron banco).
+            if e["item"] not in items.get(e["doc"], {}) and e.get("sin_segmentar") is not True:
                 huerfanos.append(f"Ejercicio huérfano: {e['doc']}/{e['item']} ya no está en el banco; su intento se conserva en progreso.yaml.")
     for h in p["historial"]:
         if not isinstance(h, dict) or h.get("tema") not in temas or not isinstance(h.get("resumen"), str) or not isinstance(h.get("log"), str):

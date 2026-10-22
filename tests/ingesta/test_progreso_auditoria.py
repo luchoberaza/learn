@@ -121,6 +121,13 @@ class ProgresoAuditoriaTest(unittest.TestCase):
         self.assertEqual(self.tema()['borde']['domina'], ['derivar un polinomio'])
         self.assertFalse([a for a in leer(self.vault, 'ejemplo')['avisos'] if 'huérfano' in a])
 
+    def test_h31_segmentar_un_documento_no_vuelve_huerfanos_sus_intentos_sin_segmentar(self):
+        (self.raiz / 'indice.yaml').write_text(yaml.safe_dump({'documentos': [{'id': 'practico', 'tipo': 'ejercicios'}, {'id': 'practico-2', 'tipo': 'ejercicios'}], 'temas': [{'id': 'derivacion'}, {'id': 'limites'}]}))
+        self.guardar({'resumen': 'Sin banco', 'ejercicios': [{'doc': 'practico-2', 'item': '2(a–c)', 'resultado': 'parcial'}]})
+        (self.raiz / '_procesado/practico-2').mkdir()
+        (self.raiz / '_procesado/practico-2/items.yaml').write_text('items:\n- {id: "2", enunciado: x}\n')
+        self.assertFalse([a for a in leer(self.vault, 'ejemplo')['avisos'] if 'huérfano' in a])
+
     def test_h53_fechas_locales_y_completadas_por_el_backend(self):
         # 22:30 en Montevideo es 01:30 UTC del día siguiente.
         instante = datetime(2026, 10, 23, 1, 30, tzinfo=timezone.utc).timestamp()
