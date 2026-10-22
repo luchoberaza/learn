@@ -169,6 +169,15 @@ class CursosAuditoriaTest(unittest.TestCase):
         self.assertEqual(json.loads(archivo.read_text())["documentos"][0]["paginas"], "todas")
         self.assertFalse((self.raiz / "_procesado/manifiesto-ejemplo.json").exists())
 
+    def test_h05_pagina_transcripta_sin_registro_es_pendiente_y_no_falta(self):
+        self.crear()
+        (self.raiz / "_procesado/libro/paginas").mkdir(parents=True)
+        (self.raiz / "_procesado/libro/paginas/0001.md").write_text("Texto")
+        r = validar(self.raiz, "ejemplo")
+        self.assertEqual((r["ok"], r["errores"]), (True, []))
+        self.assertEqual(r["pendientes"], [{"doc": "libro", "pagina": 1}, {"doc": "libro", "pagina": 2}])
+        self.assertEqual(r["sin_transcripcion"], [{"doc": "libro", "pagina": 2}])
+
 
 class VisionAuditoriaTest(unittest.TestCase):
     setUp, tearDown = test_vision.VisionTest.setUp, test_vision.VisionTest.tearDown

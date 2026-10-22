@@ -156,10 +156,10 @@ def validar(raiz: Path, slug: str, *, indice=None, contrato=None, origenes=None,
                 archivo = ruta_segura(raiz, f"_procesado/{doc}/paginas/{p:04}.md")
                 if q is not None and not isinstance(q, dict):
                     raise ValueError(f"Registro de página inválido: {doc}/{p}.")
-                if not q or q.get("pendiente") or q.get("ruta") == "pendiente" or not archivo.exists():
-                    pendientes.add((doc, p))
                 if not archivo.exists():
                     sin_transcripcion.add((doc, p))
+                if not q or q.get("pendiente") or q.get("ruta") == "pendiente" or not archivo.exists():
+                    pendientes.add((doc, p))
                 elif q.get("sha256_markdown") and sha256(archivo) != q["sha256_markdown"]:
                     errores.append(f"Transcripción editada fuera de la ingesta: {doc}/{p}.")
         hay_evaluaciones = any(d["tipo"] == "evaluaciones" for d in documentos.values())
