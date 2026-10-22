@@ -240,6 +240,9 @@ def ejecutar(manifiesto: dict, vault: Path, salida: Path, *, limite_paginas: int
                         motor = motores.get(clase_previa)
                         clave = firma({"sha256": huella, "pagina": numero, "motor": identidades.get(motor), "umbral": umbral,
                                        "archivo": doc["archivo"], "tipo": doc["tipo"]})
+                        # Visión y ediciones humanas no se regeneran desde el PDF mientras no cambien el archivo ni el tipo.
+                        ajena = (almacenado is not None and previo.get("motor") in {"vision", "manual"} and anterior is not None
+                                 and (anterior["archivo"], anterior["tipo"]) == (doc["archivo"], doc["tipo"]))
                         if previo.get("clave") == clave and almacenado is not None and not previo.get("error"):
                             estado["cache"] += 1
                             estado["procesadas"] += 1
@@ -262,20 +265,35 @@ def ejecutar(manifiesto: dict, vault: Path, salida: Path, *, limite_paginas: int
                             motor = motores[clase["clase"]]
                             clave = firma({"sha256": huella, "pagina": numero, "motor": identidades[motor], "umbral": umbral,
                                            "archivo": doc["archivo"], "tipo": doc["tipo"]})
-                            impresa, metodo_etiqueta = etiqueta_impresa(pagina)
-                            titulos[numero] = encabezados(pagina)
-                            resultado.update(clave=clave, clasificacion=clase, motor=motor, identidad_motor=identidades[motor],
-                                             impresa=impresa, metodo_etiqueta=metodo_etiqueta, encabezados=titulos[numero])
-                            texto = extractor(pdf, numero, motor, idiomas)
-                            resultado.update(calidad(texto, clase, umbral))
-                            resultado["requiere_vision"] = resultado["pendiente"] or doc["tipo"] in {"ejercicios", "evaluaciones", "soluciones"}
-                            if doc["tipo"] in {"ejercicios", "evaluaciones", "soluciones"}:
-                                resultado["pendiente"] = True
-                                resultado["avisos"].append("Transcripción con visión obligatoria en Fase 2; este texto es provisional.")
-                            ruta = "ocr" if motor == "ocrmypdf" or clase["clase"] == "escaneada" else "digital"
-                            resultado["ruta"] = "pendiente" if resultado["pendiente"] else ruta
-                            markdown = f"<!-- p. PDF {numero} · impresa {impresa or 'desconocida'} · {cita(doc['archivo'], numero)} -->\n\n{texto}\n"
-                            resultado["sha256_markdown"] = hashlib.sha256(markdown.encode("utf-8")).hexdigest()
+                            if ajena:
+                                # Sólo se actualiza la clasificación; la calidad de visión se recalcula como en vision.guardar.
+                                resultado = {**previo, "clave": clave, "clasificacion": clase}
+                                texto = contenido_pagina(almacenado)
+                                if previo["motor"] == "vision" and not previo.get("error_vision"):
+                                    resultado.update(calidad(texto, {**clase, "clase": "digital"}, umbral))
+                                    if re.search(r"\[ilegible\]", texto, re.I):
+                                        resultado.update(puntaje=min(resultado["puntaje"], 0.4), pendiente=True)
+                                        resultado["avisos"].append("Visión dejó contenido ilegible; requiere revisión del original.")
+                                    resultado["ruta"] = "pendiente" if resultado["pendiente"] else "vision"
+                                markdown = almacenado
+                            else:
+                                impresa, metodo_etiqueta = etiqueta_impresa(pagina)
+                                titulos[numero] = encabezados(pagina)
+                                resultado.update(clave=clave, clasificacion=clase, motor=motor, identidad_motor=identidades[motor],
+                                                 impresa=impresa, metodo_etiqueta=metodo_etiqueta, encabezados=titulos[numero])
+                                texto = extractor(pdf, numero, motor, idiomas)
+                                resultado.update(calidad(texto, clase, umbral))
+                                if clase["operadores_cifrados"]:
+                                    resultado["avisos"].append("En esta página «5» puede ser «=», «1» «+» y «2» «−»: verificá con la imagen.")
+                                resultado["requiere_vision"] = (resultado["pendiente"] or clase["posible_matematica"]
+                                                                or doc["tipo"] in {"ejercicios", "evaluaciones", "soluciones"})
+                                if doc["tipo"] in {"ejercicios", "evaluaciones", "soluciones"}:
+                                    resultado["pendiente"] = True
+                                    resultado["avisos"].append("Transcripción con visión obligatoria en Fase 2; este texto es provisional.")
+                                ruta = "ocr" if motor == "ocrmypdf" or clase["clase"] == "escaneada" else "digital"
+                                resultado["ruta"] = "pendiente" if resultado["pendiente"] else ruta
+                                markdown = f"<!-- p. PDF {numero} · impresa {impresa or 'desconocida'} · {cita(doc['archivo'], numero)} -->\n\n{texto}\n"
+                                resultado["sha256_markdown"] = hashlib.sha256(markdown.encode("utf-8")).hexdigest()
                         except (OSError, RuntimeError, ValueError, subprocess.SubprocessError) as error:
                             if isinstance(error, Conflicto):
                                 raise

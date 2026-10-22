@@ -15,7 +15,8 @@ import unicodedata
 import pymupdf
 from wordfreq import zipf_frequency
 
-VERSION_ALGORITMO = 2
+VERSION_ALGORITMO = 3
+SIMBOLOS = r"[∑∏∫√∀∃∈∉≤≥±∞α-ωΑ-Ω]|\w\s*\^\s*\w"
 
 
 def normalizar(texto: str) -> str:
@@ -56,15 +57,19 @@ def clasificar(pagina: pymupdf.Page) -> dict:
     else:
         clase = "digital"
     trazas = pagina.get_texttrace()
-    sospecha_matematica = bool(re.search(r"[∑∏∫√∀∃∈∉≤≥±∞α-ωΑ-Ω]|\w\s*\^\s*\w|\b\w+\s*=|\b[A-Za-z]\s*[+−-]\s*\d", texto))
-    sospecha_matematica |= any(span.get("flags", 0) & 1 or re.search(r"(?:Math|Symbol|CMSY|CMMI|CMEX)", span.get("font", ""), re.I)
-                              for bloque in pagina.get_text("dict")["blocks"] if "lines" in bloque
-                              for linea in bloque["lines"] for span in linea["spans"])
+    # El código monoespaciado y las viñetas de OpenSymbol/StarSymbol no son matemática; '=' suelto tampoco.
+    spans = [span for bloque in pagina.get_text("dict")["blocks"] for linea in bloque.get("lines", []) for span in linea["spans"]
+             if not span["flags"] & 8 and not re.search(r"OpenSymbol|StarSymbol", span["font"])]
+    fuentes = {span["font"] for span in spans if re.search(r"Math|Symbol|CMSY|CMMI|CMEX", span["font"], re.I)}
+    sospecha_matematica = bool(fuentes) or bool(re.search(SIMBOLOS, " ".join(span["text"] for span in spans)))
+    sospecha_matematica |= any(span["flags"] & 1 and re.fullmatch(r"\s*[-−–+]?\d[\d.,]*\s*", span["text"]) for span in spans)
     return {"clase": clase, "caracteres": len(texto.strip()), "letras": letras,
             "proporcion_basura": round(basura / max(1, len(texto)), 4),
             "area_imagen": round(proporcion, 4), "capa_ocr_probable": clase == "escaneada" and letras >= 30,
             "texto_invisible": any(s.get("type") == 3 for s in trazas),
-            "posible_matematica": bool(sospecha_matematica),
+            "posible_matematica": sospecha_matematica,
+            # MathematicalPi codifica operadores como dígitos: PyMuPDF extrae '5' por '=', '1' por '+' y '2' por '−'.
+            "operadores_cifrados": any(re.search(r"Math(?:ematical)?Pi", f) for f in fuentes),
             "dibujos_vectoriales": len(pagina.get_drawings())}
 
 

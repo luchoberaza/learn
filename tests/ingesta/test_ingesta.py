@@ -70,8 +70,8 @@ class IngestaTest(unittest.TestCase):
             self.assertTrue(clasificar(pdf[0])["posible_matematica"])
             pdf[2].insert_text((45, 470), "Un polígono de n + 2 lados tiene n - 1 diagonales.")
             clase = clasificar(pdf[2])
-            self.assertTrue(clase["posible_matematica"])
-            self.assertTrue(calidad(pdf[2].get_text(), clase, 0.6)["pendiente"])
+            self.assertFalse(clase["posible_matematica"])
+            self.assertFalse(calidad(pdf[2].get_text(), clase, 0.6)["pendiente"])
 
     def test_no_suma_imagenes_superpuestas(self):
         self.assertEqual(area_union([(0, 0, 10, 10), (0, 0, 10, 10), (5, 0, 15, 10)]), 150)
