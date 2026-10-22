@@ -6,7 +6,7 @@ export interface Documento { id: string; titulo: string; tipo: string; archivo: 
 export interface Tema { id: string; nombre: string; alias: string[]; unidad: number; prerequisitos: string[]; objetivos: string[];
   bibliografia?: { doc: string; seccion: string; paginas: number[] }[];
   ejercicios?: { doc: string; items: string[] }[]; evaluaciones?: { doc: string; items: string[] }[] }
-interface Item { id: string; paginas: number[]; enunciado: string; solucion?: { doc: string; id: string } }
+interface Item { id: string; paginas: number[]; enunciado: string; solucion?: { doc: string; id: string }; solucion_de?: string }
 export interface DatosCurso { curso: string; nombre?: string; contrato: string; documentos: Documento[]; temas: Tema[]; items: Record<string, Item[]>;
   progreso: { temas: Record<string, { estado?: string; borde?: unknown; proximo_paso?: string }>; historial?: unknown[] };
   avisos: string[]; validacion?: { errores: string[]; avisos: string[]; pendientes: unknown[] } }
@@ -67,15 +67,17 @@ export function ordenarTemas(datos: DatosCurso): Tema[] {
 // Evaluaciones y soluciones traen la solución en sus páginas: antes del intento, sin texto ni enlace.
 const conSolucion = (d: Documento) => d.tipo === "evaluaciones" || d.tipo === "soluciones";
 const sinEnlace = (paginas: number[]) => `PDF p. ${paginas.join(", ")} (el enlace va después del intento)`;
+const esSolucion = (d: Documento, i: Item) => d.tipo === "soluciones" || i.solucion_de !== undefined;
 export function buscarMaterial(raiz: string, datos: DatosCurso, consulta: string, tipo?: string) {
   const indice = JSON.parse(leer(raiz, "_procesado/busqueda.json", 50_000_000)) as IndiceBM25;
   return buscar(indice, consulta, 5, tipo).flatMap(r => {
     const d = datos.documentos.find(d => d.id === r.doc);
     if (!d) return [];
     if (!conSolucion(d)) return [{ doc: r.doc, pagina: r.pagina, seccion: r.seccion, fragmento: r.fragmento, pendiente: r.pendiente, cita: cita(datos, r.doc, r.pagina) }];
-    const items = (datos.items[r.doc] || []).filter(i => i.paginas.includes(r.pagina)).map(i => i.id);
+    const items = (datos.items[r.doc] || []).filter(i => !esSolucion(d, i) && i.paginas.includes(r.pagina)).map(i => i.id);
+    const como = d.tipo === "soluciones" ? "son soluciones: pedilas con leer_items e incluir_solucion después del intento" : items.length ? `leé el enunciado con leer_items (ítems: ${items.join(", ")})` : "leé el enunciado con leer_paginas, que omite la parte resuelta";
     return [{ doc: r.doc, pagina: r.pagina, seccion: /^(pregunta|ejercicio|problema)\b/i.test(r.seccion || "") ? r.seccion : null, pendiente: r.pendiente, cita: sinEnlace([r.pagina]),
-      fragmento: `Sin texto antes del intento: leé el enunciado con ${items.length ? `leer_items (ítems: ${items.join(", ")})` : "leer_paginas, que omite la parte resuelta"}.` }];
+      fragmento: `Sin texto antes del intento: ${como}.` }];
   });
 }
 // Corta desde «Solución» hasta la próxima «Pregunta N»; el estado sigue de una página a la otra.
@@ -124,12 +126,15 @@ export function leerItems(datos: DatosCurso, doc: string, ids: string[], incluir
   return acotar(ids.map(id => {
     const i = datos.items[doc]?.find(i => i.id === id);
     if (!i) return `${doc}/${id}: ítem no preparado.`;
+    if (!incluirSolucion && esSolucion(d, i)) return `${doc}/${id}: es una solución; pedila con incluir_solucion después del intento.`;
     let t = `${doc}/${i.id}\n${i.enunciado}\n${incluirSolucion || !conSolucion(d) ? i.paginas.map(p => cita(datos, doc, p)).join(" ") : sinEnlace(i.paginas)}\nRevisión humana pendiente.`;
     if (incluirSolucion) {
       const ref = i.solucion;
       const s = ref && datos.items[ref.doc]?.find(i => i.id === ref.id);
+      const propias = (datos.items[doc] || []).filter(s => s.solucion_de === i.id);
       if (s && documento(datos, ref!.doc).tipo === "soluciones") t += `\nSolución:\n${s.enunciado}\n${s.paginas.map(p => cita(datos, ref!.doc, p)).join(" ")}`;
-      else t += "\nSin solución separada vinculada: no inventarla ni extraerla implícitamente del enunciado.";
+      else if (!propias.length) t += "\nSin solución separada vinculada: no inventarla ni extraerla implícitamente del enunciado.";
+      for (const s of propias) t += `\nSolución:\n${s.enunciado}\n${s.paginas.map(p => cita(datos, doc, p)).join(" ")}`;
     }
     return t;
   }).join("\n\n"), 32000);

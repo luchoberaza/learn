@@ -96,6 +96,17 @@ test("leer_items de evaluaciones cita sin enlace antes del intento y con enlace 
   assert.match(leerItems(d, "parcial", ["2"], true), /parcial\.pdf#page=2[^]*SOLUCION SEPARADA/);
 });
 
+test("leer_items: la solución del mismo documento sólo tras el intento y nunca se lista antes (H18)", t => {
+  const d = datos(), { raiz } = curso(t, d);
+  assert.doesNotMatch(leerItems(d, "parcial", ["1-sol"]), /SOLUCION/);
+  assert.doesNotMatch(leerItems(d, "soluciones", ["2"]), /SOLUCION/);
+  const despues = leerItems(d, "parcial", ["1"], true);
+  assert.match(despues, /Solución:\nSOLUCION PROPIA[^\n]*\n\[\[[^\]]*parcial\.pdf#page=1\]\] \[\[[^\]]*parcial\.pdf#page=2\]\]/);
+  assert.doesNotMatch(despues, /Sin solución separada/);
+  assert.doesNotMatch(leerItems(d, "parcial", ["2"], true), /SOLUCION PROPIA/);
+  assert.doesNotMatch(JSON.stringify(buscarMaterial(raiz, d, "retardo de propagación")), /1-sol/);
+});
+
 test("ver_pagina de evaluaciones exige despues_del_intento; leer_paginas lo recibe", async t => {
   const e = curso(t);
   await e.activar();
