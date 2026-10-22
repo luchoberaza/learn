@@ -9,6 +9,7 @@ import difflib
 import hashlib
 import json
 from math import ceil
+import os
 from pathlib import Path
 import re
 import shutil
@@ -263,6 +264,16 @@ def validar_progreso(p, temas, documentos, items):
             raise ValueError("El log del historial debe estar en sesiones/.")
 
 
+def vivo(pid: int) -> bool:
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        pass
+    return True
+
+
 def revisar(vault: Path, slug: str, propuesta: Path, max_tokens=1500) -> tuple[dict, dict]:
     raiz = carpeta(vault, slug)
     relativa = propuesta.absolute().relative_to(vault)
@@ -275,7 +286,14 @@ def revisar(vault: Path, slug: str, propuesta: Path, max_tokens=1500) -> tuple[d
     indice = cargar_yaml(paquete["indice_yaml"])
     anteriores = {}
     base = {}
+    if raiz.exists() and not ruta_segura(raiz, "indice.yaml").exists():
+        raise FileExistsError(f"cursos/{slug}/ existe sin indice.yaml (curso incompleto o carpeta ajena): movela fuera de cursos/ y repetí.")
     if raiz.exists():
+        # Copias de un aplicar cortado sin limpieza (SIGTERM): sólo las de procesos que ya terminaron.
+        for parcial in raiz.glob("fuentes/*/.*.parcial-*"):
+            pid = re.fullmatch(r"\..+\.parcial-(\d+)", parcial.name)
+            if pid and not vivo(int(pid[1])):
+                ruta_segura(raiz, str(parcial.relative_to(raiz))).unlink()
         for nombre in ["indice.yaml", "curso.md", "progreso.yaml"]:
             base[nombre] = texto(raiz, nombre)
         anteriores = {d["id"]: d for d in cargar_yaml(base["indice.yaml"])["documentos"]}
@@ -296,8 +314,9 @@ def revisar(vault: Path, slug: str, propuesta: Path, max_tokens=1500) -> tuple[d
         fuente = ruta_segura(vault, origen)
         if fuente.suffix.lower() != ".pdf" or sha256(fuente) != o.get("sha256"):
             raise Conflicto(f"Cambió la fuente de {d['id']} o su SHA-256 es incorrecto.")
-        if ruta_segura(raiz, d["archivo"]).exists():
-            raise Conflicto("La copia de destino ya existe; se preservó sin sobrescribirla.")
+        destino = ruta_segura(raiz, d["archivo"])
+        if destino.exists() and sha256(destino) != o.get("sha256"):
+            raise Conflicto("La copia de destino ya existe y es otro archivo; se preservó sin sobrescribirla.")
         origenes[d["id"]] = fuente
         copias.append({"origen": origen, "archivo": d["archivo"], "sha256": o["sha256"]})
     validacion = validar(raiz, slug, indice=indice, contrato=paquete["curso_md"], origenes=origenes, max_tokens=max_tokens)
@@ -315,17 +334,30 @@ def aplicar(vault: Path, slug: str, propuesta: Path, base: str, huella: str, max
         revision, paquete = revisar(vault, slug, propuesta, max_tokens)
         if revision["base"] != base or revision["huella"] != huella:
             raise Conflicto("Cambió el curso o la propuesta desde la revisión; revisá el diff otra vez.")
-        raiz = carpeta(vault, slug)
+        final = raiz = carpeta(vault, slug)
         if revision["nuevo"]:
-            raiz.mkdir(parents=True, exist_ok=False)
+            # El curso nuevo se arma aparte y aparece completo; un armado cortado antes es nuestro (tenemos el bloqueo).
+            raiz = ruta_segura(vault, f"cursos/.{slug}.nuevo")
+            if raiz.exists():
+                shutil.rmtree(raiz)
+            raiz.mkdir(parents=True)
         for copia in revision["copias"]:
             fuente = ruta_segura(vault, copia["origen"])
             destino = ruta_segura(raiz, copia["archivo"])
+            if destino.exists():
+                continue  # revisar comprobó que es la misma copia, completa
             destino.parent.mkdir(parents=True, exist_ok=True)
-            with fuente.open("rb") as entrada, destino.open("xb") as salida:
-                shutil.copyfileobj(entrada, salida)
-            if sha256(destino) != copia["sha256"]:
-                raise Conflicto("La fuente cambió durante la copia; no se publicó el índice.")
+            parcial = destino.with_name(f".{destino.name}.parcial-{os.getpid()}")
+            try:
+                with fuente.open("rb") as entrada, parcial.open("wb") as salida:
+                    shutil.copyfileobj(entrada, salida)
+                    salida.flush()
+                    os.fsync(salida.fileno())
+                if sha256(parcial) != copia["sha256"]:
+                    raise Conflicto("La fuente cambió durante la copia; no se publicó el índice.")
+                os.link(parcial, destino)
+            finally:
+                parcial.unlink(missing_ok=True)
         if not revision["nuevo"] and firma({n: texto(raiz, n) for n in ["indice.yaml", "curso.md", "progreso.yaml"]}) != base:
             raise Conflicto("El curso se editó durante la copia; se preservaron sus documentos de curación.")
         for nombre in ["sesiones/adjuntos", "notas/verificaciones"]:
@@ -335,6 +367,9 @@ def aplicar(vault: Path, slug: str, propuesta: Path, base: str, huella: str, max
         for nombre, nuevo in [("indice.yaml", paquete["indice_yaml"]), ("curso.md", paquete["curso_md"])]:
             if not ruta_segura(raiz, nombre).exists() or texto(raiz, nombre) != nuevo:
                 atomico(raiz, nombre, nuevo)
+        if raiz != final:
+            os.rename(raiz, final)
+            raiz = final
         return {"curso": slug, "nuevo": revision["nuevo"], "copiados": len(revision["copias"]), "validacion": validar(raiz, slug, max_tokens=max_tokens)}
 
 
