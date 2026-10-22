@@ -154,11 +154,11 @@ function preparacion(t) {
   mkdirSync(recursos);
   writeFileSync(join(recursos, "curso.config.json"), JSON.stringify({ modelo_vision: "openai/gpt-6-luna", max_paginas_vision_sin_confirmar: 1, umbral_calidad_pagina: 0.6 }));
   const cargar = () => JSON.parse(spawnSync(join(piDir, ".venv/bin/python"), [join(piDir, "scripts/ingesta/sesion.py"), "cargar", "--vault", vault, "--curso", "ejemplo"], { encoding: "utf8" }).stdout);
-  const e = { activo: { a: { curso: "ejemplo", tema: "derivacion", log: "cursos/ejemplo/sesiones/1.md" }, d: cargar(), r: raiz }, refrescos: 0, estados: [], avisos: [], mensajes: [], llamadas: [], eventos: new Map() };
+  const e = { activo: { a: { curso: "ejemplo", tema: "derivacion", log: "cursos/ejemplo/sesiones/1.md" }, d: cargar(), r: raiz }, refrescos: [], estados: [], avisos: [], mensajes: [], llamadas: [], eventos: new Map() };
   const pi = { on: (n, h) => e.eventos.set(n, h), sendMessage: (m, o) => e.mensajes.push([m, o]) };
   e.ctx = { hasUI: true, ui: { setStatus: (k, v) => e.estados.push([k, v]), notify: (m, tipo) => e.avisos.push([tipo, m]), confirm: assert.fail },
     modelRegistry: { find: (provider, id) => ({ provider, id, input: ["text", "image"] }), hasConfiguredAuth: () => true, getProviderAuth: async () => undefined, streamSimple: modeloSimulado(e.llamadas) } };
-  e.prep = registrarPreparacion(pi, { actual: () => e.activo, refrescar: () => { e.refrescos++; return ""; } }, vault, recursos);
+  e.prep = registrarPreparacion(pi, { actual: () => e.activo, refrescar: () => { e.refrescos.push(e.llamadas.length); return ""; } }, vault, recursos);
   e.turno = async (log = e.activo.a.log) => { e.activo.a.log = log; await e.eventos.get("before_agent_start")({}, e.ctx); await e.prep.ultima(); };
   e.json = f => JSON.parse(readFileSync(join(raiz, "_procesado", f), "utf8"));
   e.yaml = f => JSON.parse(spawnSync(join(piDir, ".venv/bin/python"), ["-c", "import sys,yaml,json; print(json.dumps(yaml.safe_load(open(sys.argv[1]))))", join(raiz, "_procesado", f)], { encoding: "utf8" }).stdout);
@@ -188,7 +188,8 @@ test("preparación: la primera vez transcribe, segmenta con soluciones y puntos,
   assert.equal(e.mensajes[0][0].display, false);
   assert.match(e.mensajes[0][0].content, /1 ítems asignados a este tema/);
   assert.equal(e.activo.d.items.parcial.length, 2);
-  assert.equal(e.refrescos, 1);
+  // Tras las 2 páginas del libro (antes de parciales y prácticos) y al terminar.
+  assert.deepEqual(e.refrescos, [2, 7]);
   assert.ok(!existsSync(join(e.raiz, "_procesado/.preparacion.lock")));
   const r = dossier(e.raiz, e.activo.d, e.activo.d.temas[0], 3000, 1500);
   assert.match(r, /evaluaciones: parcial\/1 \(asignado automáticamente\) · Calcule la derivada\./);

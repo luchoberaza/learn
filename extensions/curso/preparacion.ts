@@ -131,6 +131,10 @@ export function registrarPreparacion(pi: ExtensionAPI, sesion: Pick<ReturnType<t
           ocupada ||= resumen.avisos.some(a => OCUPADA.test(a));
           if (ocupada || resumen.cancelada) throw new Error("cancelada");
           avisos.push(...resumen.avisos);
+          // Las páginas del tema ya sirven: el dossier deja de mandarlas a ver_pagina sin esperar a parciales y prácticos.
+          if (resumen.transcritas && tema.bibliografia?.some(b => b.doc === doc)) {
+            try { if (sesion.actual()?.a.curso === curso) sesion.refrescar(); } catch { /* El tema dejó el índice: el próximo /estudiar lo informa. */ }
+          }
         }
         t = await pedir();
         for (const s of t.segmentar.filter(s => s.listo)) {
