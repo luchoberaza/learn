@@ -5,7 +5,7 @@
   "umbral_calidad_pagina": 0.6,
   "max_paginas_vision_sin_confirmar": 50,
   "max_tokens_dossier": 3000,
-  "max_tokens_curso_md": 1500,
+  "max_tokens_curso_md": 2000,
   "idioma_ocr": ["spa", "eng"],
   "ruta_tesseract": "~/miniconda3/bin/tesseract"
 }
