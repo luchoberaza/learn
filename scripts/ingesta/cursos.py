@@ -266,8 +266,8 @@ def validar_progreso(p, temas, documentos, items):
 def revisar(vault: Path, slug: str, propuesta: Path, max_tokens=1500) -> tuple[dict, dict]:
     raiz = carpeta(vault, slug)
     relativa = propuesta.absolute().relative_to(vault)
-    if "_procesado" not in relativa.parts or any(p in relativa.parts for p in ["fuentes", "_entrada"]):
-        raise ValueError("Guardá la propuesta JSON en _procesado/, fuera de fuentes/ y _entrada/.")
+    if relativa.parts[:1] != ("_procesado",) or any(p in relativa.parts for p in ["fuentes", "_entrada"]):
+        raise ValueError(f"La propuesta está en {relativa.as_posix()}: movela a _procesado/ de la raíz del vault (no a cursos/<curso>/_procesado/) y repetí.")
     crudo = texto(vault, str(relativa))
     paquete = json.loads(crudo)
     if not isinstance(paquete, dict) or not isinstance(paquete.get("indice_yaml"), str) or not isinstance(paquete.get("curso_md"), str) or not isinstance(paquete.get("origenes", {}), dict):

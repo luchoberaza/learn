@@ -4,7 +4,7 @@ Backend local de `guardar_curso`, `/curso-check` y las skills de creación/ampli
 
 ## Propuesta
 
-Archivo JSON dentro de `_procesado/`, fuera de `fuentes/` y `_entrada/`:
+Archivo JSON en `_procesado/` de la raíz del vault, nunca en `cursos/<slug>/_procesado/` (esa carpeta es la salida de la ingesta):
 
 ```json
 {
@@ -39,7 +39,7 @@ El validador es de sólo lectura. `ok` significa estructura/referencias válidas
 
 ## Ingesta en segundo plano
 
-El manifiesto JSON conserva el formato base. `archivo` es relativo al vault, no al curso:
+El manifiesto JSON también va en `_procesado/` de la raíz del vault, nunca dentro de la salida `cursos/<slug>/_procesado/`. Conserva el formato base; `archivo` es relativo al vault, no al curso:
 
 ```json
 {"version":1,"documentos":[{"id":"programa","titulo":"Programa","tipo":"programa","archivo":"cursos/ejemplo/fuentes/programa/programa.pdf","paginas":[1,2]}]}
