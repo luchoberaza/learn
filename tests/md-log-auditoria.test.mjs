@@ -79,3 +79,37 @@ test("H04: un vínculo viejo sin inode cuya nota falta se recrea con aviso en ve
   assert.match(readFileSync(e.file, "utf8"), /Después de \/resume/);
   assert.equal(e.avisos.length, 1);
 });
+
+const pregunta = { question: "¿Qué cambia si se duplica R? Ver [[cursos/redes/fuentes/kurose-7.pdf#page=56|p. 56]]", details: "Referencia: [[cursos/redes/fuentes/kurose-7.pdf#page=56]]\nCon $L$ = 1000 bits", options: [{ label: "A" }, { label: "B" }, { label: "C" }], correctAnswer: "A", explanation: "d = L/R [[cursos/redes/fuentes/kurose-7.pdf#page=56]]" };
+const opciones = [{ index: 1, label: "B" }, { index: 2, label: "A" }, { index: 3, label: "C" }];
+
+test("H49: el callout del quiz va sin el enlace a la página con la respuesta, con el contexto limpio de quiz", async t => {
+  const e = entorno(t); await e.handlers.get("session_start")({}, e.ctx); await e.vincular();
+  await e.handlers.get("tool_execution_update")({ toolName: "quiz", toolCallId: "q1", args: pregunta, partialResult: { details: { question: "¿Qué cambia si se duplica R? Ver p. 56", context: "Con L = 1000 bits", options: opciones } } }, e.ctx);
+  // Un log anterior a details.context: se limpia args.details.
+  await e.handlers.get("tool_execution_update")({ toolName: "quiz", toolCallId: "q2", args: pregunta, partialResult: { details: { options: opciones } } }, e.ctx);
+  const texto = readFileSync(e.file, "utf8");
+  assert.doesNotMatch(texto, /#page=|\[\[/);
+  assert.match(texto, /> \[!question\] Quiz\n> ¿Qué cambia si se duplica R\? Ver p\. 56\n>\n> Con L = 1000 bits\n>\n> 1\. B/);
+  assert.match(texto, /> Con \$L\$ = 1000 bits/);
+  // Después de responder, la explicación conserva su cita.
+  await e.handlers.get("tool_result")({ toolName: "quiz", toolCallId: "q1", details: { status: "answered", answers: [], correctIndices: [2], explanation: pregunta.explanation } }, e.ctx);
+  assert.match(readFileSync(e.file, "utf8"), /Tu respuesta: \(ninguna\)[\s\S]*#page=56/);
+});
+
+test("H49: un quiz rechazado por forma no deja «Quiz — no disponible» en la nota, ni en vivo ni al rellenar", async t => {
+  const e = entorno(t); await e.handlers.get("session_start")({}, e.ctx); await e.vincular();
+  const rechazo = { status: "unavailable", message: "Pregunta descartada por tener menos de 3 opciones; ya viene otra." };
+  await e.handlers.get("tool_result")({ toolName: "quiz", toolCallId: "q9", details: rechazo }, e.ctx);
+  assert.equal(readFileSync(e.file, "utf8"), "");
+  const asistente = (id, args) => ({ type: "message", message: { role: "assistant", content: [{ type: "toolCall", id, name: "quiz", arguments: args }] } });
+  e.entradas.push(asistente("q9", { ...pregunta, options: pregunta.options.slice(0, 2) }), { type: "message", message: { role: "toolResult", toolCallId: "q9", toolName: "quiz", details: rechazo } },
+    asistente("q1", pregunta), { type: "message", message: { role: "toolResult", toolCallId: "q1", toolName: "quiz", details: { status: "answered", context: "Con L = 1000 bits", options: opciones, answers: [{ index: 2, label: "A" }], correctIndices: [2], correct: true } } });
+  const comandos = new Map(); mdLog({ on: () => {}, events: { on: () => {} }, registerCommand: (n, c) => comandos.set(n, c), appendEntry: () => {} });
+  e.ctx.hasUI = true; e.ctx.ui.confirm = async () => true;
+  await comandos.get("md-log").handler(e.file, e.ctx);
+  const texto = readFileSync(e.file, "utf8");
+  assert.doesNotMatch(texto, /no disponible|descartada|#page=|\[\[/);
+  assert.match(texto, /> \[!question\] Quiz\n> ¿Qué cambia si se duplica R\? Ver p\. 56\n>\n> Con L = 1000 bits\n>\n> 1\. B\n> 2\. A/);
+  assert.match(texto, /Quiz — correcto ✓/);
+});

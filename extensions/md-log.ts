@@ -224,6 +224,26 @@ export default function mdLog(pi: ExtensionAPI) {
 		return `> [!abstract] PI\n\n${text}`;
 	}
 
+	// Misma limpieza que quiz.ts (D5): la página citada puede traer la respuesta, así que antes de responder no van enlaces.
+	function sinEnlaces(texto: string): string {
+		return texto
+			.split("\n")
+			.map((linea) => {
+				const visible = linea
+					.replace(/\[\[[^\]|]*\|([^\]]*)\]\]|\[([^\]]*)\]\([^)]*\)/g, "$1$2")
+					.replace(/(?<!!)\[\[([^\]#/]+)\]\]/g, "$1");
+				const resto = visible.replace(/!?\[\[[^\]]*\]\]|https?:\/\/\S+/g, "");
+				if (resto === visible) return visible;
+				const limpia = resto.replace(/\s{2,}/g, " ").trim();
+				return /^(\p{L}+\s?){0,3}:?$/u.test(limpia) ? null : limpia;
+			})
+			.filter((linea) => linea !== null)
+			.join("\n")
+			.trim();
+	}
+	// quiz ya manda details.context limpio; args.details sólo para logs anteriores.
+	const contextoQuiz = (details: any, args: any): string | undefined => details?.context ?? (sinEnlaces(args.details?.trim() ?? "") || undefined);
+
 	function optionsList(options: Array<{ label: string }>): string[] {
 		return options.map((o, i) => `${i + 1}. ${o.label}`);
 	}
@@ -267,7 +287,7 @@ export default function mdLog(pi: ExtensionAPI) {
 			body.push("Tu respuesta: No sé");
 		} else {
 			const answers: any[] = details?.answers || [];
-			const sel = answers.map((a) => `${a.index}. ${a.label}`).join(", ") || "(none)";
+			const sel = answers.map((a) => `${a.index}. ${a.label}`).join(", ") || "(ninguna)";
 			body.push(`Tu respuesta: ${sel}`);
 		}
 
@@ -365,8 +385,8 @@ export default function mdLog(pi: ExtensionAPI) {
 		if (!shuffled || shuffled.length === 0) return;
 		loggedQuizQuestion.add(toolCallId);
 		const input = (event as any).args || {};
-		const question: string = input.question || "";
-		const context: string | undefined = input.details?.trim() || undefined;
+		const question: string = sinEnlaces(input.question || "");
+		const context = contextoQuiz((event as any).partialResult?.details, input);
 		const options = shuffled.map((o) => ({ label: o.label }));
 		const block = questionCallout("Quiz", question, context, options);
 		await withLock(() => appendToFile(block));
@@ -377,6 +397,8 @@ export default function mdLog(pi: ExtensionAPI) {
 		const toolName = (event as any).toolName;
 		if (!QA_TOOLS.has(toolName)) return;
 		const details = (event as any).details;
+		// Rechazado por forma antes de mostrarse: el alumno no vio ninguna pregunta.
+		if (toolName === "quiz" && details?.status === "unavailable" && !loggedQuizQuestion.has((event as any).toolCallId)) return;
 		const block = toolName === "quiz"
 			? answerCalloutQuiz(details)
 			: answerCalloutAsk(details);
@@ -515,6 +537,8 @@ export default function mdLog(pi: ExtensionAPI) {
 
 			if (msg.role === "toolResult") {
 				if (!QA_TOOLS.has(msg.toolName)) continue;
+				// Un quiz no disponible nunca llegó a mostrarse.
+				if (msg.toolName === "quiz" && msg.details?.status === "unavailable") continue;
 				const tc = toolCallArgs.get(msg.toolCallId);
 				// Question block. For quiz, use the persisted result's `details.options`
 				// — the TRUE post-shuffle display order the user actually saw — rather
@@ -530,7 +554,9 @@ export default function mdLog(pi: ExtensionAPI) {
 					const options = shuffled && shuffled.length > 0
 						? shuffled.map((o) => ({ label: o.label }))
 						: (Array.isArray(a.options) ? a.options : []);
-					blocks.push(questionCallout(label, a.question || "", a.details?.trim() || undefined, options));
+					blocks.push(tc.name === "quiz"
+						? questionCallout(label, sinEnlaces(a.question || ""), contextoQuiz(msg.details, a), options)
+						: questionCallout(label, a.question || "", a.details?.trim() || undefined, options));
 				}
 				if (msg.toolName === "quiz") {
 					blocks.push(answerCalloutQuiz(msg.details));
