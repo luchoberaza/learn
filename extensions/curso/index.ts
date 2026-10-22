@@ -69,7 +69,7 @@ export default function (pi: ExtensionAPI) {
     async execute(_id, args) { return { content: [{ type: "text", text: sesion.buscar_material(args) }], details: undefined }; },
   });
   pi.registerTool({
-    name: "leer_items", label: "Leer ítems", description: "Leer ítems del curso activo. Por defecto sólo enunciados, y en evaluaciones cita «PDF p. N» sin enlace porque la página trae la solución; incluir_solucion se usa después del intento del estudiante y sólo devuelve soluciones explícitamente vinculadas (de un documento de soluciones o del mismo parcial), con sus enlaces.",
+    name: "leer_items", label: "Leer ítems", description: "Leer ítems del curso activo. Por defecto sólo enunciados (con su puntaje oficial si consta), y en evaluaciones cita «PDF p. N» sin enlace porque la página trae la solución; incluir_solucion se usa después del intento del estudiante y sólo devuelve soluciones explícitamente vinculadas (de un documento de soluciones o del mismo parcial), con sus enlaces.",
     parameters: Type.Object({ doc: slug, ids: Type.Array(Type.String({ minLength: 1, maxLength: 80 }), { minItems: 1, maxItems: 100 }), incluir_solucion: Type.Optional(Type.Boolean()) }), executionMode: "sequential",
     async execute(_id, args) { return { content: [{ type: "text", text: sesion.leer_items(args) }], details: undefined }; },
   });

@@ -107,6 +107,14 @@ test("leer_items: la solución del mismo documento sólo tras el intento y nunca
   assert.doesNotMatch(JSON.stringify(buscarMaterial(raiz, d, "retardo de propagación")), /1-sol/);
 });
 
+test("leer_items muestra el puntaje oficial del ítem (H72)", () => {
+  const d = datos();
+  assert.match(leerItems(d, "parcial", ["1"]), /^parcial\/1 \(12 puntos\)\n/);
+  assert.match(leerItems(d, "parcial", ["2"]), /^parcial\/2\n/);
+  d.items.parcial[2].puntos = 1;
+  assert.match(leerItems(d, "parcial", ["2"], true), /^parcial\/2 \(1 punto\)\n/);
+});
+
 test("ver_pagina de evaluaciones exige despues_del_intento; leer_paginas lo recibe", async t => {
   const e = curso(t);
   await e.activar();

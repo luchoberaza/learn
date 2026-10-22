@@ -6,7 +6,7 @@ export interface Documento { id: string; titulo: string; tipo: string; archivo: 
 export interface Tema { id: string; nombre: string; alias: string[]; unidad: number; prerequisitos: string[]; objetivos: string[];
   bibliografia?: { doc: string; seccion: string; paginas: number[] }[];
   ejercicios?: { doc: string; items: string[] }[]; evaluaciones?: { doc: string; items: string[] }[] }
-interface Item { id: string; paginas: number[]; enunciado: string; solucion?: { doc: string; id: string }; solucion_de?: string }
+interface Item { id: string; paginas: number[]; enunciado: string; solucion?: { doc: string; id: string }; solucion_de?: string; puntos?: number }
 export interface DatosCurso { curso: string; nombre?: string; contrato: string; documentos: Documento[]; temas: Tema[]; items: Record<string, Item[]>;
   progreso: { temas: Record<string, { estado?: string; borde?: unknown; proximo_paso?: string }>; historial?: unknown[] };
   avisos: string[]; validacion?: { errores: string[]; avisos: string[]; pendientes: unknown[] } }
@@ -127,7 +127,7 @@ export function leerItems(datos: DatosCurso, doc: string, ids: string[], incluir
     const i = datos.items[doc]?.find(i => i.id === id);
     if (!i) return `${doc}/${id}: ítem no preparado.`;
     if (!incluirSolucion && esSolucion(d, i)) return `${doc}/${id}: es una solución; pedila con incluir_solucion después del intento.`;
-    let t = `${doc}/${i.id}\n${i.enunciado}\n${incluirSolucion || !conSolucion(d) ? i.paginas.map(p => cita(datos, doc, p)).join(" ") : sinEnlace(i.paginas)}\nRevisión humana pendiente.`;
+    let t = `${doc}/${i.id}${typeof i.puntos === "number" ? ` (${i.puntos} punto${i.puntos === 1 ? "" : "s"})` : ""}\n${i.enunciado}\n${incluirSolucion || !conSolucion(d) ? i.paginas.map(p => cita(datos, doc, p)).join(" ") : sinEnlace(i.paginas)}\nRevisión humana pendiente.`;
     if (incluirSolucion) {
       const ref = i.solucion;
       const s = ref && datos.items[ref.doc]?.find(i => i.id === ref.id);
