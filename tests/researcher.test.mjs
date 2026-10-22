@@ -60,7 +60,7 @@ test('alcance entrega discrepancias y segunda sesión usa caché sin otro hijo',
 test('fuentes nuevas invalidan caché y crean generación sin sobrescribir la anterior',async t=>{
   const e=entorno(t);await e.investigar('1',args,undefined,undefined,e.ctx);await e.responder();
   const file=join(e.raiz,'notas/verificaciones/derivadas.md'),antes=readFileSync(file,'utf8');writeFileSync(e.pagina,'Fuente nueva');
-  assert.match(verificacionPrevia(e.vault,e.recursos,e.d,e.tema),/Sin caché vigente/);
+  assert.match(verificacionPrevia(e.vault,e.recursos,e.d,e.tema),/Caché de alcance previa/);
   await e.investigar('2',args,undefined,undefined,e.ctx);await e.responder();
   assert.equal(e.llamadas,2);assert.equal(readFileSync(file,'utf8'),antes);assert.equal(readdirSync(join(e.raiz,'notas/verificaciones')).length,2);
   assert.match(verificacionPrevia(e.vault,e.recursos,e.d,e.tema),/Caché de alcance vigente/);
