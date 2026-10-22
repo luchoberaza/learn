@@ -1,5 +1,8 @@
 import { after, before, test } from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { pathToFileURL } from "node:url";
 import { agentDir, loadProject, vaultDir } from "../scripts/lib/pi-sdk.mjs";
 
 let p;
@@ -102,4 +105,49 @@ test("H09/X04: «Working» y «Thinking...» quedan en español desde el arranqu
   const mensaje = new sdk.AssistantMessageComponent({ role: "assistant", content: [{ type: "thinking", thinking: "I wonder if I can end the turn" }, { type: "text", text: "Seguimos." }] }, true, undefined, etiquetas.pensando);
   const visto = mensaje.render(60).map(limpio).join("\n");
   assert.match(visto, /Pensando…/); assert.doesNotMatch(visto, /Thinking|wonder/);
+});
+
+// Sesión con un proveedor falso (sin red ni modelo) y el curso activo restaurado de la rama.
+async function conFaux(t, entradas) {
+  const raiz = process.env.PI_MANAGED_INSTALL_ROOT || join(agentDir, "install"), { sdk } = p;
+  const ai = await import(pathToFileURL(join(raiz, "releases", readFileSync(join(raiz, "current-version"), "utf8").trim(), "node_modules/@earendil-works/pi-ai/dist/index.js")).href);
+  const faux = ai.fauxProvider({ provider: "faux", models: [{ id: "faux-1", contextWindow: 200000, maxTokens: 8000 }] });
+  const settingsManager = sdk.SettingsManager.create(vaultDir, agentDir, { projectTrusted: true });
+  const loader = new sdk.DefaultResourceLoader({ cwd: vaultDir, agentDir, settingsManager, extensionFactories: [pi => pi.registerProvider(faux.provider)] });
+  await loader.reload();
+  const sessionManager = sdk.SessionManager.inMemory();
+  sessionManager.appendCustomEntry("curso", { curso: "redes", tema: "retardos", log: "cursos/redes/sesiones/2026-10-22-retardos.md" });
+  const uso = { input: 1, output: 1, cacheRead: 0, cacheWrite: 0, totalTokens: 2, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } };
+  const { session } = await sdk.createAgentSession({ cwd: vaultDir, agentDir, settingsManager, resourceLoader: loader, sessionManager, model: faux.getModel(), thinkingLevel: "off" });
+  t.after(async () => { await session.extensionRunner.emit({ type: "session_shutdown" }); session.dispose(); });
+  await session.bindExtensions({});
+  if (session.model?.provider !== "faux") await session.setModel(faux.getModel());
+  settingsManager.applyOverrides({ compaction: { keepRecentTokens: 1 } });
+  for (const m of entradas) sessionManager.appendMessage({ timestamp: Date.now(), ...(m.role === "assistant" ? { provider: "faux", model: "faux-1", api: faux.api, usage: uso, stopReason: "stop" } : {}), ...m });
+  return { ai, faux, session };
+}
+
+const charla = [
+  { role: "user", content: [{ type: "text", text: "Empecemos con retardos" }] },
+  { role: "assistant", content: [{ type: "text", text: "Primera pregunta." }, { type: "toolCall", id: "q1", name: "quiz", arguments: { question: "¿Qué cambia si se duplica R?" } }], stopReason: "toolUse" },
+  { role: "toolResult", toolCallId: "q1", toolName: "quiz", content: [{ type: "text", text: "El estudiante cerró el quiz sin responder." }], isError: false },
+  { role: "user", content: [{ type: "text", text: "sigamos" }] },
+  { role: "assistant", content: [{ type: "text", text: "Dale." }] },
+];
+
+test("H62: /compact resume en español con curso, tema y log, y no califica el quiz sin responder", async t => {
+  const { ai, faux, session } = await conFaux(t, charla), pedidos = [];
+  faux.setResponses([c => { pedidos.push(c); return ai.fauxAssistantMessage("## Curso y tema\nredes · retardos"); }]);
+  const r = await session.compact();
+  assert.equal(pedidos.length, 1, "una sola llamada, también con el turno partido");
+  const pedido = JSON.stringify(pedidos[0].messages);
+  for (const parte of ["## Curso y tema", "## Borde", "## Práctica", "## Próximo paso", "pendiente, sin responder", "nunca lo califiques", "curso redes, tema retardos, log cursos/redes/sesiones/2026-10-22-retardos.md", "¿Qué cambia si se duplica R?"]) assert.ok(pedido.includes(parte), parte);
+  assert.doesNotMatch(pedido, /## Goal|In Progress|Blocked|Turn Context/);
+  assert.equal(r.summary, "## Curso y tema\nredes · retardos");
+});
+
+test("H62: si el resumen en español falla, pi sigue con el suyo y la sesión no se corta", async t => {
+  const { ai, faux, session } = await conFaux(t, charla);
+  faux.setResponses([ai.fauxAssistantMessage("", { stopReason: "error", errorMessage: "sin red" }), ai.fauxAssistantMessage("resumen de pi"), ai.fauxAssistantMessage("resumen de pi")]);
+  assert.match((await session.compact()).summary, /resumen de pi/);
 });
