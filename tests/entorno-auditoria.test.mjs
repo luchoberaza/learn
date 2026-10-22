@@ -178,3 +178,8 @@ test("comprobar: respeta ruta_tesseract y dice cómo recrear el venv con Python 
   assert.match(correr(`import sys; sys.version_info = (3, 12, 0, 'final', 0); ${lanzar}`)["Python de ingesta"].detalle,
     /UV_PROJECT_ENVIRONMENT=\.pi\/\.venv uv sync --project \.pi\/scripts\/ingesta --python 3\.13\.13 --python-preference only-managed --locked/);
 });
+
+test("H14: los argumentos de pi-learn van primero y no tapan los subcomandos de pi", t => {
+  const { home } = hogar(t);
+  assert.deepEqual(piLearn(t, { home, args: ["update", "--self"] }).llamadas[0].slice(1, 3), ["update", "--self"]);
+});

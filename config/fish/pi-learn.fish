@@ -16,7 +16,7 @@ function pi-learn --description 'Abre pi en la carpeta actual, dentro de tmux'
         set entorno -e PI_OFFLINE=1
     end
     # Sólo las skills del proyecto: las globales no son del tutor y una choca con teach.
-    set -l opciones -ns --skill "$recursos/skills" $argv
+    set -l opciones $argv -ns --skill "$recursos/skills"
     if set -q TMUX; and test -n "$TMUX"
         # Ya hay tmux: no anidar servidores ni cambiar la carpeta.
         command pi $opciones
