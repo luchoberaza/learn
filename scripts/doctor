@@ -138,14 +138,15 @@ try {
   check(false, "Carga de pi", "falló el SDK o una extensión; ejecutá pi --verbose (SETUP.md)");
 } finally { if (project) await project.close(); }
 const pythonIngesta = join(piDir, ".venv/bin/python");
+const recetaVenv = "recrealo desde el vault: UV_PROJECT_ENVIRONMENT=.pi/.venv uv sync --project .pi/scripts/ingesta --python 3.13.13 --python-preference only-managed --locked";
 if (!existsSync(pythonIngesta)) {
-  check(false, "Entorno de ingesta", "falta .pi/.venv; ejecutá uv sync según SETUP.md");
+  check(false, "Entorno de ingesta", `falta .pi/.venv; ${recetaVenv}`);
 } else {
   const ingesta = run(pythonIngesta, [join(piDir, "scripts/ingesta/comprobar.py")]);
   try {
     if (!ingesta.ok) throw new Error("diagnóstico fallido");
     for (const entrada of JSON.parse(ingesta.text).chequeos) check(entrada.ok, entrada.nombre, entrada.detalle);
-  } catch { check(false, "Entorno de ingesta", "no se pudo verificar; ejecutá .pi/.venv/bin/python .pi/scripts/ingesta/comprobar.py"); }
+  } catch { check(false, "Entorno de ingesta", `no se pudo verificar (.pi/.venv/bin/python .pi/scripts/ingesta/comprobar.py); si el venv está roto, ${recetaVenv}`); }
 }
 const cursos = readdirSync(join(vaultDir, "cursos"), { withFileTypes: true }).filter(entry => entry.isDirectory());
 if (!cursos.length) check(true, "Validación de cursos", "sin cursos todavía; /curso-nuevo prepara uno desde _entrada/");

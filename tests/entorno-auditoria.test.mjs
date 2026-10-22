@@ -155,4 +155,26 @@ test("H80/H14/H09: el doctor marca credenciales, secciones, colisiones y thinkin
   assert.match(r.stdout, /^✗ Skills de cursos: nombres repetidos: teach;/m);
   assert.match(r.stdout, /^✗ Thinking oculto:/m);
   for (const rol of ["principal", "researcher", "visión"]) assert.match(r.stdout, new RegExp(`^✗ Credenciales ${rol}: openai-codex/`, "m"));
+  assert.match(r.stdout, /^✗ Entorno de ingesta: falta \.pi\/\.venv; recrealo desde el vault: UV_PROJECT_ENVIRONMENT=\.pi\/\.venv uv sync --project \.pi\/scripts\/ingesta --python 3\.13\.13 --python-preference only-managed --locked$/m);
+});
+
+test("comprobar: respeta ruta_tesseract y dice cómo recrear el venv con Python de uv", t => {
+  const v = mkdtempSync(join(tmpdir(), "pi-comprobar-")), ingesta = join(v, ".pi/scripts/ingesta"), falso = join(v, "bin/tesseract");
+  t.after(() => rmSync(v, { recursive: true, force: true }));
+  cpSync(join(piDir, "scripts/ingesta"), ingesta, { recursive: true, filter: f => !f.includes("__pycache__") });
+  mkdirSync(join(v, "bin"));
+  writeFileSync(falso, '#!/bin/sh\n[ "$1" = --version ] && echo "tesseract 5.5.2" || printf "List of available languages (1):\\neng\\n"\n', { mode: 0o755 });
+  const config = JSON.parse(readFileSync(join(piDir, "curso.config.json"), "utf8"));
+  writeFileSync(join(v, ".pi/curso.config.json"), JSON.stringify({ ...config, ruta_tesseract: falso }));
+  const lanzar = "import runpy, sys; sys.path.insert(0, sys.argv[1].rsplit('/', 1)[0]); runpy.run_path(sys.argv[1], run_name='__main__')";
+  const correr = codigo => {
+    const r = spawnSync(join(piDir, ".venv/bin/python"), ["-c", codigo, join(ingesta, "comprobar.py")], { encoding: "utf8", env: { ...process.env, PYTHONDONTWRITEBYTECODE: "1" } });
+    assert.equal(r.status, 0, r.stderr);
+    return Object.fromEntries(JSON.parse(r.stdout).chequeos.map(c => [c.nombre, c]));
+  };
+  const propio = correr(lanzar);
+  assert.equal(propio["Tesseract"].ok, true);
+  assert.equal(propio["Idiomas OCR"].ok, false);
+  assert.match(correr(`import sys; sys.version_info = (3, 12, 0, 'final', 0); ${lanzar}`)["Python de ingesta"].detalle,
+    /UV_PROJECT_ENVIRONMENT=\.pi\/\.venv uv sync --project \.pi\/scripts\/ingesta --python 3\.13\.13 --python-preference only-managed --locked/);
 });
