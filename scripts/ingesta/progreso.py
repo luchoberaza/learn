@@ -279,7 +279,9 @@ def registrar(vault: Path, curso: str, tema: str, log: str, datos: dict, cierre=
         p["temas"][tema], fusion = fusionar(actual, nuevo, posterior)
         avisos += fusion
         rendido = {(simulacro.get("doc"), simulacro.get("id"))} if isinstance(simulacro, dict) else set()
-        reservar(p, ctx, reservas, {(e["doc"], e["item"]) for e in nuevo["ejercicios"]} | rendido)
+        # Sólo se fija la del tema que se guarda: uno sin estudiar no entra en progreso.yaml, así la curación puede quitarlo o renombrarlo.
+        propia = {tema: reservas[tema]} if isinstance(reservas, dict) and tema in reservas else {}
+        reservar(p, ctx, propia, {(e["doc"], e["item"]) for e in nuevo["ejercicios"]} | rendido)
         historia = {"fecha": log.split("/")[1][:10], "tema": tema, "log": log, "resumen": datos["resumen"], "cierre": cierre}
         if reconstruido:
             historia["reconstruido"] = True

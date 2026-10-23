@@ -11,7 +11,8 @@ import unittest
 import yaml
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'scripts/ingesta'))
 import test_progreso
-from progreso import falla, leer, registrar, usar
+from cursos import validar_progreso
+from progreso import contexto, falla, leer, registrar, usar
 
 SCRIPT = Path(__file__).resolve().parents[2] / 'scripts/ingesta/progreso.py'
 
@@ -115,8 +116,14 @@ class ReservaTest(unittest.TestCase):
         self.guardar(reservas={'derivacion': {'doc': 'parcial', 'id': '1'}, 'limites': {'doc': 'parcial', 'id': '2'}})
         self.guardar(reservas={'derivacion': {'doc': 'parcial', 'id': '2'}})
         self.assertEqual(self.temas()['derivacion']['reservado'], [{'doc': 'parcial', 'id': '1'}])
-        # Un tema sin evidencia queda sin_empezar, sólo con su reserva.
-        self.assertEqual(self.temas()['limites'], {'estado': 'sin_empezar', 'reservado': [{'doc': 'parcial', 'id': '2'}]})
+
+    def test_un_tema_sin_estudiar_no_entra_en_progreso_y_la_curacion_puede_quitarlo(self):
+        # Fijar la reserva de todos los temas los metía en progreso.yaml: quitar o renombrar uno sin estudiar chocaba en la curación.
+        self.guardar(reservas={'derivacion': {'doc': 'parcial', 'id': '1'}, 'limites': {'doc': 'parcial', 'id': '2'}})
+        self.assertNotIn('limites', self.temas())
+        temas, documentos, items = contexto(self.raiz)
+        del temas['limites']
+        validar_progreso(yaml.safe_load((self.raiz / 'progreso.yaml').read_text()), temas, documentos, items)
 
     def test_un_intento_o_un_simulacro_lo_marcan_usado_y_despues_se_fija_otro(self):
         self.guardar(reservas={'derivacion': {'doc': 'parcial', 'id': '1'}})
