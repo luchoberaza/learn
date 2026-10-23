@@ -319,6 +319,17 @@ test("preparación (b, c): red, cuota o credenciales cortan la tanda en la prime
   assert.doesNotMatch(g.avisos[0][1], /Request was aborted/);
 });
 
+test("preparación (b): un ítem inválido que habla de sockets o conexiones no corta la tanda como una falla de red", async t => {
+  const e = preparacion(t);
+  // El motivo del rechazo cita el ítem: en un curso de redes trae «socket», «connection» o «401» sin que falle el proveedor.
+  e.guion.segmentar = texto => texto.includes("Documento parcial") && respuesta(JSON.stringify({ items: [{ id: "1", paginas: [9], enunciado: "Explique qué hace un socket TCP al cerrar la connection (HTTP 401)." }] }));
+  await e.turno();
+  assert.equal(e.llamadas.filter(x => x === "segmentar").length, 3);
+  assert.equal(e.avisos.length, 1);
+  assert.match(e.avisos[0][1], /no se pudieron separar los ítems de parcial \(ítem inválido.*se reintenta mañana/);
+  assert.ok(e.json("preparacion.json").fallos["segmentar/parcial"]);
+});
+
 test("preparación (e, f): sólo se borra el lock propio y un pid reutilizado tras reiniciar no lo retiene", async t => {
   const e = preparacion(t), lock = join(e.raiz, "_procesado/.preparacion.lock");
   // El pid vive (este proceso) pero el lock es de otro arranque.

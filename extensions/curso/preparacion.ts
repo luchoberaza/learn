@@ -32,6 +32,8 @@ const CLASIFICAR = `Asignás ítems de práctica de un curso al tema que evalúa
 - tema: el id del tema cuyo contenido hace falta para resolverlo (el principal si toca varios), o null si ninguno corresponde. Sólo ids de tema recibidos.`;
 
 const mensaje = (e: unknown) => e instanceof Error ? e.message : String(e);
+// Red, cuota o credenciales según el error del proveedor (no el motivo de un rechazo, que cita el texto del ítem).
+const corte = (e: unknown) => (e as { corte?: string } | undefined)?.corte;
 const cuenta = (n: number, uno: string, varios: string) => `${n} ${n === 1 ? uno : varios}`;
 const vivo = (pid: number) => { try { process.kill(pid, 0); return true; } catch (e) { return (e as NodeJS.ErrnoException).code === "EPERM"; } };
 // Identidad que un pid reutilizado (también tras reiniciar) no repite: arranque del sistema y del proceso; en Linux.
@@ -71,14 +73,14 @@ async function pedirJSON(ctx: Pick<ExtensionContext, "modelRegistry">, modelo: M
     { maxTokens, reasoning: "low", maxRetries: 0, signal: AbortSignal.any([signal, AbortSignal.timeout(300_000)]) }).result();
   const salida = r.content.filter(b => b.type === "text").map(b => b.text).join("\n").trim();
   // «aborted» sin un corte del usuario es el plazo de 5 minutos (pi-ai lo informa como «Request was aborted»).
-  if (r.stopReason !== "stop" || !salida) throw new Error(r.stopReason === "aborted" ? "el modelo no respondió en 5 minutos" : r.errorMessage || "respuesta vacía o cortada");
+  if (r.stopReason !== "stop" || !salida) throw Object.assign(new Error(r.stopReason === "aborted" ? "el modelo no respondió en 5 minutos" : r.errorMessage || "respuesta vacía o cortada"), { corte: corteModelo(r.errorMessage) });
   try { return JSON.parse(salida.replace(/^```(?:json)?\s*|\s*```$/g, "")); } catch { throw new Error("la respuesta no es JSON válido"); }
 }
 // Una respuesta inválida se reintenta una vez con el motivo; si vuelve a fallar, espera hasta mañana o hasta que cambien sus entradas.
 async function conReintento<T>(pedido: (error: string) => Promise<T>, signal: AbortSignal): Promise<T> {
   for (let intento = 0, error = ""; ; intento++) {
     try { return await pedido(error ? `\nTu respuesta anterior se rechazó: ${error}. Corregila.` : ""); }
-    catch (e) { if (intento || signal.aborted || OCUPADA.test(mensaje(e)) || corteModelo(mensaje(e))) throw e; error = mensaje(e).slice(0, 300); }
+    catch (e) { if (intento || signal.aborted || OCUPADA.test(mensaje(e)) || corte(e)) throw e; error = mensaje(e).slice(0, 300); }
   }
 }
 function validarItems(r: any, s: Segmento) {
@@ -121,7 +123,7 @@ export function registrarPreparacion(pi: ExtensionAPI, sesion: Pick<ReturnType<t
     // Segmentaciones y clasificaciones fallidas, con la huella de sus entradas: no se repiten hasta mañana o hasta que cambien.
     const avisos: string[] = [], segmentados: string[] = [], fallos: Record<string, string> = {};
     // Red, cuota o credenciales: cada llamada siguiente fallaría igual, así que se corta la tanda con la causa.
-    const cortar = (e: unknown) => { const corte = corteModelo(mensaje(e)); if (signal.aborted || OCUPADA.test(mensaje(e)) || corte) throw corte ? new Error(corte) : e; };
+    const cortar = (e: unknown) => { if (signal.aborted || OCUPADA.test(mensaje(e)) || corte(e)) throw corte(e) ? new Error(corte(e)) : e; };
     try {
       const config = JSON.parse(readFileSync(join(recursos, "curso.config.json"), "utf8"));
       const pedir = (): Promise<Trabajo> => python("trabajo", { vault, curso, tema: tema.id, maximo: TOPE }, signal, "preparacion.py");
