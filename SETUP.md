@@ -96,7 +96,7 @@ git -C .pi remote add upstream https://github.com/amosblomqvist/learn
 git -C .pi remote -v
 ```
 
-`origin` es el fork del usuario y su rama `cursos` tiene el modo curso; `upstream`, la herramienta original. La base inspeccionada de ambos fue `7cfd8942f82ab9476e63572387e1fe9bcea5082c`, que sigue siendo `main` del fork. `skills/teach/SKILL.md` permanece intacto.
+`origin` es el fork del usuario: `cursos` es la rama de trabajo del modo curso y `main` la sigue. `upstream` es la herramienta original. La base inspeccionada de ambos fue `7cfd8942f82ab9476e63572387e1fe9bcea5082c`. `skills/teach/SKILL.md` permanece intacto.
 
 ## Paquetes pi, solo en este proyecto
 
