@@ -5,6 +5,8 @@ import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { buscarMaterial, dossier, leerItems, leerPaginas, reservados, reservas } from "../extensions/curso/material.ts";
+import { registrarSesion } from "../extensions/curso/sesion.ts";
+import { registrarSimulacro } from "../extensions/curso/simulacro.ts";
 import { tokenizar } from "../scripts/ingesta/bm25.ts";
 import { piDir, vaultDir } from "../scripts/lib/pi-sdk.mjs";
 
@@ -85,4 +87,69 @@ test("E3 con el curso real: el Ej. 10 del Práctico 1, casi copia de la Pregunta
   assert.ok(!texto.includes("practico-1/10") && !texto.includes("geoestacionario"));
   assert.match(texto, /practico-1\/9/);
   for (const x of buscarMaterial(raiz, d, "satélite geoestacionario fotografía por minuto", "ejercicios", r)) assert.ok(!/geoestacionario|fotograf/i.test(JSON.stringify(x)), JSON.stringify(x));
+});
+
+// Vault sintético con pi simulado: /simulacro con Python real para el progreso.
+function vault(t, estado) {
+  const c = curso(t), recursos = join(c.vault, ".pi");
+  for (const p of [join(recursos, "skills/teach"), join(c.raiz, "sesiones"), join(c.raiz, "_procesado/parcial")]) mkdirSync(p, { recursive: true });
+  writeFileSync(join(recursos, "skills/teach/SKILL.md"), "TEACH"); writeFileSync(join(recursos, "modo-curso.md"), "MODO");
+  writeFileSync(join(recursos, "curso.config.json"), JSON.stringify({ max_tokens_dossier: 3000, max_tokens_curso_md: 1500 }));
+  writeFileSync(join(c.raiz, "indice.yaml"), JSON.stringify({ version: 1, documentos: c.d.documentos, temas: c.d.temas }));
+  for (const doc of ["parcial", "practico"]) writeFileSync(join(c.raiz, `_procesado/${doc}/items.yaml`), JSON.stringify({ items: c.d.items[doc] }));
+  c.d.progreso.temas = estado ? { retardos: { estado } } : {};
+  writeFileSync(join(c.raiz, "progreso.yaml"), `version: 1\ntemas: ${estado ? `{retardos: {estado: ${estado}}}` : "{}"}\nhistorial: []\n`);
+  const comandos = new Map(), entradas = [], avisos = [], ordenes = [], preguntas = [], cortes = [];
+  const pi = { on: () => {}, registerCommand: (n, x) => comandos.set(n, x), registerTool: () => {}, appendEntry: (customType, data) => entradas.push({ type: "custom", customType, data }),
+    setSessionName: () => {}, sendMessage: m => ordenes.push(m), getAllTools: () => [], getActiveTools: () => [], setActiveTools: () => {},
+    exec: async () => ({ code: 0, stdout: JSON.stringify(c.d), stderr: "", killed: false }), events: { emit: (_n, p) => p.onComplete?.() } };
+  const ctx = { hasUI: true, isIdle: () => false, abort: () => cortes.push("abort"), waitForIdle: async () => {}, sessionManager: { getBranch: () => entradas, getEntries: () => entradas, getSessionId: () => "s" },
+    model: { provider: "prueba", id: "modelo" }, modelRegistry: { hasConfiguredAuth: () => true },
+    ui: { notify: (m, tipo) => avisos.push([tipo, m]), setStatus: () => {}, select: async (titulo, o) => { preguntas.push([titulo, o]); return ctx.respuesta(o); } } };
+  const sesion = registrarSesion(pi, c.vault, recursos);
+  registrarSimulacro(pi, sesion, c.vault);
+  return { ...c, ctx, comandos, entradas, avisos, ordenes, preguntas, cortes, sesion, progreso: () => readFileSync(join(c.raiz, "progreso.yaml"), "utf8") };
+}
+
+test("E9, 6d: /simulacro con el tema sin dominar pregunta antes de gastar el reservado; cancelar no usa nada", async t => {
+  const e = vault(t);
+  await e.comandos.get("estudiar").handler("redes retardos", e.ctx);
+  e.cortes.length = 0;
+  const ordenes = e.ordenes.length, progreso = e.progreso();
+  e.ctx.respuesta = () => undefined;
+  await e.comandos.get("simulacro").handler("", e.ctx);
+  assert.deepEqual(e.preguntas, [["Todavía no terminaste el tema: el simulacro usa el único ítem reservado y no se repite. ¿Rendirlo ahora?", ["Sí, rendirlo ahora", "No, seguir estudiando"]]]);
+  assert.deepEqual(e.avisos.at(-1), ["info", "Seguimos estudiando: el simulacro queda reservado para cuando termines el tema."]);
+  assert.ok(!e.entradas.some(x => x.customType === "curso-simulacro"));
+  assert.deepEqual([e.cortes, e.ordenes.length, e.progreso()], [[], ordenes, progreso]);
+  e.ctx.respuesta = o => o[1];
+  await e.comandos.get("simulacro").handler("", e.ctx);
+  assert.deepEqual([e.cortes, e.ordenes.length, e.progreso()], [[], ordenes, progreso]);
+  // Confirmado, corta el turno, lo marca usado y lo presenta.
+  e.ctx.respuesta = o => o[0];
+  await e.comandos.get("simulacro").handler("", e.ctx);
+  assert.deepEqual(e.cortes, ["abort"]);
+  assert.match(e.progreso(), /- doc: parcial\n\s+id: '3'\n\s+usado: true/);
+  assert.deepEqual(e.entradas.findLast(x => x.customType === "curso-simulacro").data.id, "3");
+  const orden = e.ordenes.at(-1).content;
+  assert.match(orden, /si viene de un nodo del plan que todavía no se enseñó, decilo/);
+  assert.match(orden, /plan de repaso ordenado por peso en el examen: los puntos que suman, en los parciales de curso\.md, las preguntas del tema/);
+});
+
+test("E9, 6d: sin interfaz y con el tema sin dominar /simulacro no gasta el reservado; con el tema dominado no pregunta", async t => {
+  const e = vault(t);
+  await e.comandos.get("estudiar").handler("redes retardos", e.ctx);
+  e.cortes.length = 0;
+  const progreso = e.progreso();
+  e.ctx.hasUI = false;
+  await e.comandos.get("simulacro").handler("", e.ctx);
+  assert.deepEqual(e.avisos.at(-1), ["info", "Todavía no terminaste el tema: rendí el simulacro cuando lo termines."]);
+  assert.deepEqual([e.preguntas, e.cortes, e.progreso()], [[], [], progreso]);
+  assert.ok(!e.entradas.some(x => x.customType === "curso-simulacro"));
+  const d = vault(t, "dominado");
+  await d.comandos.get("estudiar").handler("redes retardos", d.ctx);
+  await d.comandos.get("simulacro").handler("", d.ctx);
+  assert.deepEqual(d.preguntas, []);
+  assert.match(d.progreso(), /usado: true/);
+  assert.match(d.ordenes.at(-1).content, /^Simulacro de «Retardos»/);
 });

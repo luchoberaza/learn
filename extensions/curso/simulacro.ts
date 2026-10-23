@@ -1,4 +1,5 @@
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import { elegir } from "../comun/elegir.ts";
 import { python } from "./ingesta.ts";
 import { reservas, type Activo, type DatosCurso, type Ref } from "./material.ts";
 import { ordenar, type registrarSesion } from "./sesion.ts";
@@ -38,6 +39,12 @@ export function registrarSimulacro(pi: ExtensionAPI, sesion: Pick<ReturnType<typ
       if (enCurso(ctx, e)) { ctx.ui.notify(`Ya estás en el simulacro de «${nombre(e)}»: entregá tu resolución o terminá con /fin.`, "info"); return; }
       const x = e.a.adHoc ? undefined : reservas(e.r, e.d)[e.a.tema], item = x && e.d.items[x.doc]?.find(i => i.id === x.id);
       if (!x || !item) { ctx.ui.notify(`«${nombre(e)}» no tiene un ítem de evaluación para simulacro: todavía no hay parciales del tema preparados o ya se usaron todos.`, "info"); return; }
+      // E9: antes de dominar el tema se confirma, porque gasta el único reservado; sin UI no se gasta.
+      if (e.d.progreso.temas[e.a.tema]?.estado !== "dominado") {
+        const si = "Sí, rendirlo ahora";
+        if (!ctx.hasUI) { ctx.ui.notify("Todavía no terminaste el tema: rendí el simulacro cuando lo termines.", "info"); return; }
+        if (await elegir(ctx, "Todavía no terminaste el tema: el simulacro usa el único ítem reservado y no se repite. ¿Rendirlo ahora?", [si, "No, seguir estudiando"]) !== si) { ctx.ui.notify("Seguimos estudiando: el simulacro queda reservado para cuando termines el tema.", "info"); return; }
+      }
       // Como /fin: pi ya vació el editor, así que se corta el turno en curso (p. ej. un quiz abierto) en vez de perder el comando.
       if (!ctx.isIdle()) { ctx.abort(); await ctx.waitForIdle(); }
       // Visto es usado (E3): queda anotado antes de mostrarlo, así no vuelve a reservarse aunque la clase se corte antes de la entrega.
@@ -46,7 +53,7 @@ export function registrarSimulacro(pi: ExtensionAPI, sesion: Pick<ReturnType<typ
       pi.appendEntry("curso-simulacro", { log: e.a.log, tema: e.a.tema, doc: x.doc, id: x.id });
       ctx.ui.setStatus("curso", `📝 Simulacro · ${nombre(e)}`);
       const t = tiempo(e.d.contrato), puntos = typeof item.puntos === "number" ? `${item.puntos} puntos` : item.puntos;
-      ordenar(pi, `Simulacro de «${nombre(e)}». Presentá ahora, tal cual, este ítem de evaluación reservado${puntos ? ` con su puntaje oficial (${puntos})` : ""}, ${t ? `con el tiempo proporcional del examen real: ~${t.minutos} min (${t.examen})` : "sin tiempo: curso.md no fija la duración del examen"}, y pedí la resolución en texto o foto. Hasta la entrega no des pistas ni correcciones ni confirmes resultados parciales; si pregunta algo, respondé sólo lo que dice el enunciado. Cuando entregue: pedí la solución oficial con leer_items e incluir_solucion:true, corregí contra ella como en la práctica tipo evaluación, mapeá cada error a un nodo del tema, da un veredicto honesto, llamá registrar_progreso con el intento (doc ${x.doc}, item ${x.id}, resultado y puntaje) y los nodos fallados en borde.falla, y proponé un plan de repaso ordenado por peso en el examen.\n\nÍtem ${x.doc}/${x.id}:\n${item.enunciado}`);
+      ordenar(pi, `Simulacro de «${nombre(e)}». Presentá ahora, tal cual, este ítem de evaluación reservado${puntos ? ` con su puntaje oficial (${puntos})` : ""}, ${t ? `con el tiempo proporcional del examen real: ~${t.minutos} min (${t.examen})` : "sin tiempo: curso.md no fija la duración del examen"}, y pedí la resolución en texto o foto. Hasta la entrega no des pistas ni correcciones ni confirmes resultados parciales; si pregunta algo, respondé sólo lo que dice el enunciado. Cuando entregue: pedí la solución oficial con leer_items e incluir_solucion:true, corregí contra ella como en la práctica tipo evaluación, mapeá cada error a un nodo del tema (si viene de un nodo del plan que todavía no se enseñó, decilo), da un veredicto honesto, llamá registrar_progreso con el intento (doc ${x.doc}, item ${x.id}, resultado y puntaje) y los nodos fallados en borde.falla, y proponé un plan de repaso ordenado por peso en el examen: los puntos que suman, en los parciales de curso.md, las preguntas del tema que tocan cada nodo.\n\nÍtem ${x.doc}/${x.id}:\n${item.enunciado}`);
     },
   });
   // Las reglas siguen en el prompt aunque /compact resuma la orden.
