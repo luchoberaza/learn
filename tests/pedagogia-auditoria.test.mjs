@@ -64,6 +64,18 @@ test("H56: el dossier trae objetivo y plan dentro del presupuesto, sin perder bo
   assert.ok(!/Objetivo acordado|^Plan:/m.test(dossier(c.raiz, c.d, c.tema, 3000, 2000)));
 });
 
+test("H56: un objetivo y un plan largos con caracteres multibyte no desplazan el progreso del tema", t => {
+  const c = curso(t);
+  // 300 y 1500 caracteres de 2 y 3 bytes ocupaban más que los 3000 B del progreso: el borde desaparecía.
+  c.d.progreso.temas.retardos = { ...progresoLargo(5), objetivo: "é".repeat(300), plan: "→".repeat(1500) };
+  const r = dossier(c.raiz, c.d, c.tema, 3000, 2000), p = c.d.progreso.temas.retardos;
+  const linea = r.split("\n\n").find(l => l.startsWith("Progreso retardos:"));
+  assert.match(linea, /PROXIMO PASO/);
+  assert.ok(linea.includes(p.borde.falla.at(-1).slice(0, 40)));
+  assert.ok(linea.includes(p.errores_de_concepto.filter(e => !e.resuelto).at(-1).descripcion.slice(0, 40)));
+  assert.ok(Buffer.byteLength(r.slice(r.indexOf("Objetivo acordado"), r.indexOf("## Verificación previa"))) <= 3100);
+});
+
 test("H72: leer_items muestra el puntaje oficial también cuando es texto", t => {
   const c = curso(t);
   c.d.documentos.push({ id: "parcial", titulo: "Parcial", tipo: "evaluaciones", archivo: "fuentes/evaluaciones/parcial.pdf", paginas: 2 });

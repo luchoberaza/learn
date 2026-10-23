@@ -264,8 +264,8 @@ export function dossier(raiz: string, datos: DatosCurso, tema: Tema, maxTokens: 
   if (reservas(raiz, datos)[tema.id]) lineas.push("Simulacro: un ítem de evaluación del tema está reservado para /simulacro; no figura acá ni se puede leer. Al cerrar el tema, ofrecé /simulacro.");
   const faltan = faltantesTema(raiz, datos, tema);
   if (faltan.length) lineas.push(`Preparación del tema: sin texto confiable todavía en ${faltan.join("; ")}. Se preparan solos en segundo plano; mientras, cotejá esas páginas con ver_pagina antes de citarlas.`);
-  // Objetivo y plan acordados (H56) comparten los 3000 B del progreso del tema: retomar no los vuelve a pedir ni pierde el borde.
-  const p = datos.progreso.temas[tema.id], acordado = [p?.objetivo && `Objetivo acordado: ${String(p.objetivo).slice(0, 300)}`, p?.plan && `Plan: ${String(p.plan).slice(0, 1500)}`].filter(Boolean).join("\n\n");
+  // Objetivo y plan acordados (H56) comparten los 3000 B del progreso del tema y ocupan hasta 2000 (en bytes: los caracteres pueden ser multibyte): retomar no los vuelve a pedir ni pierde el borde.
+  const p = datos.progreso.temas[tema.id], acordado = acotar([p?.objetivo && `Objetivo acordado: ${String(p.objetivo).slice(0, 300)}`, p?.plan && `Plan: ${String(p.plan).slice(0, 1500)}`].filter(Boolean).join("\n\n"), 2000);
   // Lo que puede cortarse va al final: el progreso de los prerequisitos.
   lineas.push(...(acordado ? [acordado] : []), `Progreso ${tema.id}: ${progresoCompacto(p, 3000 - Buffer.byteLength(acordado))}`, "## Verificación previa", resumirVerificacion(verificacion));
   for (const id of tema.prerequisitos || []) lineas.push(`Progreso ${id} (prerequisito): ${progresoCompacto(datos.progreso.temas[id], 800)}`);
