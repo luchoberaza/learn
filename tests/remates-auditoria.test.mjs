@@ -1,6 +1,6 @@
 import { mock, test } from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { getEventListeners } from "node:events";
@@ -52,7 +52,7 @@ test("H04: con la nota renombrada en Obsidian, /fin guarda con el nombre de la s
   await e.final("Pregunta 1.");
   await e.comandos.get("fin").handler("", e.ctx);
   const r = await e.guardar({ cierre: true });
-  assert.match(r.content[0].text, /se renombró o movió en Obsidian/);
+  assert.doesNotMatch(r.content[0].text, /no está|se renombró o movió en Obsidian/);
   await e.final("Resumen final.");
   await e.emitir("agent_settled", {});
   assert.equal(e.sesion.actual(), undefined);
@@ -81,6 +81,25 @@ test("H04: la ruta nueva de la nota queda en el curso activo: un pi que retoma s
   assert.match(readFileSync(join(e.vault, nueva), "utf8"), /Pregunta 1\.[\s\S]*Pregunta 2\.[\s\S]*Resumen final\./);
   assert.deepEqual(historial(f), [`log: ${log.slice("cursos/ejemplo/".length)}`]);
   assert.deepEqual(f.avisos, [["info", "Sesión cerrada. El log se conserva en Obsidian."]]);
+});
+
+test("H04: registrar_progreso recibe la ruta actual de la nota y sólo avisa mientras no se la encuentra", async t => {
+  const e = await clase(t), log = e.sesion.actual().a.log, nueva = "cursos/ejemplo/sesiones/Clase renombrada.md";
+  renameSync(join(e.vault, log), join(e.vault, nueva));
+  // Todavía nada siguió el renombre: la ruta conocida no está.
+  assert.match((await e.guardar()).content[0].text, /El log sesiones\/[^ ]+ no está \(¿se renombró o movió en Obsidian\?\)/);
+  await e.final("Pregunta 1.");
+  assert.equal(e.sesion.actual().a.nota, nueva);
+  assert.doesNotMatch((await e.guardar()).content[0].text, /no está/);
+});
+
+test("H16: una clase sin nota no repite en cada guardado que falta el log", async t => {
+  const e = await clase(t), elegir = { ...e.ctx, ui: { ...e.ctx.ui, select: async (_t, opciones) => opciones.find(o => o === "Cambiar sin guardar") ?? opciones[0] } };
+  chmodSync(join(e.raiz, "sesiones"), 0o555);
+  try { await e.comandos.get("estudiar").handler("ejemplo derivacion", elegir); } finally { chmodSync(join(e.raiz, "sesiones"), 0o755); }
+  assert.match(e.avisos.at(-1)[1], /seguimos sin nota/);
+  for (const extra of [{}, { cierre: true }]) assert.doesNotMatch((await e.guardar(extra)).content[0].text, /no está|se renombró o movió en Obsidian/);
+  assert.equal(historial(e).length, 1);
 });
 
 test("H04: una nota movida fuera de sesiones/ no invalida el curso al retomar y /fin la cierra", async t => {

@@ -341,7 +341,7 @@ export function registrarSesion(pi: ExtensionAPI, vault = vaultDir, recursos = p
   });
   function actual() {
     if (!activo || !datos) throw new Error("No hay curso activo. Usá /estudiar <curso> <tema>.");
-    return { a: activo, d: datos, r: raiz(activo.curso), pendiente };
+    return { a: activo, d: datos, r: raiz(activo.curso), pendiente, sinLog };
   }
   return {
     actual: () => activo && datos ? actual() : undefined,

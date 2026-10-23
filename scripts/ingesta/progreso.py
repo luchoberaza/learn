@@ -252,14 +252,17 @@ def orden(log, tema):
     return (m[1], int(m[2] or 1)) if m else None
 
 
-def registrar(vault: Path, curso: str, tema: str, log: str, datos: dict, cierre=False, reconstruido=False, huella_log=None, reservas=None, simulacro=None):
+def registrar(vault: Path, curso: str, tema: str, log: str, datos: dict, cierre=False, reconstruido=False, huella_log=None, reservas=None, simulacro=None, nota=None):
     raiz = carpeta(vault, curso)
     if not re.fullmatch(SLUG, tema) or type(cierre) is not bool or type(reconstruido) is not bool:
         raise ValueError("Tema o flags de progreso inválidos.")
     # El nombre ata el historial al tema sin admitir adjuntos, subdirectorios ni otros cursos.
     if not orden(log, tema):
         raise ValueError("Log fuera del tema o de sesiones/.")
-    archivo_log = ruta_segura(raiz, log)
+    # nota: dónde está hoy la nota de la clase, que Obsidian puede renombrar; sin nota no se avisa (el alumno ya lo sabe).
+    if nota is not None and not (isinstance(nota, str) and nota.startswith("sesiones/") and nota.endswith(".md")):
+        raise ValueError("Nota fuera de sesiones/.")
+    archivo_log, archivo_nota = ruta_segura(raiz, log), nota and ruta_segura(raiz, nota)
     # Sólo la reconstrucción necesita el log; renombrarlo en Obsidian no debe impedir guardar.
     if reconstruido and not archivo_log.is_file():
         raise ValueError("El log de evidencia no existe.")
@@ -271,7 +274,7 @@ def registrar(vault: Path, curso: str, tema: str, log: str, datos: dict, cierre=
             raise Conflicto("El log cambió desde su lectura; releelo antes de reconstruir.")
         indice = texto(raiz, "indice.yaml")
         p, raw, avisos = cargar(raiz, ctx)
-        avisos += observaciones + ([] if archivo_log.is_file() else [f"El log {log} no está (¿se renombró o movió en Obsidian?); el progreso se guardó igual con esa ruta."])
+        avisos += observaciones + ([] if not archivo_nota or archivo_nota.is_file() else [f"El log {log} no está (¿se renombró o movió en Obsidian?); el progreso se guardó igual con esa ruta."])
         actual = p["temas"].get(tema, {})
         if reconstruido and nuevo.get("estado") == "sin_empezar" and "estado" in actual:
             del nuevo["estado"]  # una sesión sin respuestas no cambia el estado

@@ -16,7 +16,7 @@ import yaml
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'scripts/ingesta'))
 import test_cursos
 import test_progreso
-from almacen import bloquear, esperar
+from almacen import Conflicto, bloquear, esperar
 from progreso import leer, registrar
 from sesion import cargar, renderizar
 
@@ -211,12 +211,22 @@ class ProgresoAuditoriaTest(unittest.TestCase):
 
     def test_h04_log_renombrado_no_impide_guardar(self):
         (self.raiz / self.log).rename(self.raiz / 'sesiones/Clase (renombrada).md')
-        r = self.guardar(cierre=True)
+        r = self.guardar(cierre=True, nota=self.log)
         self.assertIn(self.log, ' '.join(r['avisos']))
         self.assertEqual(r['progreso']['historial'][-1]['log'], self.log)
         self.assertEqual(self.tema()['estado'], 'en_curso')
         with self.assertRaises(ValueError):
             self.guardar(reconstruido=True, huella_log='0' * 64)
+
+    def test_h04_h16_con_la_nota_renombrada_o_sin_nota_no_avisa_y_la_ruta_se_valida(self):
+        nueva = 'sesiones/Clase (renombrada).md'
+        (self.raiz / self.log).rename(self.raiz / nueva)
+        self.assertNotIn('no está', ' '.join(self.guardar(nota=nueva)['avisos']))
+        self.assertNotIn('no está', ' '.join(self.guardar()['avisos']))
+        for mala in ['notas/x.md', 'sesiones/x.txt', 'sesiones/../../../afuera.md', '/tmp/x.md', 3]:
+            with self.assertRaises((ValueError, Conflicto), msg=mala):
+                self.guardar(nota=mala)
+        self.assertEqual(self.tema()['estado'], 'en_curso')
 
     def test_x01_disco_lleno_da_una_linea_en_espanol_y_conserva_el_progreso(self):
         antes = (self.raiz / 'progreso.yaml').read_bytes()

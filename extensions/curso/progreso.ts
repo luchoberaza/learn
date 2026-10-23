@@ -27,6 +27,8 @@ export function registrarProgreso(pi: ExtensionAPI, sesion: ReturnType<typeof re
       if (e.a.adHoc) throw new Error("Ad hoc no escribe progreso de un tema inexistente; ofrecé curarlo con /curso-agregar.");
       const { cierre = false, reconstruir_log, huella_log, ...datos } = args;
       const log = reconstruir_log || relative(e.r, join(vault, e.a.log));
+      // Con la nota renombrada en Obsidian, su ruta actual; sin nota no hay qué avisar: el alumno ya lo sabe.
+      const nota = reconstruir_log || e.sinLog ? undefined : relative(e.r, join(vault, e.a.nota ?? e.a.log));
       if (reconstruir_log) {
         if (reconstruir_log !== e.pendiente || !huella_log) throw new Error("Releé la última sesión pendiente antes de reconstruirla.");
         // ui.confirm de pi dibuja «Yes»/«No»; Esc o un corte valen como no.
@@ -36,7 +38,7 @@ export function registrarProgreso(pi: ExtensionAPI, sesion: ReturnType<typeof re
       const solicitud = ctx.sessionManager.getBranch().findLast(x => x.type === "custom" && x.customType === "curso-cierre") as any;
       const final = reconstruir_log ? true : cierre;
       // Las reservas de ítems para /simulacro (E3) se fijan en progreso.yaml la primera vez que se guarda; uno que se rindió queda usado.
-      const r = await python("registrar", { vault, curso: e.a.curso, tema: e.a.tema, log, datos, cierre: final, reconstruido: !!reconstruir_log, huella_log, reservas: reservas(e.r, e.d), simulacro: enCurso(ctx, e) }, signal, "progreso.py");
+      const r = await python("registrar", { vault, curso: e.a.curso, tema: e.a.tema, log, nota, datos, cierre: final, reconstruido: !!reconstruir_log, huella_log, reservas: reservas(e.r, e.d), simulacro: enCurso(ctx, e) }, signal, "progreso.py");
       sesion.actualizarProgreso(r.progreso);
       try { sesion.refrescar(); } catch { ctx.ui.notify("Progreso guardado; reactivá /estudiar para refrescar el dossier.", "warning"); }
       if (!reconstruir_log && final && solicitud?.data?.log !== e.a.log) pi.appendEntry("curso-cierre", { log: e.a.log });
