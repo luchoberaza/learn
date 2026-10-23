@@ -1,10 +1,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { dossier, leerItems } from "../extensions/curso/material.ts";
-import { loadProject } from "../scripts/lib/pi-sdk.mjs";
+import { loadProject, piDir, vaultDir } from "../scripts/lib/pi-sdk.mjs";
 
 // Regresiones de la auditoría pedagógica: curso sintético, sin modelos.
 function curso(t) {
@@ -67,4 +68,17 @@ test("H72: leer_items muestra el puntaje oficial también cuando es texto", t =>
   assert.match(r, /^parcial\/1 \(12 puntos\)$/m);
   assert.match(r, /^parcial\/2 \(10 \(a: 4, b: 6\)\)$/m);
   assert.match(r, /^parcial\/3$/m);
+});
+
+// Con el curso real: lo que el tutor recibe al estudiar retardos.
+const redes = () => JSON.parse(execFileSync(join(piDir, ".venv/bin/python"), [join(piDir, "scripts/ingesta/sesion.py"), "cargar", "--vault", vaultDir, "--curso", "redes"], { env: { ...process.env, PYTHONDONTWRITEBYTECODE: "1" } }));
+
+test("H51, X12: el dossier de retardos trae la notación de la cátedra desde curso.md", t => {
+  if (!existsSync(join(vaultDir, "cursos/redes/curso.md"))) return t.skip("sin el curso redes");
+  const d = redes(), r = dossier(join(vaultDir, "cursos/redes"), d, d.temas.find(x => x.id === "retardos"), 3000, 2000);
+  assert.ok(Buffer.byteLength(r) <= 12000);
+  const notacion = r.slice(r.indexOf("# Notación y convenciones"));
+  assert.match(notacion, /Manda la notación de la cátedra \(prácticos y parciales\) sobre la del libro/);
+  assert.match(notacion, /distancia \$D\$, velocidad de propagación \$c\$, \$d_\{prop\}\$/);
+  assert.match(notacion, /traducí una vez a la notación de la cátedra/);
 });
