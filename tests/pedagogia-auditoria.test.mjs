@@ -194,7 +194,7 @@ function vault(t) {
     events: { emit: (_n, p) => p.onComplete?.() } };
   const ctx = { hasUI: true, isIdle: () => true, sessionManager: { getBranch: () => entradas, getEntries: () => entradas, getSessionId: () => "s" },
     model: { provider: "prueba", id: "modelo" }, modelRegistry: { hasConfiguredAuth: () => true },
-    ui: { notify: (m, tipo) => avisos.push([tipo, m]), setStatus: (k, v) => { estados[k] = v; }, select: async (_t, o) => o[0], confirm: async () => true } };
+    ui: { notify: (m, tipo) => avisos.push([tipo, m]), setStatus: (k, v) => { estados[k] = v; }, select: async (_t, o) => o.find(x => x.startsWith("Sí")) ?? o[0], confirm: async () => true } };
   const sesion = registrarSesion(pi, c.vault, recursos);
   return { ...c, recursos, pi, ctx, comandos, eventos, entradas, avisos, estados, ordenes, sesion };
 }
