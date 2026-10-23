@@ -114,6 +114,7 @@ const REGLAS_I = {
   "leer al arrancar sin demorar (F1)": "en una misma tanda: `leer_paginas` con 2–3 páginas del comienzo de la bibliografía e `investigar_tema`",
   "sin preámbulo no es sin leer (F1)": "«sin preámbulo» es sin texto, no sin leer",
   "6a desde la bibliografía (F1)": "enseñá ya, en modo expositivo y desde la bibliografía",
+  "retomar tras un corte (A3, D5)": "Al retomar tras un corte, una línea de «dónde quedamos» y la pregunta pendiente idéntica, sin agregar datos",
 };
 test("modo-curso: reglas de fidelidad y evaluación de la etapa I", () => {
   const plano = readFileSync(join(piDir, "modo-curso.md"), "utf8").replace(/\s+/g, " ");
