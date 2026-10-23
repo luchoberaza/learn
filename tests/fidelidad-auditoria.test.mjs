@@ -67,6 +67,14 @@ test("E3: la reserva prefiere un ítem de evaluación sin casi copias visibles y
   assert.match(leerPaginas(c.raiz, c.d, "practico", 1, 1, false, new Set()), /geoestacionario[\s\S]*practico\.pdf#page=1/);
 });
 
+test("E3: un ítem de evaluación cuya casi copia ya se practicó no se reserva", t => {
+  const c = curso(t);
+  c.d.progreso.temas.retardos = { estado: "en_curso", ejercicios: [{ doc: "practico", item: "1", resultado: "correcto" }, { doc: "parcial", item: "3", resultado: "parcial" }] };
+  assert.equal(reservas(c.raiz, c.d).retardos, undefined);
+  c.d.progreso.temas.retardos.ejercicios.shift();
+  assert.deepEqual(reservas(c.raiz, c.d).retardos, { doc: "parcial", id: "2" });
+});
+
 test("F1, F2: el dossier muestra la bibliografía del tema con su tool y su rango, antes de los ítems y sin enlace al comienzo del rango", t => {
   const c = curso(t), d = dossier(c.raiz, c.d, c.tema, 3000, 1500);
   assert.match(d, /^Bibliografía del tema: antes de enseñar cada nodo, leé con leer_paginas la página que lo define y citá esa\.\n\n- leer_paginas libro PDF 1–3 · 1\.4 · Libro \(principal\)$/m);

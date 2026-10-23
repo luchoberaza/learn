@@ -127,7 +127,8 @@ export function reservas(raiz: string, datos: DatosCurso): Record<string, Ref> {
   for (const tema of datos.temas) {
     const fijado = lista(datos.progreso.temas[tema.id]?.reservado).find(x => !x?.usado && enunciado(x));
     const peso = (x: Ref) => 4 * Number(!copias(x).length) + 2 * Number(conSolucionOficial(x)) + Number(enunciado(x)!.puntos !== undefined);
-    const elegido = fijado || itemsDelTema(raiz, datos, tema).filter(x => x.clase === "evaluaciones" && enunciado(x) && !tocados.has(`${x.doc}/${x.id}`)).sort((a, b) => peso(b) - peso(a))[0];
+    // Un ítem cuya casi copia ya se practicó (p. ej. antes de que se segmentara el parcial) tampoco es inédito.
+    const elegido = fijado || itemsDelTema(raiz, datos, tema).filter(x => x.clase === "evaluaciones" && enunciado(x) && ![x, ...copias(x)].some(c => tocados.has(`${c.doc}/${c.id}`))).sort((a, b) => peso(b) - peso(a))[0];
     if (elegido) { r[tema.id] = { doc: elegido.doc, id: elegido.id }; tocados.add(`${elegido.doc}/${elegido.id}`); }
   }
   return r;
