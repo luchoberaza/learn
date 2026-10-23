@@ -282,34 +282,50 @@ def registrar(vault: Path, curso: str, tema: str, log: str, datos: dict, cierre=
         anterior = next((h for h in p["historial"] if h["log"] == log and h["tema"] == tema), {})
         historia["cierre"] = cierre or anterior.get("cierre", False)
         p["historial"] = [h for h in p["historial"] if (h["log"], h["tema"]) != (log, tema)] + [{**anterior, **historia}]
-        comprobar(p, ctx)
-        contenido = yaml.safe_dump(p, allow_unicode=True, sort_keys=False)
-        if len(contenido.encode()) > 2_000_000:
-            raise ValueError("Progreso demasiado grande; se preservó la versión previa.")
-        if cargar_yaml(contenido) == cargar_yaml(raw.decode("utf-8")):
-            return {"progreso": p, "avisos": avisos, "sin_cambios": True}
-        bak = ruta_segura(raiz, "progreso.yaml.bak")
-        if bak.exists():
-            comprobar(cargar_yaml(crudo(raiz, "progreso.yaml.bak").decode("utf-8")), ctx)
-        if crudo(raiz, "progreso.yaml") != raw or texto(raiz, "indice.yaml") != indice:
-            raise Conflicto("El curso o el progreso cambió durante la fusión; se preservó.")
-        atomico(raiz, "progreso.yaml.bak", raw)
-        if crudo(raiz, "progreso.yaml") != raw:
-            raise Conflicto("El progreso cambió al respaldarlo; no se reemplazó.")
-        atomico(raiz, "progreso.yaml", contenido)
-        return {"progreso": p, "avisos": avisos, "sin_cambios": False}
+        return publicar(raiz, p, raw, indice, ctx, avisos)
+
+
+def usar(vault: Path, curso: str, tema: str, doc: str, item: str):
+    """E9: el reservado queda usado al presentarse en /simulacro, aunque la sesión se corte antes de la entrega."""
+    raiz = carpeta(vault, curso)
+    with bloqueo(raiz):
+        ctx = contexto(raiz)
+        indice = texto(raiz, "indice.yaml")
+        p, raw, avisos = cargar(raiz, ctx)
+        reservar(p, ctx, {tema: {"doc": doc, "id": item}}, {(doc, item)})
+        return publicar(raiz, p, raw, indice, ctx, avisos)
+
+
+def publicar(raiz, p, raw, indice, ctx, avisos):
+    """Bajo bloqueo(raiz): valida y reemplaza progreso.yaml con .bak, salvo que nada haya cambiado."""
+    comprobar(p, ctx)
+    contenido = yaml.safe_dump(p, allow_unicode=True, sort_keys=False)
+    if len(contenido.encode()) > 2_000_000:
+        raise ValueError("Progreso demasiado grande; se preservó la versión previa.")
+    if cargar_yaml(contenido) == cargar_yaml(raw.decode("utf-8")):
+        return {"progreso": p, "avisos": avisos, "sin_cambios": True}
+    bak = ruta_segura(raiz, "progreso.yaml.bak")
+    if bak.exists():
+        comprobar(cargar_yaml(crudo(raiz, "progreso.yaml.bak").decode("utf-8")), ctx)
+    if crudo(raiz, "progreso.yaml") != raw or texto(raiz, "indice.yaml") != indice:
+        raise Conflicto("El curso o el progreso cambió durante la fusión; se preservó.")
+    atomico(raiz, "progreso.yaml.bak", raw)
+    if crudo(raiz, "progreso.yaml") != raw:
+        raise Conflicto("El progreso cambió al respaldarlo; no se reemplazó.")
+    atomico(raiz, "progreso.yaml", contenido)
+    return {"progreso": p, "avisos": avisos, "sin_cambios": False}
 
 
 def main():
     p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument("accion", choices=["leer", "registrar"])
+    p.add_argument("accion", choices=["leer", "registrar", "usar"])
     a = p.parse_args()
     entrada = sys.stdin.read(100_001)
     if len(entrada.encode()) > 100_000:
         raise ValueError("Registro de progreso demasiado grande.")
     datos = json.loads(entrada)
     vault, curso = Path(datos.pop("vault")).resolve(), datos.pop("curso")
-    r = leer(vault, curso) if a.accion == "leer" else registrar(vault, curso, **datos)
+    r = leer(vault, curso) if a.accion == "leer" else {"registrar": registrar, "usar": usar}[a.accion](vault, curso, **datos)
     print(json.dumps(r, ensure_ascii=False, default=str))
 
 

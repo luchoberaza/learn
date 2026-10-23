@@ -1,6 +1,8 @@
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import { python } from "./ingesta.ts";
 import { reservas, type Activo, type DatosCurso, type Ref } from "./material.ts";
 import { ordenar, type registrarSesion } from "./sesion.ts";
+import { vaultDir } from "../../scripts/lib/pi-sdk.mjs";
 
 type Simulacro = Ref & { log: string; tema: string };
 type Sesion = { a: Activo; d: DatosCurso };
@@ -9,11 +11,11 @@ const pedido = (ctx: Pick<ExtensionContext, "sessionManager">) => {
   const s = ctx.sessionManager.getBranch().findLast(x => x.type === "custom" && x.customType === "curso-simulacro");
   return s?.type === "custom" ? s.data as Simulacro | null : undefined;
 };
-// El simulacro en curso: el último pedido de la rama (sobrevive /compact, /resume y un kill), del log activo y sin rendir.
+// El simulacro en curso: el último pedido de la rama (sobrevive /compact, /resume y un kill), del log activo y sin intento registrado.
 // /fin y el cambio de tema lo cierran porque cambian o cierran el log.
 export function enCurso(ctx: Pick<ExtensionContext, "sessionManager">, e?: Sesion): Simulacro | undefined {
-  const s = pedido(ctx), reservado = s && e?.d.progreso.temas[s.tema]?.reservado;
-  if (!s || s.log !== e?.a.log || (Array.isArray(reservado) && reservado.some(r => r?.doc === s.doc && r?.id === s.id && r?.usado))) return;
+  const s = pedido(ctx), intentos = s && e?.d.progreso.temas[s.tema]?.ejercicios;
+  if (!s || s.log !== e?.a.log || (Array.isArray(intentos) && intentos.some(x => x?.doc === s.doc && x?.item === s.id))) return;
   return s;
 }
 // Tiempo proporcional del examen real según curso.md: «2 horas» y «5 preguntas» → 24 min por pregunta.
@@ -23,7 +25,7 @@ export function tiempo(contrato: string) {
   return { minutos: Math.round(Number(t[1].replace(",", ".")) * (/^h/i.test(t[2]) ? 60 : 1) / Number(n[1])), examen: `${t[1]} ${t[2]} para ${n[1]} preguntas` };
 }
 
-export function registrarSimulacro(pi: ExtensionAPI, sesion: Pick<ReturnType<typeof registrarSesion>, "actual">) {
+export function registrarSimulacro(pi: ExtensionAPI, sesion: Pick<ReturnType<typeof registrarSesion>, "actual" | "actualizarProgreso" | "refrescar">, vault = vaultDir) {
   const nombre = (e: Sesion) => e.d.temas.find(t => t.id === e.a.tema)?.nombre || e.a.tema;
   const barra = (ctx: ExtensionContext) => { const e = sesion.actual(); if (e && enCurso(ctx, e)) ctx.ui.setStatus("curso", `📝 Simulacro · ${nombre(e)}`); };
   pi.on("session_start", (_event, ctx) => barra(ctx));
@@ -38,6 +40,9 @@ export function registrarSimulacro(pi: ExtensionAPI, sesion: Pick<ReturnType<typ
       if (!x || !item) { ctx.ui.notify(`«${nombre(e)}» no tiene un ítem de evaluación reservado para simulacro: faltan parciales de este tema en el material.`, "info"); return; }
       // Como /fin: pi ya vació el editor, así que se corta el turno en curso (p. ej. un quiz abierto) en vez de perder el comando.
       if (!ctx.isIdle()) { ctx.abort(); await ctx.waitForIdle(); }
+      // Visto es usado (E3): queda anotado antes de mostrarlo, así no vuelve a reservarse aunque la clase se corte antes de la entrega.
+      try { sesion.actualizarProgreso((await python("usar", { vault, curso: e.a.curso, tema: e.a.tema, doc: x.doc, item: x.id }, undefined, "progreso.py")).progreso); sesion.refrescar(); }
+      catch { ctx.ui.notify("No se pudo anotar el simulacro en el progreso; se reintenta al guardar tu intento.", "warning"); }
       pi.appendEntry("curso-simulacro", { log: e.a.log, tema: e.a.tema, doc: x.doc, id: x.id });
       ctx.ui.setStatus("curso", `📝 Simulacro · ${nombre(e)}`);
       const t = tiempo(e.d.contrato), puntos = typeof item.puntos === "number" ? `${item.puntos} puntos` : item.puntos;
@@ -50,7 +55,7 @@ export function registrarSimulacro(pi: ExtensionAPI, sesion: Pick<ReturnType<typ
     if (s) event.systemPromptOptions.sections.simulacro = `Simulacro en curso del ítem reservado ${s.doc}/${s.id}: hasta que el estudiante entregue su resolución no des pistas, correcciones ni resultados parciales. Al entregar, corregí contra la solución oficial (leer_items con incluir_solucion:true) y registrá el intento con registrar_progreso.`;
     else delete event.systemPromptOptions.sections.simulacro;
   });
-  // registrar_progreso marca usado el reservado (progreso.py): ahí termina el simulacro.
+  // Termina cuando registrar_progreso guarda el intento del ítem; un guardado sin él (lo pendiente de la clase) no lo corta.
   pi.on("tool_execution_end", (event, ctx) => {
     const e = sesion.actual(), s = pedido(ctx);
     if (event.toolName !== "registrar_progreso" || !e || !s || s.log !== e.a.log || enCurso(ctx, e)) return;

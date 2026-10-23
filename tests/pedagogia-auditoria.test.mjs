@@ -220,7 +220,7 @@ test("E3 con el curso real: el reservado de cada tema no se ve en sol-prc2024092
 
 test("E9: /simulacro sin tema activo o sin ítem reservado lo dice en una línea", async t => {
   const e = vault(t);
-  registrarSimulacro(e.pi, e.sesion);
+  registrarSimulacro(e.pi, e.sesion, e.vault);
   await e.comandos.get("simulacro").handler("", e.ctx);
   assert.deepEqual(e.avisos.at(-1), ["info", "Empezá con /estudiar <tema> y después /simulacro."]);
   e.d.items.parcial = e.d.items.parcial.filter(i => i.id === "2-solucion");
@@ -234,7 +234,7 @@ test("E9: /simulacro corta el turno, presenta el reservado con su tiempo y termi
   const e = vault(t);
   e.d.contrato += "Individual, sin material, 2 horas. Siempre son 5 preguntas de desarrollo.\n";
   const progreso = registrarProgreso(e.pi, e.sesion, e.vault);
-  registrarSimulacro(e.pi, e.sesion);
+  registrarSimulacro(e.pi, e.sesion, e.vault);
   await e.comandos.get("estudiar").handler("redes retardos", e.ctx);
   const orden = [];
   Object.assign(e.ctx, { isIdle: () => false, abort: () => orden.push("abort"), waitForIdle: async () => orden.push("espera") });
@@ -256,10 +256,10 @@ test("E9: /simulacro corta el turno, presenta el reservado con su tiempo y termi
   e.estados.curso = undefined;
   for (const h of e.eventos.get("session_start")) await h({}, e.ctx);
   assert.equal(e.estados.curso, "📝 Simulacro · Retardos");
-  // El intento registrado marca usado el reservado y cierra el simulacro; el próximo reservado es otro.
+  // El intento registrado cierra el simulacro; el reservado quedó usado al presentarlo y el próximo es otro.
   await progreso.registrar("1", { resumen: "simulacro", ejercicios: [{ doc: "parcial", item: "2", resultado: "parcial", puntaje: "≈ 5/8" }] }, undefined, undefined, e.ctx);
   for (const h of e.eventos.get("tool_execution_end")) h({ toolName: "registrar_progreso", isError: false }, e.ctx);
-  assert.deepEqual(e.sesion.actual().d.progreso.temas.retardos.reservado, [{ doc: "parcial", id: "2", usado: true }]);
+  assert.deepEqual(e.sesion.actual().d.progreso.temas.retardos.reservado[0], { doc: "parcial", id: "2", usado: true });
   assert.equal(e.entradas.findLast(x => x.customType === "curso-simulacro").data, null);
   assert.equal(enCurso(e.ctx, e.sesion.actual()), undefined);
   assert.equal(e.estados.curso, "📚 redes › Retardos");
@@ -268,16 +268,28 @@ test("E9: /simulacro corta el turno, presenta el reservado con su tiempo y termi
   assert.equal(evento.systemPromptOptions.sections.simulacro, undefined);
 });
 
-test("E9: /fin durante el simulacro lo cierra y marca usado el reservado que ya se mostró", async t => {
+test("E3, E9: el reservado queda usado al presentarlo, un guardado sin el intento no corta el simulacro y /fin lo cierra", async t => {
   const e = vault(t);
   const progreso = registrarProgreso(e.pi, e.sesion, e.vault);
-  registrarSimulacro(e.pi, e.sesion);
+  registrarSimulacro(e.pi, e.sesion, e.vault);
   await e.comandos.get("estudiar").handler("redes retardos", e.ctx);
   await e.comandos.get("simulacro").handler("", e.ctx);
   assert.match(e.ordenes.at(-1).content, /sin tiempo: curso\.md no fija la duración del examen/);
+  // Visto es usado: si pi se corta antes de la entrega, otra sesión no lo vuelve a reservar ni lo oculta.
+  assert.match(readFileSync(join(e.raiz, "progreso.yaml"), "utf8"), /- doc: parcial\n\s+id: '2'\n\s+usado: true/);
+  assert.deepEqual(reservas(e.raiz, e.sesion.actual().d).retardos, { doc: "parcial", id: "3" });
+  assert.ok(!e.sesion.refrescar().includes("ENUNCIADO TRES"));
+  // Guardar lo pendiente de la clase antes de presentar no termina el simulacro.
+  await progreso.registrar("1", { resumen: "evidencia pendiente" }, undefined, undefined, e.ctx);
+  for (const h of e.eventos.get("tool_execution_end")) h({ toolName: "registrar_progreso", isError: false }, e.ctx);
+  assert.equal(enCurso(e.ctx, e.sesion.actual())?.id, "2");
+  assert.equal(e.estados.curso, "📝 Simulacro · Retardos");
+  assert.match(e.sesion.leer_items({ doc: "parcial", ids: ["2"] }, enCurso(e.ctx, e.sesion.actual())), /ENUNCIADO DOS/);
+  // /fin sin entrega lo cierra con la sesión; otra clase del tema no lo sigue.
   await e.comandos.get("fin").handler("", e.ctx);
   await progreso.registrar("1", { resumen: "cierre sin entrega", cierre: true }, undefined, undefined, e.ctx);
-  assert.deepEqual(e.sesion.actual().d.progreso.temas.retardos.reservado, [{ doc: "parcial", id: "2", usado: true }]);
+  await e.sesion.cerrar(e.ctx);
+  await e.comandos.get("estudiar").handler("redes retardos", e.ctx);
   assert.equal(enCurso(e.ctx, e.sesion.actual()), undefined);
 });
 

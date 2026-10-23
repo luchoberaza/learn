@@ -11,7 +11,7 @@ import unittest
 import yaml
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'scripts/ingesta'))
 import test_progreso
-from progreso import falla, leer, registrar
+from progreso import falla, leer, registrar, usar
 
 SCRIPT = Path(__file__).resolve().parents[2] / 'scripts/ingesta/progreso.py'
 
@@ -121,6 +121,28 @@ class ReservaTest(unittest.TestCase):
     def test_rendido_en_el_mismo_registro_en_que_se_fija_queda_usado(self):
         self.guardar(simulacro={'doc': 'parcial', 'id': '1'}, reservas={'derivacion': {'doc': 'parcial', 'id': '1'}})
         self.assertEqual(self.temas()['derivacion']['reservado'], [{'doc': 'parcial', 'id': '1', 'usado': True}])
+
+    def test_presentado_en_el_simulacro_queda_usado_sin_esperar_el_intento(self):
+        # Visto es usado: si pi se corta antes de la entrega, no vuelve a reservarse ni a ocultarse.
+        r = usar(self.vault, 'ejemplo', 'derivacion', 'parcial', '1')
+        self.assertEqual(self.temas()['derivacion'], {'estado': 'sin_empezar', 'reservado': [{'doc': 'parcial', 'id': '1', 'usado': True}]})
+        self.assertEqual(r['progreso']['historial'], [])
+        self.guardar(reservas={'derivacion': {'doc': 'parcial', 'id': '2'}})
+        usar(self.vault, 'ejemplo', 'derivacion', 'parcial', '2')
+        self.assertEqual(self.temas()['derivacion']['reservado'], [{'doc': 'parcial', 'id': '1', 'usado': True}, {'doc': 'parcial', 'id': '2', 'usado': True}])
+        # Una solución no se reserva ni se anota.
+        self.assertTrue(usar(self.vault, 'ejemplo', 'limites', 'parcial', '1-solucion')['sin_cambios'])
+
+    def test_presentado_en_el_simulacro_queda_usado_sin_esperar_el_intento(self):
+        # Visto es usado: si pi se corta antes de la entrega, no vuelve a reservarse ni a ocultarse.
+        r = usar(self.vault, 'ejemplo', 'derivacion', 'parcial', '1')
+        self.assertEqual(self.temas()['derivacion'], {'estado': 'sin_empezar', 'reservado': [{'doc': 'parcial', 'id': '1', 'usado': True}]})
+        self.assertEqual(r['progreso']['historial'], [])
+        self.guardar(reservas={'derivacion': {'doc': 'parcial', 'id': '2'}})
+        usar(self.vault, 'ejemplo', 'derivacion', 'parcial', '2')
+        self.assertEqual(self.temas()['derivacion']['reservado'], [{'doc': 'parcial', 'id': '1', 'usado': True}, {'doc': 'parcial', 'id': '2', 'usado': True}])
+        # Una solución no se reserva ni se anota.
+        self.assertTrue(usar(self.vault, 'ejemplo', 'limites', 'parcial', '1-solucion')['sin_cambios'])
 
     def test_si_el_reservado_desaparece_se_elige_otro(self):
         self.guardar(reservas={'derivacion': {'doc': 'parcial', 'id': '1'}})
