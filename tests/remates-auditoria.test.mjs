@@ -211,7 +211,7 @@ test("textos: la copia muestra el error limpio de Python y la nota se nombra en 
   await e.comandos.get("estudiar").handler("ejemplo derivacion", e.ctx);
   assert.deepEqual(e.avisos.filter(([, m]) => /Material/.test(m)), [["warning", "Material desde la última carga. Disco lleno: no se pudo preparar el material; liberá espacio y reintentá."]]);
   assert.equal(e.sesion.actual().pendiente, undefined);
-  // Otra nota vinculada a mano durante la clase: el cierre no se confirma y se dice sin nombrar componentes.
+  // Otra nota vinculada a mano durante la clase: el cierre no se confirma, se dice sin nombrar componentes y con lo que lo destraba (repetir /fin no alcanza).
   const otra = join(e.raiz, "sesiones/otra.md"); writeFileSync(otra, "");
   await e.comandos.get("md-log").handler(otra, e.ctx);
   await e.comandos.get("fin").handler("", e.ctx);
@@ -219,8 +219,11 @@ test("textos: la copia muestra el error limpio de Python y la nota se nombra en 
   await e.final("Resumen final.");
   e.avisos.length = 0;
   await e.emitir("agent_settled", {});
-  assert.deepEqual(e.avisos, [["warning", "No se pudo cerrar la nota de la clase en Obsidian; la clase sigue abierta: repetí /fin."]]);
+  assert.deepEqual(e.avisos, [["warning", "No se pudo cerrar la nota de la clase en Obsidian; la clase sigue abierta: hay otra nota vinculada, desvinculala con /md-unlog y repetí /fin."]]);
   assert.ok(e.sesion.actual());
+  await e.comandos.get("md-unlog").handler("", e.ctx);
+  await e.emitir("agent_settled", {});
+  assert.equal(e.sesion.actual(), undefined);
 });
 
 // Preparación por tema con la ingesta base real y un modelo simulado (como preparacion-auditoria): libro, parcial y práctico.

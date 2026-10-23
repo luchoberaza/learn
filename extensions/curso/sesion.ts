@@ -349,9 +349,10 @@ export function registrarSesion(pi: ExtensionAPI, vault = vaultDir, recursos = p
     async cerrar(ctx: ExtensionContext) {
       const { a } = actual();
       if (!sinLog) await new Promise<void>((resolve, reject) => {
-        const sinCerrar = new Error("No se pudo cerrar la nota de la clase en Obsidian; la clase sigue abierta: repetí /fin.");
-        const timer = setTimeout(() => reject(sinCerrar), 2000);
-        pi.events.emit("md-log:unlink", { file: rutaSegura(vault, a.nota ?? a.log), onComplete(error?: string) { clearTimeout(timer); error ? reject(sinCerrar) : resolve(); } });
+        const sinCerrar = "No se pudo cerrar la nota de la clase en Obsidian; la clase sigue abierta:";
+        const timer = setTimeout(() => reject(new Error(`${sinCerrar} repetí /fin.`)), 2000);
+        // md-log sólo rechaza si la nota vinculada ya no es la de la clase (otra con /md-log): repetir /fin no alcanza.
+        pi.events.emit("md-log:unlink", { file: rutaSegura(vault, a.nota ?? a.log), onComplete(error?: string) { clearTimeout(timer); error ? reject(new Error(`${sinCerrar} hay otra nota vinculada, desvinculala con /md-unlog y repetí /fin.`)) : resolve(); } });
       });
       pi.appendEntry("curso", null);
       olvidarActivo(ctx, a.curso);
