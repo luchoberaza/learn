@@ -35,7 +35,7 @@ const mensaje = (e: unknown) => e instanceof Error ? e.message : String(e);
 // Red, cuota o credenciales según el error del proveedor (no el motivo de un rechazo, que cita el texto del ítem).
 const corte = (e: unknown) => (e as { corte?: string } | undefined)?.corte;
 const cuenta = (n: number, uno: string, varios: string) => `${n} ${n === 1 ? uno : varios}`;
-const vivo = (pid: number) => { try { process.kill(pid, 0); return true; } catch (e) { return (e as NodeJS.ErrnoException).code === "EPERM"; } };
+export const vivo = (pid: number) => { try { process.kill(pid, 0); return true; } catch (e) { return (e as NodeJS.ErrnoException).code === "EPERM"; } };
 // Identidad que un pid reutilizado (también tras reiniciar) no repite: arranque del sistema y del proceso; en Linux.
 function proceso(pid: number) {
   try { return `${readFileSync("/proc/sys/kernel/random/boot_id", "utf8").trim()}:${readFileSync(`/proc/${pid}/stat`, "utf8").split(") ").at(-1)!.split(" ")[19]}`; }

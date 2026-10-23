@@ -10,6 +10,7 @@ import { registrarPresentacion } from "./presentacion.ts";
 import { registrarResearcher } from "./researcher.ts";
 import { registrarProgreso } from "./progreso.ts";
 import { registrarPreparacion } from "./preparacion.ts";
+import { registrarIngestaFondo } from "./ingesta-fondo.ts";
 import { enCurso, registrarSimulacro } from "./simulacro.ts";
 
 const slug = Type.String({ pattern: "^[a-z0-9]+(?:-[a-z0-9]+)*$" });
@@ -24,6 +25,7 @@ function salida(curso: string): string {
 
 export default function (pi: ExtensionAPI) {
   registrarCuracion(pi);
+  registrarIngestaFondo(pi);
   const sesion = registrarSesion(pi);
   registrarPreparacion(pi, sesion);
   const progreso = registrarProgreso(pi, sesion);

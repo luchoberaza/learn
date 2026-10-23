@@ -42,7 +42,7 @@ Para ver si todo está en orden en cualquier momento: `.pi/scripts/doctor` desde
 2. **Abrí `pi-learn` y escribí** `/curso-nuevo <slug>`, por ejemplo `/curso-nuevo redes`. El slug es un nombre corto, sin espacios.
 3. **El agente inventaría los PDFs** y te muestra qué toma para el curso. Si algo es dudoso (otra materia, una edición vieja), te pregunta con botones.
 4. **Arma dos archivos.** `curso.md` es el contrato: objetivos, cómo se evalúa y formato de las preguntas, todo citado del programa o con «no consta». `indice.yaml` tiene los temas, el rango de páginas de la bibliografía de cada uno, los prerequisitos y los ejercicios.
-5. **Indexa todas las páginas en local, sin modelo**, en segundo plano. Con `/curso-estado <slug>` ves cómo va.
+5. **Indexa todas las páginas en local, sin modelo**, en segundo plano. Sobre el editor aparece una barra con el avance («⏳ Ingesta de <slug> [████░░…] 568/2592 páginas · 22%»). No hace falta escribir nada: cuando termina, el agente sigue solo con el armado. Si se corta, te avisa y te propone reanudar.
 6. **Revisá la tabla tema → material** que te muestra y abrí `cursos/<slug>/informe-ingesta.md` en Obsidian. El curso queda como borrador hasta que la revises. Cada cambio a un curso ya guardado te muestra el diff y pide confirmación.
 
 Más adelante:
