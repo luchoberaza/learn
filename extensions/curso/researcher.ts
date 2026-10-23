@@ -3,7 +3,7 @@ import { closeSync, existsSync, fsyncSync, linkSync, mkdirSync, openSync, readdi
 import { spawn } from "node:child_process";
 import { dirname, join, relative } from "node:path";
 import { createHash, randomUUID } from "node:crypto";
-import { acotar, cita, documento, esSlug, leer, rutaSegura, type DatosCurso, type Tema } from "./material.ts";
+import { acotar, cita, copiaEnPagina, documento, esSlug, leer, reservados, rutaSegura, type DatosCurso, type Tema } from "./material.ts";
 import { preparando } from "./preparacion.ts";
 
 const sha = (s: string) => createHash("sha256").update(s).digest("hex");
@@ -34,14 +34,15 @@ export function prepararInvestigacion(vault: string, recursos: string, d: DatosC
   let bytes = 0, inspeccionadas = 0;
   const refs = [...(tema.bibliografia || []).map(ref => ({ doc: ref.doc, paginas: ref.paginas })),
     ...d.documentos.filter(doc => doc.tipo === "programa").map(doc => ({ doc: doc.id, paginas: [1, doc.paginas] }))];
-  const vistos = new Set<string>();
+  // E3: el researcher lee páginas enteras con read; no recibe una con la casi copia de un reservado ni los ejercicios ocultos.
+  const vistos = new Set<string>(), ocultos = reservados(raiz, d);
   for (const ref of refs) {
     const doc = documento(d, ref.doc);
     if (ref.paginas.length !== 2 || !ref.paginas.every(Number.isSafeInteger) || ref.paginas[0] < 1 || ref.paginas[1] < ref.paginas[0] || ref.paginas[1] > doc.paginas) throw new Error("Referencia de investigación fuera de rango PDF.");
     for (let p = ref.paginas[0]; p <= ref.paginas.at(-1)!; p++) {
       if (anclas.length >= 50 || bytes >= 200_000 || inspeccionadas++ >= 2000) break;
       const file = `_procesado/${doc.id}/paginas/${String(p).padStart(4, "0")}.md`;
-      if (vistos.has(file)) continue;
+      if (vistos.has(file) || copiaEnPagina(raiz, d, doc.id, p, ocultos)) continue;
       vistos.add(file);
       try {
         const texto = leer(raiz, file, 200_000);
@@ -63,7 +64,7 @@ export function prepararInvestigacion(vault: string, recursos: string, d: DatosC
   for (const ref of tema.ejercicios || []) {
     const doc = documento(d, ref.doc);
     if (doc.tipo !== "ejercicios") continue;
-    for (const id of ref.items) {
+    for (const id of ref.items.filter(id => !ocultos.has(`${doc.id}/${id}`))) {
       const item = d.items[doc.id]?.find(i => i.id === id);
       if (item && (!Array.isArray(item.paginas) || !item.paginas.length || item.paginas.some(p => !Number.isSafeInteger(p) || p < 1 || p > doc.paginas))) throw new Error("Ítem con páginas PDF fuera de rango; corregí el banco antes de verificarlo.");
       if (!item || bytes + Buffer.byteLength(item.enunciado) > 200_000) { faltantes.push(`${doc.id}/${id}`); continue; }

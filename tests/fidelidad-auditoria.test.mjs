@@ -8,6 +8,7 @@ import { buscarMaterial, copiaEnPagina, dossier, leerItems, leerPaginas, reserva
 import { registrarSesion } from "../extensions/curso/sesion.ts";
 import { registrarSimulacro } from "../extensions/curso/simulacro.ts";
 import { registrarProgreso } from "../extensions/curso/progreso.ts";
+import { prepararInvestigacion } from "../extensions/curso/researcher.ts";
 import { tokenizar } from "../scripts/ingesta/bm25.ts";
 import { piDir, vaultDir } from "../scripts/lib/pi-sdk.mjs";
 
@@ -251,4 +252,15 @@ test("G2: /fin pide un resumen de toda la sesión, no sólo de lo nuevo desde el
   const orden = e.ordenes.at(-1).content;
   assert.match(orden, /cierre:true, la evidencia observada desde el último guardado \(lo omitido se conserva\) y un resumen de toda la sesión, no sólo de lo nuevo: qué se aprendió, qué falló y qué sigue\./);
   assert.doesNotMatch(orden, /alcanza con resumen/);
+});
+
+test("E3: el researcher no recibe la página del libro con la casi copia del reservado ni los ejercicios ocultos", t => {
+  const c = curso(t);
+  c.escribir("_procesado/libro/paginas/0001.md", "<!-- p. PDF 1 -->\nEl retardo de propagación es d/s.");
+  c.escribir("_procesado/libro/paginas/0002.md", `<!-- p. PDF 2 -->\nP28. Otro problema.\nP29. ${COPIA_PRACTICO}`);
+  c.d.progreso = { temas: { retardos: { estado: "en_curso", reservado: [{ doc: "parcial", id: "2" }] } }, historial: [] };
+  const { tarea } = prepararInvestigacion(c.vault, piDir, c.d, c.tema, "alcance");
+  assert.match(tarea, /libro\/paginas\/0001\.md/);
+  assert.doesNotMatch(tarea, /0002\.md|geoestacionario/);
+  assert.match(tarea, /N paquetes/);
 });
