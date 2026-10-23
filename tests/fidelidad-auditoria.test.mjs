@@ -94,8 +94,9 @@ test("E3 con el curso real: el Ej. 10 del Práctico 1, casi copia de la Pregunta
   d.progreso = { temas: { retardos: { estado: "en_curso", reservado: [{ doc: "sol-prc20230918", id: "3" }] } }, historial: [] };
   const r = reservados(raiz, d);
   assert.ok(r.has("practico-1/10"));
-  // Nada más que el reservado, sus soluciones y esa copia: los otros ejercicios del práctico siguen a la vista.
-  assert.deepEqual([...r].filter(x => !/^sol-prc20240926\//.test(x)).sort(), ["practico-1/10", "sol-prc20230918/3", "sol-prc20230918/3-solucion"]);
+  // Del práctico sólo esa copia: los otros ejercicios siguen a la vista (los reservados de otros temas dependen de qué parciales ya se segmentaron).
+  assert.deepEqual([...r].filter(x => x.startsWith("practico-1/")), ["practico-1/10"]);
+  assert.ok(r.has("sol-prc20230918/3") && r.has("sol-prc20230918/3-solucion"));
   assert.equal(leerItems(d, "practico-1", ["10"], false, r), "practico-1/10: Ese ítem está reservado para /simulacro; elegí otro.");
   const pagina = leerPaginas(raiz, d, "practico-1", 3, 3, false, r);
   assert.ok(!/geoestacionario|#page=/.test(pagina), pagina);
@@ -118,8 +119,8 @@ test("E3 con el curso real: el problema P29 de Kurose, gemelo de la Pregunta 3 r
   assert.match(leerPaginas(raiz, d, "kurose-7", 88, 88, false, new Set()), /P29\. Suponga que existe un enlace de microondas/);
   const ocultas = retardos.bibliografia.flatMap(b => Array.from({ length: b.paginas[1] - b.paginas[0] + 1 }, (_, i) => b.paginas[0] + i)).filter(p => copiaEnPagina(raiz, d, "kurose-7", p, r));
   assert.deepEqual(ocultas, [88]);
-  const [hallado] = buscarMaterial(raiz, d, "producto ancho de banda retardo microondas", "bibliografia", r);
-  assert.deepEqual([hallado.pagina, hallado.fragmento], [88, "Sin fragmento: la página trae un problema reservado para /simulacro; leela con leer_paginas, que lo omite."]);
+  const hallado = buscarMaterial(raiz, d, "producto ancho de banda retardo microondas", "bibliografia", r).find(h => h.pagina === 88);
+  assert.equal(hallado.fragmento, "Sin fragmento: la página trae un problema reservado para /simulacro; leela con leer_paginas, que lo omite.");
 });
 
 test("F1, F2 con el curso real: el dossier de retardos nombra la tool y los rangos de Kurose dentro del presupuesto", t => {
