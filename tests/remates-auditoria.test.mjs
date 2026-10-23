@@ -337,10 +337,10 @@ test("preparación (a): una segmentación que falla siempre no gasta llamadas en
   e.guion.segmentar = texto => texto.includes("Documento parcial") && respuesta("No encontré ítems.");
   await e.turno();
   assert.equal(e.llamadas.filter(x => x === "segmentar").length, 3);
-  assert.deepEqual(e.avisos, [["warning", "Material de Derivación preparado en parte: 4 páginas transcriptas, 1 ítem nuevo; no se pudieron separar los ítems de parcial (la respuesta no es JSON válido), se reintenta mañana o si cambia el material."]]);
+  assert.deepEqual(e.avisos, [], "P4: una segmentación que espera no cambia lo que puede hacer el alumno");
   e.llamadas.length = 0;
   await e.turno();
-  assert.deepEqual([e.llamadas, e.avisos.length, e.json("preparacion.json").temas.derivacion.estado], [[], 1, "incompleta"]);
+  assert.deepEqual([e.llamadas, e.avisos.length, e.json("preparacion.json").temas.derivacion.estado], [[], 0, "incompleta"]);
   // Un día después se reintenta una vez más (2 llamadas) y vuelve a esperar.
   const prep = e.json("preparacion.json"); prep.fallos["segmentar/parcial"].fecha = "2000-01-01T00:00:00+00:00";
   writeFileSync(join(e.raiz, "_procesado/preparacion.json"), JSON.stringify(prep));
@@ -369,9 +369,9 @@ test("preparación (b, c): red, cuota o credenciales cortan la tanda en la prime
   const g = preparacion(t);
   g.guion.segmentar = texto => texto.includes("Documento parcial") && respuesta("", { stopReason: "aborted", errorMessage: "Request was aborted" });
   await g.turno();
-  assert.equal(g.avisos.length, 1);
-  assert.match(g.avisos[0][1], /no se pudieron separar los ítems de parcial \(el modelo no respondió en 5 minutos\)/);
-  assert.doesNotMatch(g.avisos[0][1], /Request was aborted/);
+  // Un plazo vencido no es una falla de red: el parcial queda en espera, sin aviso, y la tanda sigue.
+  assert.deepEqual(g.avisos, []);
+  assert.ok(g.json("preparacion.json").fallos["segmentar/parcial"]);
 });
 
 test("H19: los fallos de la corrida quedan registrados aunque después la corte la red, y la próxima clase no los repite", async t => {
@@ -395,8 +395,7 @@ test("preparación (b): un ítem inválido que habla de sockets o conexiones no 
   e.guion.segmentar = texto => texto.includes("Documento parcial") && respuesta(JSON.stringify({ items: [{ id: "1", paginas: [9], enunciado: "Explique qué hace un socket TCP al cerrar la connection (HTTP 401)." }] }));
   await e.turno();
   assert.equal(e.llamadas.filter(x => x === "segmentar").length, 3);
-  assert.equal(e.avisos.length, 1);
-  assert.match(e.avisos[0][1], /no se pudieron separar los ítems de parcial \(ítem inválido.*se reintenta mañana/);
+  assert.deepEqual(e.avisos, []);
   assert.ok(e.json("preparacion.json").fallos["segmentar/parcial"]);
 });
 

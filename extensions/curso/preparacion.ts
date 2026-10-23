@@ -119,9 +119,9 @@ export function registrarPreparacion(pi: ExtensionAPI, sesion: Pick<ReturnType<t
     corriendo.set(curso, control); intentados.add(clave);
     const estado = (texto?: string) => { try { ctx.ui.setStatus("preparacion", texto); } catch { /* ctx viejo tras /reload. */ } };
     const avisar = (texto: string, tipo: "info" | "warning") => { try { ctx.ui.notify(texto, tipo); } catch { /* ctx viejo tras /reload. */ } };
-    let ocupada = false, transcriptas = 0, nuevos = 0, asignadas = 0, fallo = false;
+    let ocupada = false, transcriptas = 0, nuevos = 0, asignadas = 0;
     // Segmentaciones y clasificaciones fallidas, con la huella de sus entradas: no se repiten hasta mañana o hasta que cambien.
-    const avisos: string[] = [], segmentados: string[] = [], fallos: Record<string, string> = {};
+    const segmentados: string[] = [], fallos: Record<string, string> = {};
     // Red, cuota o credenciales: cada llamada siguiente fallaría igual, así que se corta la tanda con la causa.
     const cortar = (e: unknown) => { if (signal.aborted || OCUPADA.test(mensaje(e)) || corte(e)) throw corte(e) ? new Error(corte(e)) : e; };
     try {
@@ -145,7 +145,6 @@ export function registrarPreparacion(pi: ExtensionAPI, sesion: Pick<ReturnType<t
           ocupada ||= resumen.avisos.some(a => OCUPADA.test(a));
           if (ocupada || resumen.cancelada) throw new Error("cancelada");
           if (resumen.corte) throw new Error(resumen.corte);
-          avisos.push(...resumen.avisos);
           // Las páginas del tema ya sirven: el dossier deja de mandarlas a ver_pagina sin esperar a parciales y prácticos.
           if (resumen.transcritas && tema.bibliografia?.some(b => b.doc === doc)) {
             try { if (sesion.actual()?.a.curso === curso) sesion.refrescar(); } catch { /* El tema dejó el índice: el próximo /estudiar lo informa. */ }
@@ -168,8 +167,6 @@ export function registrarPreparacion(pi: ExtensionAPI, sesion: Pick<ReturnType<t
             segmentados.push(s.doc);
           } catch (e) {
             cortar(e);
-            fallo ||= !avisos.length;
-            avisos.push(`no se pudieron separar los ítems de ${s.doc} (${mensaje(e).slice(0, 150)})`);
             fallos[`segmentar/${s.doc}`] = s.entrada;
           }
         }
@@ -188,8 +185,6 @@ export function registrarPreparacion(pi: ExtensionAPI, sesion: Pick<ReturnType<t
             asignadas += asignaciones.filter((a: any) => a.tema === tema.id).length;
           } catch (e) {
             cortar(e);
-            fallo ||= !avisos.length;
-            avisos.push(`no se ${lote.length === 1 ? "pudo clasificar 1 ítem" : `pudieron clasificar ${lote.length} ítems`} (${mensaje(e).slice(0, 150)})`);
             for (const x of lote) fallos[`clasificar/${x.doc}/${x.id}`] = x.entrada;
           }
         }
@@ -205,8 +200,6 @@ export function registrarPreparacion(pi: ExtensionAPI, sesion: Pick<ReturnType<t
       }
       const resultado = `${cuenta(transcriptas, "página transcripta", "páginas transcriptas")}, ${cuenta(nuevos, "ítem nuevo", "ítems nuevos")}`;
       const quedan = pendientes === 1 ? "queda 1 página" : `quedan ${pendientes} páginas`;
-      const detalle = avisos[0]?.replace(/\.$/, "").slice(0, 200) || (pendientes ? quedan : "quedan ítems que no se pudieron preparar");
-      avisar(completa ? `Material de ${tema.nombre} listo: ${resultado}.` : `Material de ${tema.nombre} preparado en parte: ${resultado}; ${detalle}, ${fallo || !avisos.length && !pendientes ? "se reintenta mañana o si cambia el material" : "sigue la próxima vez"}.`, completa ? "info" : "warning");
       if (e?.a.curso === curso && e.a.tema === tema.id) pi.sendMessage({ customType: "curso-preparacion", display: false,
         content: `Preparación automática del material de «${tema.nombre}»: ${resultado}${segmentados.length ? ` (ítems de ${segmentados.join(", ")})` : ""}${asignadas ? `; ${cuenta(asignadas, "ítem asignado a este tema, marcado", "ítems asignados a este tema, marcados")} «asignado automáticamente» en el dossier` : ""}${pendientes ? `; ${quedan} sin transcribir` : ""}. El dossier ya está actualizado: usá leer_paginas y leer_items con ese material.` }, { deliverAs: "nextTurn" });
     } catch (e) {
