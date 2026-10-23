@@ -1,6 +1,6 @@
 import { after, before, test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -127,8 +127,13 @@ async function conFaux(t, entradas, activo = true) {
   const sessionManager = sdk.SessionManager.inMemory();
   if (activo) sessionManager.appendCustomEntry("curso", { curso: "redes", tema: "retardos", log: "cursos/redes/sesiones/2026-10-22-retardos.md" });
   const uso = { input: 1, output: 1, cacheRead: 0, cacheWrite: 0, totalTokens: 2, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } };
+  // La sesión restaurada escribe el registro de clase del curso real; se devuelve como estaba.
+  const registro = ["activa", "cargada"].map(n => join(vaultDir, `cursos/redes/.sesion-${n}.json`)).map(f => [f, existsSync(f) ? readFileSync(f) : null]);
   const { session } = await sdk.createAgentSession({ cwd: vaultDir, agentDir, settingsManager, resourceLoader: loader, sessionManager, model: faux.getModel(), thinkingLevel: "off" });
-  t.after(async () => { await session.extensionRunner.emit({ type: "session_shutdown" }); session.dispose(); });
+  t.after(async () => {
+    await session.extensionRunner.emit({ type: "session_shutdown" }); session.dispose();
+    for (const [f, antes] of registro) antes ? writeFileSync(f, antes) : rmSync(f, { force: true });
+  });
   await session.bindExtensions({});
   if (session.model?.provider !== "faux") await session.setModel(faux.getModel());
   settingsManager.applyOverrides({ compaction: { keepRecentTokens: 1 } });
