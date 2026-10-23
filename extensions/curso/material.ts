@@ -87,14 +87,35 @@ function itemsDelTema(raiz: string, datos: DatosCurso, tema: Tema) {
 }
 // E3: números normalizados (36,000 → 36000; 2,4 → 2.4) y palabras de 5 letras o más, sin comandos LaTeX.
 const huella = (t: string) => new Set(normalizar(t).replace(/\\[a-z]+/g, " ").replace(/(\d)[.,](?=\d{3}(?!\d))/g, "$1").replace(/(\d),(?=\d)/g, "$1.").match(/\d+(?:\.\d+)?|[a-z]{5,}/g) ?? []);
-// Casi copias visibles de un ítem: enunciados de ejercicios y evaluaciones con Jaccard ≥ 0,5 y 10 términos en común, así dos enunciados cortos no se confunden
-// (en redes, el parcial copiado en el práctico da 0,73 con 30 en común; el par siguiente, 0,19).
+// Casi copia: Jaccard ≥ 0,5 y 10 términos en común, así dos enunciados cortos no se confunden
+// (en redes, el parcial copiado en el práctico da 0,73 con 30 en común y en el problema P29 del libro 0,63; el par siguiente, 0,21).
+const casi = (a: Set<string>, b: Set<string>) => { const comun = [...a].filter(t => b.has(t)).length; return comun >= 10 && comun / (a.size + b.size - comun) >= 0.5; };
+// Casi copias visibles de un ítem entre los enunciados de ejercicios y evaluaciones.
 function casiCopias(datos: DatosCurso) {
   const visibles = datos.documentos.filter(d => d.tipo === "ejercicios" || d.tipo === "evaluaciones").flatMap(d => (datos.items[d.id] || []).filter(i => !esSolucion(d, i)).map(i => ({ doc: d.id, id: i.id, h: huella(i.enunciado) })));
   return (x: Ref) => {
     const a = visibles.find(v => v.doc === x.doc && v.id === x.id);
-    return a ? visibles.filter(v => { const comun = [...a.h].filter(t => v.h.has(t)).length; return v !== a && comun >= 10 && comun / (a.h.size + v.h.size - comun) >= 0.5; }) : [];
+    return a ? visibles.filter(v => v !== a && casi(a.h, v.h)) : [];
   };
+}
+// En una página leída entera (el libro, un práctico sin segmentar) se omite el bloque («P29.», «Ejercicio 10»…) casi igual a un reservado.
+// shortcut: un problema partido entre dos páginas puede quedar bajo el umbral en cada mitad; si aparece, comparar también con la página siguiente.
+function sinCopias(datos: DatosCurso, texto: string, reservados: Set<string>) {
+  const huellas = datos.documentos.flatMap(d => (datos.items[d.id] || []).filter(i => !esSolucion(d, i) && reservados.has(`${d.id}/${i.id}`)).map(i => huella(i.enunciado)));
+  if (!huellas.length) return texto;
+  const salida: string[] = [];
+  let bloque: string[] = [];
+  const cerrar = () => { salida.push(...(huellas.some(h => casi(h, huella(bloque.join("\n")))) ? ["[Problema reservado para /simulacro.]"] : bloque)); bloque = []; };
+  for (const linea of texto.split("\n")) {
+    if (/^(?:[pr]\d+\.|(?:pregunta|ejercicio|problema)\s*(?:n\S{0,2}\s*)?\d+)/.test(normalizar(linea).replace(/^(?:[\s#>*_|•-]|<[^>]*>)+/, ""))) cerrar();
+    bloque.push(linea);
+  }
+  cerrar();
+  return salida.join("\n");
+}
+const textoPagina = (raiz: string, doc: string, p: number) => leer(raiz, `_procesado/${doc}/paginas/${String(p).padStart(4, "0")}.md`, 200_000);
+export function copiaEnPagina(raiz: string, datos: DatosCurso, doc: string, p: number, reservados: Set<string>) {
+  try { const t = textoPagina(raiz, doc, p); return sinCopias(datos, t, reservados) !== t; } catch { return false; }
 }
 // E3: por tema, un ítem real de evaluación sin practicar queda para /simulacro: sin casi copias visibles si hay, con solución oficial y puntos si hay.
 // El primero vigente que guardó progreso.yaml manda: los ítems nuevos no lo cambian; usado o desaparecido, se elige otro.
@@ -132,7 +153,8 @@ export function buscarMaterial(raiz: string, datos: DatosCurso, consulta: string
   return buscar(indice, consulta, 5, tipo).flatMap(r => {
     const d = datos.documentos.find(d => d.id === r.doc);
     if (!d) return [];
-    if (!conSolucion(datos, d) && !paginasReservadas(datos, r.doc, reservados).has(r.pagina)) return [{ doc: r.doc, pagina: r.pagina, seccion: r.seccion, fragmento: r.fragmento, pendiente: r.pendiente, cita: cita(datos, r.doc, r.pagina) }];
+    if (!conSolucion(datos, d) && !paginasReservadas(datos, r.doc, reservados).has(r.pagina)) return [{ doc: r.doc, pagina: r.pagina, seccion: r.seccion, pendiente: r.pendiente, cita: cita(datos, r.doc, r.pagina),
+      fragmento: copiaEnPagina(raiz, datos, r.doc, r.pagina, reservados) ? "Sin fragmento: la página trae un problema reservado para /simulacro; leela con leer_paginas, que lo omite." : r.fragmento }];
     const items = (datos.items[r.doc] || []).filter(i => !esSolucion(d, i) && !reservados.has(`${r.doc}/${i.id}`) && i.paginas.includes(r.pagina)).map(i => i.id);
     const como = d.tipo === "soluciones" ? "son soluciones: pedilas con leer_items e incluir_solucion después del intento" : items.length ? `leé el enunciado con leer_items (ítems: ${items.join(", ")})` : "leé el enunciado con leer_paginas, que omite la parte resuelta";
     return [{ doc: r.doc, pagina: r.pagina, seccion: /^(pregunta|ejercicio|problema)\b/i.test(r.seccion || "") ? r.seccion : null, pendiente: r.pendiente, cita: sinEnlace([r.pagina]),
@@ -172,7 +194,7 @@ export function leerPaginas(raiz: string, datos: DatosCurso, doc: string, desde:
   const separadas = (!despuesDelIntento && conSolucion(datos, d)) || enRango ? sinSoluciones(raiz, d, new Error(enRango ? `Esas páginas de ${doc} traen un ítem reservado para /simulacro; elegí otro rango o leé los ítems con leer_items.` : `No se puede separar el enunciado de la solución en ${doc}: leé el enunciado con leer_items; el texto completo, sólo después del intento del estudiante (despues_del_intento:true).`), omitir, !despuesDelIntento && conSolucion(datos, d)) : undefined;
   let salida = "";
   for (let p = desde; p <= hasta && Buffer.byteLength(salida) < 30000; p++) {
-    try { salida += separadas ? `\n${separadas[p - 1]}\n${sinEnlace([p])}\n` : `\n${leer(raiz, `_procesado/${doc}/paginas/${String(p).padStart(4, "0")}.md`, 200_000)}\n${cita(datos, doc, p)}\n`; }
+    try { salida += separadas ? `\n${separadas[p - 1]}\n${sinEnlace([p])}\n` : `\n${sinCopias(datos, textoPagina(raiz, doc, p), reservados)}\n${cita(datos, doc, p)}\n`; }
     catch { salida += `\nPágina PDF ${p} sin transcripción utilizable; consultá ver_pagina. ${cita(datos, doc, p)}\n`; }
     try {
       const q = JSON.parse(leer(raiz, `_procesado/${doc}/calidad.json`)).paginas?.[String(p)];

@@ -4,7 +4,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { buscarMaterial, dossier, leerItems, leerPaginas, reservados, reservas } from "../extensions/curso/material.ts";
+import { buscarMaterial, copiaEnPagina, dossier, leerItems, leerPaginas, reservados, reservas } from "../extensions/curso/material.ts";
 import { registrarSesion } from "../extensions/curso/sesion.ts";
 import { registrarSimulacro } from "../extensions/curso/simulacro.ts";
 import { registrarProgreso } from "../extensions/curso/progreso.ts";
@@ -99,6 +99,21 @@ test("E3 con el curso real: el Ej. 10 del Práctico 1, casi copia de la Pregunta
   for (const x of buscarMaterial(raiz, d, "satélite geoestacionario fotografía por minuto", "ejercicios", r)) assert.ok(!/geoestacionario|fotograf/i.test(JSON.stringify(x)), JSON.stringify(x));
 });
 
+test("E3 con el curso real: el problema P29 de Kurose, gemelo de la Pregunta 3 reservada, no se ve en la p. 88 y el resto de la bibliografía de retardos queda igual", t => {
+  if (!existsSync(join(vaultDir, "cursos/redes/_procesado/kurose-7/paginas/0088.md"))) return t.skip("sin el curso redes");
+  const d = redes(), raiz = join(vaultDir, "cursos/redes"), retardos = d.temas.find(x => x.id === "retardos");
+  d.items["sol-prc20230918"] ||= JSON.parse(readFileSync(join(piDir, "tests/fixtures/sol-prc20230918.json"), "utf8")).items;
+  d.progreso = { temas: { retardos: { estado: "en_curso", reservado: [{ doc: "sol-prc20230918", id: "3" }] } }, historial: [] };
+  const r = reservados(raiz, d), pagina = leerPaginas(raiz, d, "kurose-7", 88, 88, false, r);
+  assert.ok(!/geoestacionario|fotograf/i.test(pagina), pagina);
+  assert.match(pagina, /P25\. Se tienen dos hosts[\s\S]*P28\.[\s\S]*\[Problema reservado para \/simulacro\.\]\nP30\.[\s\S]*#page=88\]\]/);
+  assert.match(leerPaginas(raiz, d, "kurose-7", 88, 88, false, new Set()), /P29\. Suponga que existe un enlace de microondas/);
+  const ocultas = retardos.bibliografia.flatMap(b => Array.from({ length: b.paginas[1] - b.paginas[0] + 1 }, (_, i) => b.paginas[0] + i)).filter(p => copiaEnPagina(raiz, d, "kurose-7", p, r));
+  assert.deepEqual(ocultas, [88]);
+  const [hallado] = buscarMaterial(raiz, d, "producto ancho de banda retardo microondas", "bibliografia", r);
+  assert.deepEqual([hallado.pagina, hallado.fragmento], [88, "Sin fragmento: la página trae un problema reservado para /simulacro; leela con leer_paginas, que lo omite."]);
+});
+
 test("F1, F2 con el curso real: el dossier de retardos nombra la tool y los rangos de Kurose dentro del presupuesto", t => {
   if (!existsSync(join(vaultDir, "cursos/redes/indice.yaml"))) return t.skip("sin el curso redes");
   const d = redes(), r = dossier(join(vaultDir, "cursos/redes"), d, d.temas.find(x => x.id === "retardos"), 3000, 2000);
@@ -152,7 +167,8 @@ function vault(t, estado) {
     ui: { notify: (m, tipo) => avisos.push([tipo, m]), setStatus: () => {}, select: async (titulo, o) => { preguntas.push([titulo, o]); return ctx.respuesta(o); } } };
   const sesion = registrarSesion(pi, c.vault, recursos);
   registrarSimulacro(pi, sesion, c.vault);
-  return { ...c, pi, ctx, comandos, entradas, avisos, ordenes, preguntas, cortes, sesion, progreso: () => readFileSync(join(c.raiz, "progreso.yaml"), "utf8") };
+  return { ...c, pi, ctx, comandos, entradas, avisos, ordenes, preguntas, cortes, sesion, progreso: () => readFileSync(join(c.raiz, "progreso.yaml"), "utf8"),
+    leerPagina: p => readFileSync(join(c.raiz, `_procesado/libro/paginas/${String(p).padStart(4, "0")}.md`), "utf8") };
 }
 
 test("E9, 6d: /simulacro con el tema sin dominar pregunta antes de gastar el reservado; cancelar no usa nada", async t => {
@@ -196,6 +212,25 @@ test("E9, 6d: sin interfaz y con el tema sin dominar /simulacro no gasta el rese
   assert.deepEqual(d.preguntas, []);
   assert.match(d.progreso(), /usado: true/);
   assert.match(d.ordenes.at(-1).content, /^Simulacro de «Retardos»/);
+});
+
+test("E3: el problema del libro casi igual al reservado no se ve por leer_paginas, buscar_material ni ver_pagina; el resto de la página sí", async t => {
+  const e = vault(t);
+  e.escribir("_procesado/libro/paginas/0001.md", "1.4 Retardos: el retardo de propagación es d/s.");
+  e.escribir("_procesado/libro/paginas/0002.md", `PROBLEMAS\nP25. Se tienen dos hosts, A y B, separados 20.000 kilómetros, con un enlace de 2 Mbps.\nP29. ${COPIA_PRACTICO.replace(/\n/g, " ")}\nP30. Considere la analogía de la compañía aérea.`);
+  e.d.progreso.temas.retardos = { estado: "en_curso", reservado: [{ doc: "parcial", id: "2" }] };
+  await e.comandos.get("estudiar").handler("redes retardos", e.ctx);
+  const texto = e.sesion.leer_paginas({ doc: "libro", desde: 1, hasta: 2 });
+  assert.ok(!/geoestacionario/.test(texto), texto);
+  assert.match(texto, /d\/s\.[\s\S]*libro\.pdf#page=1[\s\S]*P25\. Se tienen dos hosts[^\n]*\n\[Problema reservado para \/simulacro\.\]\nP30\.[\s\S]*libro\.pdf#page=2/);
+  const fragmentos = [1, 2].map(pagina => ({ doc: "libro", titulo: "Libro", tipo: "bibliografia", pagina, seccion: "Problemas", texto: e.leerPagina(pagina), cita: "", calidad: 1, pendiente: false }));
+  for (const f of fragmentos) { f.largo = tokenizar(f.texto).length; f.frecuencias = Object.fromEntries(tokenizar(f.texto).map(w => [w, 1])); }
+  e.escribir("_procesado/busqueda.json", JSON.stringify({ version: 1, normalizacion: "NFD-sin-tildes-v1", k1: 1.2, b: 0.75, cantidad: 2, largo_promedio: 40, df: { satelite: 1, geoestacionario: 1, retardo: 2 }, fragmentos }));
+  const hallados = JSON.parse(e.sesion.buscar_material({ consulta: "satélite geoestacionario retardo" }));
+  assert.ok(!/geoestacionario/.test(JSON.stringify(hallados)), JSON.stringify(hallados));
+  assert.deepEqual(hallados.find(h => h.pagina === 2).fragmento, "Sin fragmento: la página trae un problema reservado para /simulacro; leela con leer_paginas, que lo omite.");
+  await assert.rejects(e.sesion.ver_pagina({ doc: "libro", pagina: 2 }), /Esa página trae un ítem reservado para \/simulacro/);
+  await assert.rejects(e.sesion.ver_pagina({ doc: "libro", pagina: 1 }), x => !/reservado/.test(x.message));
 });
 
 test("G2: /fin pide un resumen de toda la sesión, no sólo de lo nuevo desde el último guardado", async t => {
