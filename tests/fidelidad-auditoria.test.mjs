@@ -116,8 +116,10 @@ test("E3 con el curso real: el problema P29 de Kurose, gemelo de la Pregunta 3 r
   d.progreso = { temas: { retardos: { estado: "en_curso", reservado: [{ doc: "sol-prc20230918", id: "3" }] } }, historial: [] };
   const r = reservados(raiz, d), pagina = leerPaginas(raiz, d, "kurose-7", 88, 88, false, r);
   assert.ok(!/geoestacionario|fotograf/i.test(pagina), pagina);
-  assert.match(pagina, /P25\. Se tienen dos hosts[\s\S]*P28\.[\s\S]*\[Problema reservado para \/simulacro\.\]\nP30\.[\s\S]*#page=88\]\]/);
-  assert.match(leerPaginas(raiz, d, "kurose-7", 88, 88, false, new Set()), /P29\. Suponga que existe un enlace de microondas/);
+  // La preparación del tema transcribe la p. 88 por visión («**P25.**»): vale el texto del OCR y el transcripto.
+  assert.match(pagina, /P25\.(?:\*\*)? Se tienen dos hosts[\s\S]*P28\.[\s\S]*\[Problema reservado para \/simulacro\.\]\s*(?:\*\*)?P30\./);
+  assert.match(pagina, /#page=88\]\]/);
+  assert.match(leerPaginas(raiz, d, "kurose-7", 88, 88, false, new Set()), /P29\.(?:\*\*)? Suponga que existe un enlace de microondas/);
   const ocultas = retardos.bibliografia.flatMap(b => Array.from({ length: b.paginas[1] - b.paginas[0] + 1 }, (_, i) => b.paginas[0] + i)).filter(p => copiaEnPagina(raiz, d, "kurose-7", p, r));
   assert.deepEqual(ocultas, [88]);
   const hallado = buscarMaterial(raiz, d, "producto ancho de banda retardo microondas", "bibliografia", r).find(h => h.pagina === 88);
