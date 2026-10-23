@@ -150,6 +150,8 @@ test("E3: fuera del simulacro el reservado no está en el dossier, leer_items, l
   assert.ok(!d.includes("ENUNCIADO DOS") && !d.includes("parcial/2"));
   assert.match(d, /evaluaciones: parcial\/3 · ENUNCIADO TRES/);
   assert.match(d, /Simulacro: un ítem de evaluación del tema está reservado para \/simulacro/);
+  // Con /fin ya no hay tema activo y /simulacro pediría /estudiar de nuevo: se ofrece antes del cierre.
+  assert.match(d, /Terminada la práctica y antes del cierre, ofrecé \/simulacro\./);
   assert.equal(leerItems(c.d, "parcial", ["2"], false, r), "parcial/2: Ese ítem está reservado para /simulacro; elegí otro.");
   assert.match(leerItems(c.d, "parcial", ["2-solucion"], true, r), /reservado para \/simulacro/);
   assert.doesNotMatch(leerItems(c.d, "parcial", ["2", "3"], true, r), /ENUNCIADO DOS|SOLUCION DOS/);
@@ -347,6 +349,7 @@ test("modo-curso: prevalece sobre teach con sus conflictos explícitos y trae la
     "reservado (E3)": "Nunca lo uses ni lo parafrasees al enseñar",
     "rozado (E3)": "si algo lo rozó, declaralo",
     "simulacro (E9)": "sin pistas ni correcciones hasta la entrega",
+    "oferta del simulacro antes del cierre (E9)": "Terminada la práctica del tema, y antes del cierre, ofrecé `/simulacro`",
     "nodos fallados del simulacro (E9)": "registrás el intento y los nodos fallados (en `borde.falla`) con `registrar_progreso`",
     "práctica al final (6e)": "Al final del tema",
     "delta del progreso": "sólo lo nuevo desde el último guardado",

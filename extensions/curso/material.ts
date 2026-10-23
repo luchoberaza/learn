@@ -261,7 +261,7 @@ export function dossier(raiz: string, datos: DatosCurso, tema: Tema, maxTokens: 
   }
   const ids = (automatico: boolean) => resto.filter(i => i.automatico === automatico).map(i => i.id).join(", ");
   if (resto.length) lineas.push(acotar(`Más ítems del tema (leelos con leer_items): ${[ids(false), ids(true) && `asignados automáticamente: ${ids(true)}`].filter(Boolean).join("; ")}`, 800));
-  if (reservas(raiz, datos)[tema.id]) lineas.push("Simulacro: un ítem de evaluación del tema está reservado para /simulacro; no figura acá ni se puede leer. Al cerrar el tema, ofrecé /simulacro.");
+  if (reservas(raiz, datos)[tema.id]) lineas.push("Simulacro: un ítem de evaluación del tema está reservado para /simulacro; no figura acá ni se puede leer. Terminada la práctica y antes del cierre, ofrecé /simulacro.");
   const faltan = faltantesTema(raiz, datos, tema);
   if (faltan.length) lineas.push(`Preparación del tema: sin texto confiable todavía en ${faltan.join("; ")}. Se preparan solos en segundo plano; mientras, cotejá esas páginas con ver_pagina antes de citarlas.`);
   // Objetivo y plan acordados (H56) comparten los 3000 B del progreso del tema y ocupan hasta 2000 (en bytes: los caracteres pueden ser multibyte): retomar no los vuelve a pedir ni pierde el borde.
