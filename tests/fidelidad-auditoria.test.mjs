@@ -267,3 +267,13 @@ test("E3: el researcher no recibe la página del libro con la casi copia del res
   assert.doesNotMatch(tarea, /0002\.md|geoestacionario/);
   assert.match(tarea, /N paquetes/);
 });
+
+test("DA38: una página con la capa OCR del escaneo llega al tutor marcada como OCR, y deja de estarlo al pasar por visión", t => {
+  const c = curso(t);
+  c.escribir("_procesado/libro/paginas/0001.md", "<!-- p. PDF 1 -->\nThe target function f (x) might be 1 if the patient survives.");
+  const capa = (motor, pendiente) => c.escribir("_procesado/libro/calidad.json", JSON.stringify({ version: 1, paginas: { 1: { motor, capa_ocr_previa: true, pendiente, avisos: [] } } }));
+  capa("pymupdf", false);
+  assert.match(leerPaginas(c.raiz, c.d, "libro", 1, 1), /OCR que traía el PDF escaneado: interpretalo como tal/);
+  capa("vision", false);
+  assert.ok(!/OCR que traía/.test(leerPaginas(c.raiz, c.d, "libro", 1, 1)));
+});

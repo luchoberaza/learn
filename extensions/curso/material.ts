@@ -199,6 +199,7 @@ export function leerPaginas(raiz: string, datos: DatosCurso, doc: string, desde:
     catch { salida += `\nPágina PDF ${p} sin transcripción utilizable; consultá ver_pagina. ${cita(datos, doc, p)}\n`; }
     try {
       const q = JSON.parse(leer(raiz, `_procesado/${doc}/calidad.json`)).paginas?.[String(p)];
+      if (q?.capa_ocr_previa && q.motor === "pymupdf") salida += "[OCR que traía el PDF escaneado: interpretalo como tal; puede confundir letras, y los símbolos y fórmulas no son fiables. Cotejá con ver_pagina lo que cites textual.]\n";
       if (!q || q.pendiente) salida += `[Calidad pendiente: cotejá el original con ver_pagina antes de usarlo.${q?.avisos?.length ? ` ${q.avisos.join(" ")}` : ""}]\n`;
     } catch { salida += "[Calidad no disponible.]\n"; }
   }
