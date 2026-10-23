@@ -62,14 +62,14 @@ test("H46: el popup y el render del quiz muestran texto plano en lugar de LaTeX"
   let parcial;
   const r = await quiz.execute("l1", {
     question: "Un paquete de $1200\\,\\text{bytes}$ sale a $8\\times10^6\\,\\text{bits/s}$ por $A\\to\\text{router}\\to B$. ¿Cuánto tarda $d_{\\text{trans}}$ si $x_1 = 2^{-3}$?",
-    details: "Usá $1\\,\\text{byte}=8\\,\\text{bits}$ y $a\\cdot b$; dejá $\\alpha$.",
+    details: "Usá $1\\,\\text{byte}=8\\,\\text{bits}$ y $a\\cdot b$; dejá $\\alpha$. Tomá $\\min\\{10,4\\}$.",
     options: [{ label: "$1{,}2\\,\\text{ms}$", value: "ok" }, { label: "$\\tfrac{1}{3}\\,\\text{s}$", value: "b" }, { label: "$\\frac{a+b}{c}$", value: "c" }],
     correctAnswer: "ok", explanation: "$L/R$",
   }, undefined, u => { parcial ??= u; }, ui(["enter", "enter"], vistas));
   const fino = " ";
   const popup = vistas[0];
   assert.ok(popup.includes(`Un paquete de 1200${fino}bytes sale a 8×10⁶${fino}bits/s por A→router→B. ¿Cuánto tarda d_trans si x₁ = 2⁻³?`), popup);
-  assert.ok(popup.includes(`Usá 1${fino}byte=8${fino}bits y a·b; dejá \\alpha.`), popup);
+  assert.ok(popup.includes(`Usá 1${fino}byte=8${fino}bits y a·b; dejá \\alpha. Tomá mín{10,4}.`), popup);
   for (const o of [`1,2${fino}ms`, `1/3${fino}s`, "(a+b)/c"]) assert.ok(popup.includes(o), o);
   assert.doesNotMatch(popup, /\$|\\text|\{,\}|\\times|\\frac/);
   assert.deepEqual(parcial.details.options.map(o => o.label).sort(), [`1,2${fino}ms`, `1/3${fino}s`, "(a+b)/c"].sort());

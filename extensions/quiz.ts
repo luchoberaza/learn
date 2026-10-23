@@ -134,6 +134,8 @@ function textoPlano(texto: string): string {
 		.replace(/\$\$?([^$]+?)\$\$?/g, "$1")
 		.replace(/\{,\}/g, ",")
 		.replace(/\\(?:displaystyle|left|right)\b\s*/g, "")
+		.replace(/\\(min|max)\b/g, (_, f) => (f === "min" ? "mín" : "máx"))
+		.replace(/\\([{}])/g, "$1")
 		.replace(/\s*\\([a-zA-Z]+)\s*/g, (m, c) => SIMBOLOS[c] ?? m)
 		.replace(/\\(?:text|mathrm)\{([^{}]*)\}/g, "$1")
 		.replace(/\^(?:\{([-+]?\d+)\}|(\d))/g, mapear(SUPERINDICES))
