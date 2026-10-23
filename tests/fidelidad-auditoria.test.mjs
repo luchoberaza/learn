@@ -124,6 +124,7 @@ const REGLAS_I = {
   "frase textual de la solución (E7)": "con una frase textual de la solución oficial por inciso",
   "notación o errata del enunciado (E8)": "si un enunciado usa otra notación o trae una errata, decilo una vez",
   "ya lo tengo antes del plan (6e)": "si el alumno dice que ya lo tiene antes de terminar el plan, preguntá con `ask_user_question` «Seguir con <nodo siguiente>» / «Practicar lo visto»",
+  "tabla de cierre del nodo (C6)": "Al cerrar un nodo con fórmula, una tabla breve «lo que hicimos ↔ nombre y fórmula del material», citada",
 };
 test("modo-curso: reglas de fidelidad y evaluación de la etapa I", () => {
   const plano = readFileSync(join(piDir, "modo-curso.md"), "utf8").replace(/\s+/g, " ");
