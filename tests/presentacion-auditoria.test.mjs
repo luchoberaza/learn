@@ -181,9 +181,12 @@ test("P3: /compact en una clase corta suma una línea en español a la de pi, qu
   const avisos = [], { session } = await conFaux(t, [], true, avisos);
   await assert.rejects(() => session.compact(), /Nothing to compact/);
   assert.deepEqual(avisos, [["info", "Todavía no hay nada para resumir; la clase sigue igual."]]);
-  const fuera = [], sinClase = await conFaux(t, [], false, fuera);
-  await assert.rejects(() => sinClase.session.compact(), /Nothing to compact/);
-  assert.deepEqual(fuera, []);
+});
+
+test("P3: sin clase activa, /compact no suma la línea de la clase", async t => {
+  const avisos = [], { session } = await conFaux(t, [], false, avisos);
+  await assert.rejects(() => session.compact(), /Nothing to compact/);
+  assert.deepEqual(avisos, []);
 });
 
 test("H80: el doctor revisa timeout, la web del researcher y el renombre a web_fetch en vez de safe_bash", t => {
