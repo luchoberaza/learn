@@ -50,4 +50,9 @@ export function registrarPresentacion(pi: ExtensionAPI, actual: () => { a: Activ
       return { compaction: { summary, firstKeptEntryId: p.firstKeptEntryId, tokensBefore: p.tokensBefore, usage: r.usage } };
     } catch { return; }
   });
+  // pi ya mostró «Compaction failed: Nothing to compact (session too small)» en inglés y una extensión no puede evitarlo:
+  // el error sale antes de session_before_compact (agent-session.js:2244-2250) y llega a la terminal antes que este evento (:2336-2350).
+  pi.on("session_compact_failed", (event, ctx) => {
+    if (actual() && event.reason === "manual" && /Nothing to compact|Already compacted/.test(event.errorMessage || "")) ctx.ui.notify("Todavía no hay nada para resumir; la clase sigue igual.", "info");
+  });
 }

@@ -117,7 +117,7 @@ test("H09/X04: «Working» y «Thinking...» quedan en español desde el arranqu
 });
 
 // Sesión con un proveedor falso (sin red ni modelo) y el curso activo restaurado de la rama.
-async function conFaux(t, entradas, activo = true) {
+async function conFaux(t, entradas, activo = true, avisos) {
   const raiz = process.env.PI_MANAGED_INSTALL_ROOT || join(agentDir, "install"), { sdk } = p;
   const ai = await import(pathToFileURL(join(raiz, "releases", readFileSync(join(raiz, "current-version"), "utf8").trim(), "node_modules/@earendil-works/pi-ai/dist/index.js")).href);
   const faux = ai.fauxProvider({ provider: "faux", models: [{ id: "faux-1", contextWindow: 200000, maxTokens: 8000 }] });
@@ -134,7 +134,9 @@ async function conFaux(t, entradas, activo = true) {
     await session.extensionRunner.emit({ type: "session_shutdown" }); session.dispose();
     for (const [f, antes] of registro) antes ? writeFileSync(f, antes) : rmSync(f, { force: true });
   });
-  await session.bindExtensions({});
+  // Con avisos, una UI que los anota (el resto de sus métodos no hace nada).
+  const nada = Object.fromEntries(["setStatus", "setWorkingMessage", "setWorkingVisible", "setWorkingIndicator", "setHiddenThinkingLabel", "setWidget", "setTitle", "onTerminalInput"].map(n => [n, () => () => {}]));
+  await session.bindExtensions(avisos ? { uiContext: { ...nada, notify: (m, tipo) => avisos.push([tipo, m]) } } : {});
   if (session.model?.provider !== "faux") await session.setModel(faux.getModel());
   settingsManager.applyOverrides({ compaction: { keepRecentTokens: 1 } });
   for (const m of entradas) sessionManager.appendMessage({ timestamp: Date.now(), ...(m.role === "assistant" ? { provider: "faux", model: "faux-1", api: faux.api, usage: uso, stopReason: "stop" } : {}), ...m });
@@ -173,6 +175,15 @@ test("H62: sin clase activa (preparando un curso o tras /fin) /compact usa la pl
   const pedido = JSON.stringify(pedidos[0].messages);
   assert.match(pedido, /## Goal/);
   assert.doesNotMatch(pedido, /## Borde|pendiente, sin responder/);
+});
+
+test("P3: /compact en una clase corta suma una línea en español a la de pi, que queda en inglés", async t => {
+  const avisos = [], { session } = await conFaux(t, [], true, avisos);
+  await assert.rejects(() => session.compact(), /Nothing to compact/);
+  assert.deepEqual(avisos, [["info", "Todavía no hay nada para resumir; la clase sigue igual."]]);
+  const fuera = [], sinClase = await conFaux(t, [], false, fuera);
+  await assert.rejects(() => sinClase.session.compact(), /Nothing to compact/);
+  assert.deepEqual(fuera, []);
 });
 
 test("H80: el doctor revisa timeout, la web del researcher y el renombre a web_fetch en vez de safe_bash", t => {
