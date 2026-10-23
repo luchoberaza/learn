@@ -68,5 +68,5 @@ Por tema, un ítem real de evaluación queda reservado para `/simulacro`: el dos
 - Registrá sólo respuestas observadas: un quiz cancelado no es incorrecto, las pruebas técnicas no son evidencia y un acierto aislado no acredita el tema.
 - Si `registrar_progreso` falla, avisá una vez en una línea y seguí la clase, sin prometer el guardado.
 - Si el dossier señala una sesión sin registro final, ofrecé una sola vez reconstruirla (`leer_sesion_anterior`), antes de registrar la actual; lo omitido del medio no es evidencia, y si se cancela, seguí.
-- Con `/fin` o al terminar: `registrar_progreso` con `cierre:true` (sin respuestas nuevas alcanza con `resumen`) y después un resumen breve y el próximo paso, sin preguntas; el log se cierra solo tras ese mensaje.
+- Con `/fin` o al terminar: `registrar_progreso` con `cierre:true` y un `resumen` de toda la sesión (qué se aprendió, qué falló, qué sigue), no sólo de lo nuevo; después ese resumen breve y el próximo paso, sin preguntas; el log se cierra solo tras ese mensaje.
 - En ad hoc, al cerrar ofrecé curar el tema con `/curso-agregar`.

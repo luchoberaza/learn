@@ -7,6 +7,7 @@ import { join } from "node:path";
 import { buscarMaterial, dossier, leerItems, leerPaginas, reservados, reservas } from "../extensions/curso/material.ts";
 import { registrarSesion } from "../extensions/curso/sesion.ts";
 import { registrarSimulacro } from "../extensions/curso/simulacro.ts";
+import { registrarProgreso } from "../extensions/curso/progreso.ts";
 import { tokenizar } from "../scripts/ingesta/bm25.ts";
 import { piDir, vaultDir } from "../scripts/lib/pi-sdk.mjs";
 
@@ -125,6 +126,7 @@ const REGLAS_I = {
   "notación o errata del enunciado (E8)": "si un enunciado usa otra notación o trae una errata, decilo una vez",
   "ya lo tengo antes del plan (6e)": "si el alumno dice que ya lo tiene antes de terminar el plan, preguntá con `ask_user_question` «Seguir con <nodo siguiente>» / «Practicar lo visto»",
   "tabla de cierre del nodo (C6)": "Al cerrar un nodo con fórmula, una tabla breve «lo que hicimos ↔ nombre y fórmula del material», citada",
+  "resumen de toda la sesión al cerrar (G2)": "un `resumen` de toda la sesión (qué se aprendió, qué falló, qué sigue), no sólo de lo nuevo",
 };
 test("modo-curso: reglas de fidelidad y evaluación de la etapa I", () => {
   const plano = readFileSync(join(piDir, "modo-curso.md"), "utf8").replace(/\s+/g, " ");
@@ -150,7 +152,7 @@ function vault(t, estado) {
     ui: { notify: (m, tipo) => avisos.push([tipo, m]), setStatus: () => {}, select: async (titulo, o) => { preguntas.push([titulo, o]); return ctx.respuesta(o); } } };
   const sesion = registrarSesion(pi, c.vault, recursos);
   registrarSimulacro(pi, sesion, c.vault);
-  return { ...c, ctx, comandos, entradas, avisos, ordenes, preguntas, cortes, sesion, progreso: () => readFileSync(join(c.raiz, "progreso.yaml"), "utf8") };
+  return { ...c, pi, ctx, comandos, entradas, avisos, ordenes, preguntas, cortes, sesion, progreso: () => readFileSync(join(c.raiz, "progreso.yaml"), "utf8") };
 }
 
 test("E9, 6d: /simulacro con el tema sin dominar pregunta antes de gastar el reservado; cancelar no usa nada", async t => {
@@ -194,4 +196,14 @@ test("E9, 6d: sin interfaz y con el tema sin dominar /simulacro no gasta el rese
   assert.deepEqual(d.preguntas, []);
   assert.match(d.progreso(), /usado: true/);
   assert.match(d.ordenes.at(-1).content, /^Simulacro de «Retardos»/);
+});
+
+test("G2: /fin pide un resumen de toda la sesión, no sólo de lo nuevo desde el último guardado", async t => {
+  const e = vault(t);
+  registrarProgreso(e.pi, e.sesion, e.vault);
+  await e.comandos.get("estudiar").handler("redes retardos", e.ctx);
+  await e.comandos.get("fin").handler("", e.ctx);
+  const orden = e.ordenes.at(-1).content;
+  assert.match(orden, /cierre:true, la evidencia observada desde el último guardado \(lo omitido se conserva\) y un resumen de toda la sesión, no sólo de lo nuevo: qué se aprendió, qué falló y qué sigue\./);
+  assert.doesNotMatch(orden, /alcanza con resumen/);
 });
