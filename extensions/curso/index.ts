@@ -10,6 +10,7 @@ import { registrarPresentacion } from "./presentacion.ts";
 import { registrarResearcher } from "./researcher.ts";
 import { registrarProgreso } from "./progreso.ts";
 import { registrarPreparacion } from "./preparacion.ts";
+import { enCurso, registrarSimulacro } from "./simulacro.ts";
 
 const slug = Type.String({ pattern: "^[a-z0-9]+(?:-[a-z0-9]+)*$" });
 const paginas = Type.Array(Type.Integer({ minimum: 1 }), { minItems: 1 });
@@ -26,6 +27,7 @@ export default function (pi: ExtensionAPI) {
   const sesion = registrarSesion(pi);
   registrarPreparacion(pi, sesion);
   const progreso = registrarProgreso(pi, sesion);
+  registrarSimulacro(pi, sesion);
   registrarPresentacion(pi, sesion.actual);
   const textoProgreso = Type.String({ minLength: 1, maxLength: 2000 });
   const listaProgreso = Type.Array(textoProgreso, { maxItems: 100 });
@@ -75,9 +77,9 @@ export default function (pi: ExtensionAPI) {
     async execute(_id, args) { return { content: [{ type: "text", text: sesion.buscar_material(args) }], details: undefined }; },
   });
   pi.registerTool({
-    name: "leer_items", label: "Leer ítems", description: "Leer ítems del curso activo. Por defecto sólo enunciados (con su puntaje oficial si consta), y en evaluaciones cita «PDF p. N» sin enlace porque la página trae la solución; incluir_solucion se usa después del intento del estudiante y sólo devuelve soluciones explícitamente vinculadas (de un documento de soluciones o del mismo parcial), con sus enlaces.",
+    name: "leer_items", label: "Leer ítems", description: "Leer ítems del curso activo. Por defecto sólo enunciados (con su puntaje oficial si consta), y en evaluaciones cita «PDF p. N» sin enlace porque la página trae la solución; incluir_solucion se usa después del intento del estudiante y sólo devuelve soluciones explícitamente vinculadas (de un documento de soluciones o del mismo parcial), con sus enlaces. Un ítem reservado para /simulacro sólo se lee durante el simulacro.",
     parameters: Type.Object({ doc: slug, ids: Type.Array(Type.String({ minLength: 1, maxLength: 80 }), { minItems: 1, maxItems: 100 }), incluir_solucion: Type.Optional(Type.Boolean()) }), executionMode: "sequential",
-    async execute(_id, args) { return { content: [{ type: "text", text: sesion.leer_items(args) }], details: undefined }; },
+    async execute(_id, args, _signal, _update, ctx) { return { content: [{ type: "text", text: sesion.leer_items(args, enCurso(ctx, sesion.actual())) }], details: undefined }; },
   });
   pi.registerTool({
     name: "ver_pagina", label: "Ver página original", description: "Mostrar la imagen original de una página PDF del curso activo, con render local y caché. No ejecuta OCR ni llama al modelo de visión. En evaluaciones y soluciones la imagen trae la solución: exige despues_del_intento:true, sólo cuando el estudiante ya entregó su intento.",

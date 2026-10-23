@@ -4,6 +4,7 @@ import { join, relative } from "node:path";
 import { python } from "./ingesta.ts";
 import { acotar, leer, ordenarTemas, reservas, type DatosCurso } from "./material.ts";
 import { ordenar, type registrarSesion } from "./sesion.ts";
+import { enCurso } from "./simulacro.ts";
 import { vaultDir } from "../../scripts/lib/pi-sdk.mjs";
 import { normalizar } from "../../scripts/ingesta/bm25.ts";
 
@@ -31,8 +32,8 @@ export function registrarProgreso(pi: ExtensionAPI, sesion: ReturnType<typeof re
       }
       const solicitud = ctx.sessionManager.getBranch().findLast(x => x.type === "custom" && x.customType === "curso-cierre") as any;
       const final = reconstruir_log ? true : cierre;
-      // Las reservas de ítems para /simulacro (E3) se fijan en progreso.yaml la primera vez que se guarda.
-      const r = await python("registrar", { vault, curso: e.a.curso, tema: e.a.tema, log, datos, cierre: final, reconstruido: !!reconstruir_log, huella_log, reservas: reservas(e.r, e.d) }, signal, "progreso.py");
+      // Las reservas de ítems para /simulacro (E3) se fijan en progreso.yaml la primera vez que se guarda; uno que se rindió queda usado.
+      const r = await python("registrar", { vault, curso: e.a.curso, tema: e.a.tema, log, datos, cierre: final, reconstruido: !!reconstruir_log, huella_log, reservas: reservas(e.r, e.d), simulacro: enCurso(ctx, e) }, signal, "progreso.py");
       sesion.actualizarProgreso(r.progreso);
       try { sesion.refrescar(); } catch { ctx.ui.notify("Progreso guardado; reactivá /estudiar para refrescar el dossier.", "warning"); }
       if (!reconstruir_log && final && solicitud?.data?.log !== e.a.log) pi.appendEntry("curso-cierre", { log: e.a.log });

@@ -146,17 +146,18 @@ def reservar(p, ctx, propuestas, usados):
     def vigente(r):
         item = items.get(r.get("doc"), {}).get(r.get("id")) if isinstance(r, dict) else None
         return isinstance(item, dict) and "solucion_de" not in item and documentos[r["doc"]].get("tipo") == "evaluaciones" and not r.get("usado")
-    for t in p["temas"].values():
-        for r in t.get("reservado", []):
-            if not r.get("usado") and (r["doc"], r["id"]) in usados:
-                r["usado"] = True
-    tomados = {(r["doc"], r["id"]) for t in p["temas"].values() for r in t.get("reservado", [])} | usados
-    for tema, r in (propuestas or {}).items():
+    tomados = {(r["doc"], r["id"]) for t in p["temas"].values() for r in t.get("reservado", [])}
+    for tema, r in (propuestas if isinstance(propuestas, dict) else {}).items():
         t = p["temas"].get(tema, {})
         previas = [x for x in t.get("reservado", []) if x.get("usado") or vigente(x)]
         if tema in temas and vigente(r) and (r["doc"], r["id"]) not in tomados and not any(vigente(x) for x in previas):
             p["temas"][tema] = {"estado": "sin_empezar", **t, "reservado": previas + [{"doc": r["doc"], "id": r["id"]}]}
             tomados.add((r["doc"], r["id"]))
+    # Después de fijar: un reservado que se rinde en el mismo registro en que se fija también queda usado.
+    for t in p["temas"].values():
+        for r in t.get("reservado", []):
+            if not r.get("usado") and (r["doc"], r["id"]) in usados:
+                r["usado"] = True
 
 
 ETIQUETA = re.compile(r"^(?:ejercicio|problema|pregunta|[ií]tem|ej)\.?\s*", re.I)

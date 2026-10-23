@@ -118,6 +118,10 @@ class ReservaTest(unittest.TestCase):
         self.guardar(simulacro={'doc': 'parcial', 'id': '2'})
         self.assertTrue(self.temas()['derivacion']['reservado'][1]['usado'])
 
+    def test_rendido_en_el_mismo_registro_en_que_se_fija_queda_usado(self):
+        self.guardar(simulacro={'doc': 'parcial', 'id': '1'}, reservas={'derivacion': {'doc': 'parcial', 'id': '1'}})
+        self.assertEqual(self.temas()['derivacion']['reservado'], [{'doc': 'parcial', 'id': '1', 'usado': True}])
+
     def test_si_el_reservado_desaparece_se_elige_otro(self):
         self.guardar(reservas={'derivacion': {'doc': 'parcial', 'id': '1'}})
         self.banco('2')

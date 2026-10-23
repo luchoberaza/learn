@@ -7,6 +7,7 @@ import { join } from "node:path";
 import { buscarMaterial, dossier, leerItems, leerPaginas, reservados, reservas } from "../extensions/curso/material.ts";
 import { registrarSesion } from "../extensions/curso/sesion.ts";
 import { registrarProgreso } from "../extensions/curso/progreso.ts";
+import { enCurso, registrarSimulacro, tiempo } from "../extensions/curso/simulacro.ts";
 import { tokenizar } from "../scripts/ingesta/bm25.ts";
 import { loadProject, piDir, vaultDir } from "../scripts/lib/pi-sdk.mjs";
 
@@ -215,4 +216,73 @@ test("E3 con el curso real: el reservado de cada tema no se ve en sol-prc2024092
     const tema_ = d.temas.find(t => t.id === tema);
     assert.ok(!dossier(raiz, d, tema_, 3000, 2000).includes(`${x.doc}/${x.id} `));
   }
+});
+
+test("E9: /simulacro sin tema activo o sin ítem reservado lo dice en una línea", async t => {
+  const e = vault(t);
+  registrarSimulacro(e.pi, e.sesion);
+  await e.comandos.get("simulacro").handler("", e.ctx);
+  assert.deepEqual(e.avisos.at(-1), ["info", "Empezá con /estudiar <tema> y después /simulacro."]);
+  e.d.items.parcial = e.d.items.parcial.filter(i => i.id === "2-solucion");
+  await e.comandos.get("estudiar").handler("redes retardos", e.ctx);
+  await e.comandos.get("simulacro").handler("", e.ctx);
+  assert.match(e.avisos.at(-1)[1], /^«Retardos» no tiene un ítem de evaluación reservado para simulacro/);
+  assert.ok(!e.entradas.some(x => x.customType === "curso-simulacro"));
+});
+
+test("E9: /simulacro corta el turno, presenta el reservado con su tiempo y termina al registrar el intento", async t => {
+  const e = vault(t);
+  e.d.contrato += "Individual, sin material, 2 horas. Siempre son 5 preguntas de desarrollo.\n";
+  const progreso = registrarProgreso(e.pi, e.sesion, e.vault);
+  registrarSimulacro(e.pi, e.sesion);
+  await e.comandos.get("estudiar").handler("redes retardos", e.ctx);
+  const orden = [];
+  Object.assign(e.ctx, { isIdle: () => false, abort: () => orden.push("abort"), waitForIdle: async () => orden.push("espera") });
+  await e.comandos.get("simulacro").handler("", e.ctx);
+  assert.deepEqual(orden, ["abort", "espera"]);
+  assert.deepEqual(e.entradas.at(-1).data, { log: e.sesion.actual().a.log, tema: "retardos", doc: "parcial", id: "2" });
+  assert.equal(e.estados.curso, "📝 Simulacro · Retardos");
+  const o = e.ordenes.at(-1);
+  assert.deepEqual([o.customType, o.display, o.triggerTurn], ["curso-orden", false, true]);
+  assert.match(o.content, /tal cual[\s\S]*\(8 puntos\)[\s\S]*~24 min \(2 horas para 5 preguntas\)[\s\S]*no des pistas[\s\S]*registrar_progreso[\s\S]*plan de repaso ordenado por peso/);
+  assert.match(o.content, /Ítem parcial\/2:\nENUNCIADO DOS: calcule el retardo\.$/);
+  // Durante el simulacro, leer_items devuelve el reservado; el prompt lleva las reglas aunque /compact resuma la orden.
+  Object.assign(e.ctx, { isIdle: () => true });
+  assert.match(e.sesion.leer_items({ doc: "parcial", ids: ["2"] }, enCurso(e.ctx, e.sesion.actual())), /ENUNCIADO DOS/);
+  const evento = { systemPromptOptions: { sections: {} } };
+  for (const h of e.eventos.get("before_agent_start")) h(evento, e.ctx);
+  assert.match(evento.systemPromptOptions.sections.simulacro, /Simulacro en curso del ítem reservado parcial\/2/);
+  // Tras un kill, /resume o /tree vuelve la barra del simulacro.
+  e.estados.curso = undefined;
+  for (const h of e.eventos.get("session_start")) await h({}, e.ctx);
+  assert.equal(e.estados.curso, "📝 Simulacro · Retardos");
+  // El intento registrado marca usado el reservado y cierra el simulacro; el próximo reservado es otro.
+  await progreso.registrar("1", { resumen: "simulacro", ejercicios: [{ doc: "parcial", item: "2", resultado: "parcial", puntaje: "≈ 5/8" }] }, undefined, undefined, e.ctx);
+  for (const h of e.eventos.get("tool_execution_end")) h({ toolName: "registrar_progreso", isError: false }, e.ctx);
+  assert.deepEqual(e.sesion.actual().d.progreso.temas.retardos.reservado, [{ doc: "parcial", id: "2", usado: true }]);
+  assert.equal(e.entradas.findLast(x => x.customType === "curso-simulacro").data, null);
+  assert.equal(enCurso(e.ctx, e.sesion.actual()), undefined);
+  assert.equal(e.estados.curso, "📚 redes › Retardos");
+  assert.match(e.sesion.leer_items({ doc: "parcial", ids: ["3"] }), /reservado para \/simulacro/);
+  for (const h of e.eventos.get("before_agent_start")) h(evento, e.ctx);
+  assert.equal(evento.systemPromptOptions.sections.simulacro, undefined);
+});
+
+test("E9: /fin durante el simulacro lo cierra y marca usado el reservado que ya se mostró", async t => {
+  const e = vault(t);
+  const progreso = registrarProgreso(e.pi, e.sesion, e.vault);
+  registrarSimulacro(e.pi, e.sesion);
+  await e.comandos.get("estudiar").handler("redes retardos", e.ctx);
+  await e.comandos.get("simulacro").handler("", e.ctx);
+  assert.match(e.ordenes.at(-1).content, /sin tiempo: curso\.md no fija la duración del examen/);
+  await e.comandos.get("fin").handler("", e.ctx);
+  await progreso.registrar("1", { resumen: "cierre sin entrega", cierre: true }, undefined, undefined, e.ctx);
+  assert.deepEqual(e.sesion.actual().d.progreso.temas.retardos.reservado, [{ doc: "parcial", id: "2", usado: true }]);
+  assert.equal(enCurso(e.ctx, e.sesion.actual()), undefined);
+});
+
+test("E9: el tiempo proporcional sale de curso.md", () => {
+  assert.deepEqual(tiempo("individual, sin material, 2 horas … Siempre son 5 preguntas"), { minutos: 24, examen: "2 horas para 5 preguntas" });
+  assert.deepEqual(tiempo("Duración: 90 minutos. Consta de 3 preguntas."), { minutos: 30, examen: "90 minutos para 3 preguntas" });
+  assert.equal(tiempo("Sin duración declarada."), undefined);
 });
