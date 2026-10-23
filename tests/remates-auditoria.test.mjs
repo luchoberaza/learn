@@ -312,8 +312,14 @@ test("preparación (e, f): sólo se borra el lock propio y un pid reutilizado tr
 test("/curso-check suma una línea por tema con la preparación automática, y sin ella igual valida", async () => {
   const comandos = new Map(), mensajes = [];
   registrarCuracion({ registerCommand: (n, d) => comandos.set(n, d), sendMessage: m => mensajes.push(m.content),
-    exec: async () => ({ code: 0, killed: false, stderr: "", stdout: JSON.stringify({ ok: true, errores: [], avisos: ["Aviso de validar."], pendientes: [] }) }) });
+    exec: async (_py, args) => ({ code: 0, killed: false, stderr: "", stdout: JSON.stringify({ ok: true, errores: [], avisos: ["Aviso de validar."], pendientes: args.includes("redes") ? [] : [{ doc: "libro", pagina: 3 }] }) }) });
   for (const curso of ["redes", "no-existe"]) await comandos.get("curso-check").handler(curso, { ui: { notify: assert.fail } });
   assert.match(mensajes[0], /Aviso de validar\.\n(Preparación de [a-z-]+: [^\n]+; \d+ ítems? asignados? automáticamente\.\n){2,}Informe:/);
-  assert.match(mensajes[1], /^no-existe: estructura válida; 0 páginas referidas pendientes\.\nAviso de validar\.\nInforme:/);
+  assert.match(mensajes[0], /^redes: estructura válida; 0 páginas referidas pendientes\./);
+  assert.match(mensajes[1], /^no-existe: estructura válida; 1 página referida pendiente\.\nAviso de validar\.\nInforme:/);
+  // El diálogo de guardar un curso también dice «1 PDF nuevo».
+  let titulo;
+  const pi = { exec: async () => ({ code: 0, killed: false, stderr: "", stdout: JSON.stringify({ diff: "+Un tema", copias: ["fuentes/bibliografia/nuevo.pdf"], nuevo: false }) }), sendMessage: () => {} };
+  await guardarCurso(pi, { curso: "ejemplo", propuesta: "_procesado/propuesta.json" }, { hasUI: true, ui: { select: async t => { titulo = t; } } });
+  assert.match(titulo, /\n1 PDF nuevo\./);
 });

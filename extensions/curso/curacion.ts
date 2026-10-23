@@ -41,7 +41,7 @@ export function registrarCuracion(pi: ExtensionAPI) {
         // Estado de la preparación automática por tema: es informativo, sin él la validación igual vale.
         const preparacion: string[] = await python("estado", { vault: vaultDir, curso: c }, undefined, "preparacion.py").catch(() => []);
         const preparar = r.sin_transcripcion?.length ? `\n${r.sin_transcripcion.length} sin transcripción; preparalas sin modelo desde la raíz del vault:\n.pi/.venv/bin/python .pi/scripts/ingesta/cursos.py manifiesto --curso ${c} --pendientes\n.pi/.venv/bin/python .pi/scripts/ingesta/ingestar.py iniciar --manifiesto _procesado/manifiesto-${c}.json --salida cursos/${c}/_procesado` : "";
-        pi.sendMessage({ customType: "curso-check", display: true, content: `${c}: ${r.ok ? "estructura válida" : "con errores"}; ${r.pendientes.length} páginas referidas pendientes.${preparar}\n${[...r.errores, ...r.avisos, ...preparacion].join("\n")}\nInforme: cursos/${c}/informe-ingesta.md`, details: r });
+        pi.sendMessage({ customType: "curso-check", display: true, content: `${c}: ${r.ok ? "estructura válida" : "con errores"}; ${r.pendientes.length === 1 ? "1 página referida pendiente" : `${r.pendientes.length} páginas referidas pendientes`}.${preparar}\n${[...r.errores, ...r.avisos, ...preparacion].join("\n")}\nInforme: cursos/${c}/informe-ingesta.md`, details: r });
       } catch (e) { ctx.ui.notify(e instanceof Error ? e.message : "No se pudo validar el curso.", "error"); }
     },
   });
@@ -75,7 +75,7 @@ export async function guardarCurso(pi: ExtensionAPI, args: { curso: string; prop
     informar?.(r.diff);
     pi.sendMessage({ customType: "curso-diff", display: true, content: r.diff, details: undefined });
     // ui.confirm de pi dibuja «Yes»/«No»; Esc o un corte valen como no.
-    const acepta = await ctx.ui.select(`Guardar cambios del curso\n${r.copias.length} PDFs nuevos. Revisá el diff mostrado antes de confirmar. No se modifica progreso.yaml ni se reemplazan PDFs existentes.`, ["Sí, guardar los cambios", "No"], { signal }) === "Sí, guardar los cambios";
+    const acepta = await ctx.ui.select(`Guardar cambios del curso\n${r.copias.length === 1 ? "1 PDF nuevo" : `${r.copias.length} PDFs nuevos`}. Revisá el diff mostrado antes de confirmar. No se modifica progreso.yaml ni se reemplazan PDFs existentes.`, ["Sí, guardar los cambios", "No"], { signal }) === "Sí, guardar los cambios";
     if (!acepta) return { content: [{ type: "text", text: "Cambios rechazados; el curso se preservó." }], details: { cancelada: true } };
   }
   const guardado = await ejecutar(pi, "aplicar", args.curso, [...extras, "--base", r.base, "--huella", r.huella], signal);
