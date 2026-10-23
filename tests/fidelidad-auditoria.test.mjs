@@ -118,6 +118,8 @@ const REGLAS_I = {
   "peso del objetivo (A4, E2)": "su peso en curso.md: cae en N de M parciales",
   "6a con peso y ajustable (A4)": "el objetivo del curso con su peso y que se puede ajustar",
   "details sin la propiedad ni la forma (D3, D5)": "nunca la propiedad que el quiz verifica ni la forma de la respuesta (fracción, unidad) salvo que todas las opciones la compartan",
+  "criterios al pedir cada parte (E5)": "al pedir cada parte o inciso: los criterios que vas a mirar",
+  "tomate el tiempo (C8)": "«tomate el tiempo» si es escrito",
 };
 test("modo-curso: reglas de fidelidad y evaluación de la etapa I", () => {
   const plano = readFileSync(join(piDir, "modo-curso.md"), "utf8").replace(/\s+/g, " ");

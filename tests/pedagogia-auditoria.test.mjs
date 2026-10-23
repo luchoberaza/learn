@@ -340,7 +340,7 @@ test("modo-curso: prevalece sobre teach con sus conflictos explícitos y trae la
     "sin páginas ni rúbricas inventadas": "no inventes páginas ni rúbricas",
     "C5 (H48)": "nunca dos quizzes seguidos sin texto de clase en el medio",
     "figuras (H48)": "Nunca preguntes por una figura o tabla que el alumno no vio",
-    "criterios antes (E5, H20)": "Antes del intento: los criterios que vas a mirar",
+    "criterios antes (E5, H20)": "Antes del intento, al pedir cada parte o inciso: los criterios que vas a mirar",
     "contra qué (E6, H20)": "decí contra qué corregís",
     "forma de la corrección (E7, 6c)": "«≈ x/N» por pregunta (y por inciso si la escala oficial lo desglosa), con coma decimal y descuentos explícitos («(−0,5)»)",
     "sin escala (6c)": "sin escala, criterios sin número",
