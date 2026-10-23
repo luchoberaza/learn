@@ -484,10 +484,6 @@ async function askSingleChoice(
 
 	return ctx.ui.custom<QuizResponse | null>(
 		(tui: any, theme: any, _kb: any, done: (result: QuizResponse | null) => void) => {
-			// /fin y /estudiar cortan el turno con ctx.abort(): el popup se cierra solo, como con Esc.
-			const cortar = () => done(null);
-			if (signal?.aborted) cortar();
-			else signal?.addEventListener("abort", cortar, { once: true });
 			let optionIndex = 0;
 			let phase: "select" | "feedback" = "select";
 			let focus: "options" | "note" = "options";
@@ -496,6 +492,10 @@ async function askSingleChoice(
 			const editor = makeNoteEditor(tui, theme);
 			let cachedLines: string[] | undefined;
 			let cachedWidth = -1;
+			// /fin y /estudiar cortan el turno con ctx.abort(): el popup se cierra solo, como con Esc; una respuesta ya corregida se conserva.
+			const cortar = () => done(phase === "feedback" ? response() : null);
+			if (signal?.aborted) cortar();
+			else signal?.addEventListener("abort", cortar, { once: true });
 
 			function refresh() {
 				cachedLines = undefined;
@@ -679,10 +679,6 @@ async function askMultiChoice(
 
 	return ctx.ui.custom<QuizResponse | null>(
 		(tui: any, theme: any, _kb: any, done: (result: QuizResponse | null) => void) => {
-			// /fin y /estudiar cortan el turno con ctx.abort(): el popup se cierra solo, como con Esc.
-			const cortar = () => done(null);
-			if (signal?.aborted) cortar();
-			else signal?.addEventListener("abort", cortar, { once: true });
 			let optionIndex = 0;
 			let phase: "select" | "feedback" = "select";
 			let focus: "options" | "note" = "options";
@@ -690,6 +686,10 @@ async function askMultiChoice(
 			let cachedLines: string[] | undefined;
 			let cachedWidth = -1;
 			const selected = new Map<string, OptionAnswer>();
+			// /fin y /estudiar cortan el turno con ctx.abort(): el popup se cierra solo, como con Esc; una respuesta ya corregida se conserva.
+			const cortar = () => done(phase === "feedback" ? response() : null);
+			if (signal?.aborted) cortar();
+			else signal?.addEventListener("abort", cortar, { once: true });
 
 			function refresh() {
 				cachedLines = undefined;

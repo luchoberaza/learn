@@ -132,6 +132,28 @@ test("H26/H25: cortar el turno (/fin, /estudiar) cierra un quiz o una pregunta a
   } finally { await p.close(); }
 });
 
+test("H26/H25: un corte con el quiz ya corregido conserva la respuesta (el alumno ya vio la correcta)", async () => {
+  const p = await loadProject();
+  const theme = { fg: (_c, s) => s, bg: (_c, s) => s, bold: s => s, italic: s => s, underline: s => s, strikethrough: s => s };
+  const tui = { requestRender() {}, terminal: { rows: 40, columns: 100 } };
+  const quiz = { question: "¿Qué retardo depende de la distancia?", options: [{ label: "Propagación", value: "prop" }, { label: "Transmisión", value: "trans" }, { label: "Cola", value: "cola" }], correctAnswer: "prop", explanation: "d/s" };
+  try {
+    for (const args of [quiz, { ...quiz, multiSelect: true, correctAnswer: ["prop"] }]) {
+      const corte = new AbortController(), tool = p.session.extensionRunner.getToolDefinition("quiz"), pantallas = [];
+      // Responde la primera opción (en múltiple: la marca y baja hasta Enviar) y el corte llega con la corrección a la vista.
+      const ctx = { hasUI: true, ui: { custom: factory => new Promise(res => {
+        const c = factory(tui, theme, {}, res);
+        for (const tecla of args.multiSelect ? [" ", "\x1b[B", "\x1b[B", "\x1b[B", "\x1b[B", "\r"] : ["\r"]) c.handleInput(tecla);
+        pantallas.push(c.render(100).join("\n")); setTimeout(() => corte.abort(), 10);
+      }) } };
+      const r = await Promise.race([tool.execute("x", args, corte.signal, () => {}, ctx), new Promise(res => setTimeout(() => res({ details: { status: "abierto" } }), 1500))]);
+      assert.match(pantallas[0], /Enter o Esc para seguir/);
+      assert.equal(r.details.status, "answered", JSON.stringify(args.multiSelect ?? false));
+      assert.equal(r.details.answers.length, 1);
+    }
+  } finally { await p.close(); }
+});
+
 test("H26/H25, H45: la respuesta libre de ask_user_question se cierra al cortar el turno y dibuja sus atajos en español", async () => {
   const p = await loadProject();
   const theme = { fg: (_c, s) => s, bg: (_c, s) => s, bold: s => s, italic: s => s, underline: s => s, strikethrough: s => s };
