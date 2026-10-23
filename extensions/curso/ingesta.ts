@@ -5,6 +5,7 @@ import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { piDir } from "../../scripts/lib/pi-sdk.mjs";
+import { elegir } from "../comun/elegir.ts";
 
 export function python(accion: string, datos: object, signal?: AbortSignal, script: "vision.py" | "progreso.py" | "preparacion.py" = "vision.py"): Promise<any> {
   return new Promise((resolve, reject) => {
@@ -44,7 +45,7 @@ export async function modeloVision(ctx: Pick<ExtensionContext, "modelRegistry">,
   return credenciales ? { modelo } : { motivo: `no hay credenciales para ${modelo.provider}; ejecutá /login` };
 }
 
-export async function transcribir(ctx: Pick<ExtensionContext, "modelRegistry" | "hasUI" | "ui">,
+export async function transcribir(ctx: Pick<ExtensionContext, "modelRegistry" | "hasUI" | "ui" | "mode">,
   solicitud: Solicitud, config: Config, signal?: AbortSignal, informar?: (texto: string) => void) {
   if (!Array.isArray(solicitud.paginas) || !solicitud.paginas.length || solicitud.paginas.some(n => !Number.isSafeInteger(n) || n < 1)) {
     throw new Error("Indicá páginas PDF enteras y positivas (base 1).");
@@ -66,7 +67,7 @@ export async function transcribir(ctx: Pick<ExtensionContext, "modelRegistry" | 
   if (paginas.length > config.max_paginas_vision_sin_confirmar) {
     if (!ctx.hasUI) throw new Error(`La tanda de ${paginas.length} páginas necesita confirmación interactiva; no se envió ninguna página.`);
     // ui.confirm de pi dibuja «Yes»/«No»; Esc o un corte valen como no.
-    resumen.cancelada = await ctx.ui.select(`Confirmar gasto de visión\nSolicitaste ${paginas.length} páginas con ${config.modelo_vision}. Se reutilizará la caché disponible. ¿Autorizás esta tanda?`,
+    resumen.cancelada = await elegir(ctx, `Confirmar gasto de visión\nSolicitaste ${paginas.length} páginas con ${config.modelo_vision}. Se reutilizará la caché disponible. ¿Autorizás esta tanda?`,
       ["Sí, transcribir", "No"], { signal }) !== "Sí, transcribir";
     if (resumen.cancelada) return { resumen, usage: undefined };
   }

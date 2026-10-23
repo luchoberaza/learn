@@ -31,6 +31,7 @@ import * as path from "node:path";
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { homedir } from "node:os";
+import { elegir } from "./comun/elegir.ts";
 
 const QA_TOOLS = new Set(["quiz", "ask_user_question"]);
 const SIN_CONVERSOR = "es HEIC o BMP y no hay ImageMagick para convertirla; mandala en JPEG o PNG.";
@@ -507,7 +508,7 @@ export default function mdLog(pi: ExtensionAPI) {
 
 			// ui.confirm de pi dibuja «Yes»/«No»; Esc vale como no.
 			const si = "Sí, reemplazar la nota";
-			if (fs.statSync(resolved).size > 0 && (!ctx.hasUI || await ctx.ui.select("Reemplazar nota con el historial\nLa nota tiene contenido. ¿Confirmás reemplazarlo con la rama activa? Si querés conservarlo, elegí otra nota vacía.", [si, "No"]) !== si)) {
+			if (fs.statSync(resolved).size > 0 && (!ctx.hasUI || await elegir(ctx, "Reemplazar nota con el historial\nLa nota tiene contenido. ¿Confirmás reemplazarlo con la rama activa? Si querés conservarlo, elegí otra nota vacía.", [si, "No"]) !== si)) {
 				ctx.ui.notify("Nota preservada; no se cambió el vínculo.", "info");
 				return;
 			}

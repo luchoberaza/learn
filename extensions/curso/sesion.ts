@@ -8,6 +8,7 @@ import { buscarMaterial, cita, documento, dossier, esSlug, leer, leerItems, leer
   type Activo, type DatosCurso, type Ref, type Tema } from "./material.ts";
 
 import { verificacionPrevia } from "./researcher.ts";
+import { elegir } from "../comun/elegir.ts";
 
 type Config = { max_tokens_dossier: number; max_tokens_curso_md: number };
 // Tools del estudio; read queda para las fotos del alumno, que pi 1.4.0 pega como ruta de texto (interactive-mode.js:2477-2483).
@@ -251,7 +252,7 @@ export function registrarSesion(pi: ExtensionAPI, vault = vaultDir, recursos = p
         if (consulta && candidatos.length === 1) tema = candidatos[0];
         else if (candidatos.length && ctx.hasUI) {
           const etiquetas = candidatos.map(t => `${t.nombre} [${t.id}] · ${d.progreso.temas[t.id]?.estado || "sin_empezar"}${resultados.length ? " · por material" : ""}`);
-          const elegido = await ctx.ui.select(consulta ? "Elegí el tema" : "Temas: en curso, prerequisitos firmes, restantes", resultados.length ? [...etiquetas, `Estudiar «${consulta}» fuera del índice (ad hoc)`] : etiquetas);
+          const elegido = await elegir(ctx, consulta ? "Elegí el tema" : "Temas: en curso, prerequisitos firmes, restantes", resultados.length ? [...etiquetas, `Estudiar «${consulta}» fuera del índice (ad hoc)`] : etiquetas);
           if (!elegido) return;
           tema = candidatos[etiquetas.indexOf(elegido)];
         } else if (candidatos.length) { ctx.ui.notify("Indicá el id exacto del tema; esta sesión no tiene selector interactivo.", "warning"); return; }
@@ -261,7 +262,7 @@ export function registrarSesion(pi: ExtensionAPI, vault = vaultDir, recursos = p
           if (ctx.hasUI) {
             const etiquetas = resultados.map(r => `${r.doc} · PDF ${r.pagina} · ${r.seccion || r.fragmento.slice(0, 70)}`);
             const sinMaterial = "Continuar sin material ubicado (ad hoc)";
-            const elegido = await ctx.ui.select("Tema fuera del índice: elegí una sección para el modo ad hoc", [...etiquetas, sinMaterial]);
+            const elegido = await elegir(ctx, "Tema fuera del índice: elegí una sección para el modo ad hoc", [...etiquetas, sinMaterial]);
             if (!elegido) return;
             seleccionado = resultados[etiquetas.indexOf(elegido)];
           }
@@ -271,11 +272,11 @@ export function registrarSesion(pi: ExtensionAPI, vault = vaultDir, recursos = p
         if (!esSlug(tema.id)) throw new Error("Id del tema inválido; revisá el índice.");
         // Con un tema activo, lo trabajado se guarda (como /fin, con orden oculta y espera) o se descarta a propósito.
         const viejo = activo && !activo.adHoc && ctx.hasUI ? activo : undefined, nombre = viejo && (datos?.temas.find(t => t.id === viejo.tema)?.nombre || viejo.tema);
-        const eleccion = viejo && await ctx.ui.select(`Estás en «${nombre}»`, ["Guardar y cambiar", "Cambiar sin guardar", "Cancelar"]);
+        const eleccion = viejo && await elegir(ctx, `Estás en «${nombre}»`, ["Guardar y cambiar", "Cambiar sin guardar", "Cancelar"]);
         if (viejo && eleccion !== "Guardar y cambiar" && eleccion !== "Cambiar sin guardar") return;
         // pi ya vació el editor: como /fin, se corta el turno en vez de perder el comando, recién ahora para que cancelar no lo corte; una pregunta abierta se confirma antes.
         if (!ctx.isIdle()) {
-          if (preguntas && !viejo && await ctx.ui.select("Hay una pregunta abierta", ["Cortarla y cambiar de tema", "Seguir con la pregunta"]) !== "Cortarla y cambiar de tema") return;
+          if (preguntas && !viejo && await elegir(ctx, "Hay una pregunta abierta", ["Cortarla y cambiar de tema", "Seguir con la pregunta"]) !== "Cortarla y cambiar de tema") return;
           ctx.abort(); await ctx.waitForIdle();
         }
         if (viejo && eleccion === "Guardar y cambiar") {

@@ -197,6 +197,39 @@ test("H45: las confirmaciones se dibujan en español y Esc o un corte valen como
     ["Reemplazar nota con el historial", ["Sí, reemplazar la nota", "No"]], ["Confirmar gasto de visión", ["Sí, transcribir", "No"]], ["Guardar cambios del curso", ["Sí, guardar los cambios", "No"]]]);
 });
 
+test("H45: en la terminal, el selector de temas, el cambio de tema y las confirmaciones se dibujan con la ayuda en español", async t => {
+  const e = await clase(t, true), { r } = e.sesion.actual(), vistas = [];
+  const kb = { matches: (dato, id) => ({ "tui.select.cancel": "\x1b" })[id] === dato, getKeys: id => [({ "tui.select.confirm": "enter", "tui.select.cancel": "escape" })[id]] };
+  // Cada respuesta son las teclas del alumno: j baja, \n elige.
+  const teclas = [];
+  const ui = { select: assert.fail, custom: factory => new Promise(res => {
+    const c = factory({ requestRender() {} }, { fg: (_c, s) => s, bold: s => s }, kb, res);
+    vistas.push(c.render(100).join("\n"));
+    for (const k of teclas.shift()) c.handleInput(k);
+  }) };
+  const tc = { ...e.ctx, mode: "tui", ui: { ...e.ctx.ui, ...ui } };
+  teclas.push(["\n"], ["j", "j", "\n"]);
+  await e.comandos.get("estudiar").handler("ejemplo", tc);
+  const leido = await e.progreso.leerAnterior(), huella = leido.content[0].text.match(/SHA-256: (\w+)/)[1];
+  teclas.push(["j", "\n"]);
+  await assert.rejects(() => e.progreso.registrar("x", { resumen: "Probe", reconstruir_log: e.sesion.actual().pendiente, huella_log: huella }, undefined, undefined, tc), /Reconstrucción sin confirmar/);
+  const nota = join(r, "sesiones/otra.md"); writeFileSync(nota, "contenido previo");
+  teclas.push(["\x1b"]);
+  await e.comandos.get("md-log").handler(nota, tc);
+  assert.equal(readFileSync(nota, "utf8"), "contenido previo");
+  const modelRegistry = { find: (provider, id) => ({ provider, id, input: ["text", "image"] }), hasConfiguredAuth: () => true };
+  teclas.push(["j", "\n"]);
+  const tanda = await transcribir({ hasUI: true, mode: "tui", modelRegistry, ui }, { vault: e.vault, salida: r, doc: "libro", paginas: [1, 2] }, { modelo_vision: "openai/gpt-6-luna", max_paginas_vision_sin_confirmar: 1, umbral_calidad_pagina: 0.6 });
+  assert.equal(tanda.resumen.cancelada, true);
+  const pi = { exec: async () => ({ code: 0, killed: false, stderr: "", stdout: JSON.stringify({ diff: "+Un tema", copias: [], nuevo: false }) }), sendMessage: () => {} };
+  teclas.push(["\x1b"]);
+  assert.equal((await guardarCurso(pi, { curso: "ejemplo", propuesta: "_procesado/propuesta.json" }, { hasUI: true, mode: "tui", ui })).details.cancelada, true);
+  assert.deepEqual(vistas.map(v => v.split("\n")[2]), [" Temas: en curso, prerequisitos firmes, restantes", " Estás en «Derivación»", " Reconstruir el progreso de la clase anterior",
+    " Reemplazar nota con el historial", " Confirmar gasto de visión", " Guardar cambios del curso"]);
+  for (const v of vistas) { assert.match(v, /\n ↑↓ moverse {2}enter elegir {2}escape cancelar\n/); assert.doesNotMatch(v, /navigate|select\b|cancel\b|Yes/); }
+  assert.equal(e.sesion.actual().a.tema, "derivacion");
+});
+
 test("H45: sin el venv, las operaciones locales fallan en español y remiten al doctor", async t => {
   const real = childProcess.spawn;
   mock.method(childProcess, "spawn", (_programa, args, opciones) => real("/no/existe/python", args, opciones)); syncBuiltinESMExports();

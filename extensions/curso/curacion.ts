@@ -3,6 +3,7 @@ import { readdirSync } from "node:fs";
 import { join } from "node:path";
 import { piDir, vaultDir } from "../../scripts/lib/pi-sdk.mjs";
 import { python } from "./ingesta.ts";
+import { elegir } from "../comun/elegir.ts";
 import { fallaPython } from "./sesion.ts";
 
 const patron = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
@@ -75,7 +76,7 @@ export async function guardarCurso(pi: ExtensionAPI, args: { curso: string; prop
     informar?.(r.diff);
     pi.sendMessage({ customType: "curso-diff", display: true, content: r.diff, details: undefined });
     // ui.confirm de pi dibuja «Yes»/«No»; Esc o un corte valen como no.
-    const acepta = await ctx.ui.select(`Guardar cambios del curso\n${r.copias.length === 1 ? "1 PDF nuevo" : `${r.copias.length} PDFs nuevos`}. Revisá el diff mostrado antes de confirmar. No se modifica progreso.yaml ni se reemplazan PDFs existentes.`, ["Sí, guardar los cambios", "No"], { signal }) === "Sí, guardar los cambios";
+    const acepta = await elegir(ctx, `Guardar cambios del curso\n${r.copias.length === 1 ? "1 PDF nuevo" : `${r.copias.length} PDFs nuevos`}. Revisá el diff mostrado antes de confirmar. No se modifica progreso.yaml ni se reemplazan PDFs existentes.`, ["Sí, guardar los cambios", "No"], { signal }) === "Sí, guardar los cambios";
     if (!acepta) return { content: [{ type: "text", text: "Cambios rechazados; el curso se preservó." }], details: { cancelada: true } };
   }
   const guardado = await ejecutar(pi, "aplicar", args.curso, [...extras, "--base", r.base, "--huella", r.huella], signal);
