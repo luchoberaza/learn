@@ -136,6 +136,7 @@ test("F1, F2 con el curso real: el dossier de retardos nombra la tool y los rang
 
 // modo-curso.md: cada regla de la etapa I por una frase estable (el tamaño lo controla el test de la auditoría pedagógica).
 const REGLAS_I = {
+  "reintento guiado (G2)": "Un reintento tras mostrarle el error o la solución no es intento nuevo: va en las notas del mismo ejercicio, nunca como correcto.",
   "leer la bibliografía antes de cada nodo (F1)": "Antes de establecer cada nodo, leé con `leer_paginas` la página de la bibliografía del tema que lo define",
   "un enunciado no respalda una definición (F2)": "un enunciado de ejercicio nunca respalda una definición",
   "sin bibliografía, decirlo (F1)": "decilo en una línea y marcá «sin respaldo en el material» lo que no conste",
