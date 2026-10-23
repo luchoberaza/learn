@@ -342,7 +342,7 @@ test("modo-curso: prevalece sobre teach con sus conflictos explícitos y trae la
     "figuras (H48)": "Nunca preguntes por una figura o tabla que el alumno no vio",
     "criterios antes (E5, H20)": "Antes del intento, al pedir cada parte o inciso: los criterios que vas a mirar",
     "contra qué (E6, H20)": "decí contra qué corregís",
-    "forma de la corrección (E7, 6c)": "«≈ x/N» por pregunta (y por inciso si la escala oficial lo desglosa), con coma decimal y descuentos explícitos («(−0,5)»)",
+    "forma de la corrección (E7, 6c)": "«≈ x/N» por pregunta, con coma decimal",
     "sin escala (6c)": "sin escala, criterios sin número",
     "error a nodo (E7)": "cada error mapeado a un nodo del plan",
     "notación de la cátedra (E8, F6, H51, X12)": "Manda la notación de la cátedra",
