@@ -122,6 +122,7 @@ const REGLAS_I = {
   "tomate el tiempo (C8)": "«tomate el tiempo» si es escrito",
   "descuento estimado por inciso (E7)": "si la escala oficial es sólo por pregunta, cada inciso con su descuento estimado («c) ≈ (−3)», no oficial)",
   "frase textual de la solución (E7)": "con una frase textual de la solución oficial por inciso",
+  "notación o errata del enunciado (E8)": "si un enunciado usa otra notación o trae una errata, decilo una vez",
 };
 test("modo-curso: reglas de fidelidad y evaluación de la etapa I", () => {
   const plano = readFileSync(join(piDir, "modo-curso.md"), "utf8").replace(/\s+/g, " ");
