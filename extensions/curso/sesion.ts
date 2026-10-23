@@ -1,7 +1,7 @@
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { mkdirSync, openSync, closeSync, readdirSync, readFileSync, renameSync, rmSync, statfsSync, statSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { basename, join, resolve, sep } from "node:path";
+import { basename, join, relative, resolve, sep } from "node:path";
 import { piDir, vaultDir } from "../../scripts/lib/pi-sdk.mjs";
 import { normalizar } from "../../scripts/ingesta/bm25.ts";
 import { buscarMaterial, cita, documento, dossier, esSlug, leer, leerItems, leerPaginas, ordenarTemas, paginasReservadas, reservados, resolverTemas, rutaSegura,
@@ -36,7 +36,8 @@ function escribir(file: string, texto: string) {
 // Las órdenes internas van ocultas: llegan al modelo como mensaje custom y md-log no las anota como del alumno.
 export const ordenar = (pi: ExtensionAPI, content: string) => pi.sendMessage({ customType: "curso-orden", content, display: false }, { triggerTurn: true, deliverAs: "followUp" });
 export function registrarSesion(pi: ExtensionAPI, vault = vaultDir, recursos = piDir) {
-  let activo: Activo | undefined;
+  // log es el nombre de la sesión, al que progreso.py ata fecha y orden; nota, la ruta actual si se renombró en Obsidian.
+  let activo: (Activo & { nota?: string }) | undefined;
   let datos: DatosCurso | undefined;
   let resumen = "", teach = "", modo = "", pendiente: string | undefined, sinLog = false, religar = false, herramientas: string[] | undefined;
   const activarEstudio = () => { const todas = new Set(pi.getAllTools().map(t => t.name)); pi.setActiveTools(ESTUDIO.filter(n => todas.has(n))); };
@@ -122,9 +123,9 @@ export function registrarSesion(pi: ExtensionAPI, vault = vaultDir, recursos = p
     } catch { /* sin registro utilizable */ }
     if (!estado) return;
     try {
-      const a = estado as Activo;
-      if (!esSlug(a.curso) || !esSlug(a.tema) || typeof a.log !== "string" || !a.log.startsWith(`cursos/${a.curso}/sesiones/`) || !a.log.endsWith(".md")) throw new Error("Estado de curso inválido.");
-      rutaSegura(vault, a.log);
+      const a = estado as Activo & { nota?: string };
+      if (!esSlug(a.curso) || !esSlug(a.tema) || [a.log, a.nota ?? a.log].some(l => typeof l !== "string" || !l.startsWith(`cursos/${a.curso}/sesiones/`) || !l.endsWith(".md"))) throw new Error("Estado de curso inválido.");
+      for (const l of [a.log, a.nota ?? a.log]) rutaSegura(vault, l);
       const d = await cargar(a.curso, false, undefined, 30000);
       for (const aviso of d.avisos.filter(a => a.startsWith("Progreso") || a.startsWith(COPIA))) ctx.ui.notify(aviso, "warning");
       const tema = preparar(a, d);
@@ -160,9 +161,23 @@ export function registrarSesion(pi: ExtensionAPI, vault = vaultDir, recursos = p
     activarEstudio();
     if (religar) {
       religar = false;
-      pi.events.emit("md-log:link", { file: rutaSegura(vault, activo.log), backfill: false,
+      pi.events.emit("md-log:link", { file: rutaSegura(vault, activo.nota ?? activo.log), backfill: false,
         onComplete(error?: string) { if (error) ctx.ui.notify("No se reabrió la nota del curso: seguimos sin nota de Obsidian.", "warning"); } });
     }
+  });
+  // md-log siguió la nota renombrada o movida: su ruta queda en el curso activo y en el registro propio, para revincularla al restaurar y cerrarla.
+  // shortcut: ?. porque los dobles de pi de los tests de sesión y progreso sólo emiten; sacarlo si suman events.on.
+  pi.events.on?.("md-log:movido", datos => {
+    const { anterior, actual: nueva } = datos as { anterior: string; actual: string };
+    try {
+      if (!activo || anterior !== rutaSegura(vault, activo.nota ?? activo.log)) return;
+      const nota = relative(vault, nueva);
+      // Fuera de sesiones/ se cierra por la ruta de origen, que md-log también reconoce.
+      activo.nota = nota.startsWith(`cursos/${activo.curso}/sesiones/`) && nota.endsWith(".md") ? nota : undefined;
+      pi.appendEntry("curso", { ...activo, ...(sinLog ? { sinLog } : {}), herramientas });
+      const propio = JSON.parse(readFileSync(registro(activo.curso), "utf8"));
+      if (propio.log === activo.log) escribir(registro(activo.curso), JSON.stringify({ ...propio, nota: activo.nota }));
+    } catch { /* Sin registro propio, md-log igual sigue la nota. */ }
   });
   // Durante el estudio read no lee material ni notas del curso (saltearía el filtro de soluciones) ni otros textos.
   pi.on("tool_call", (event, ctx) => {
@@ -336,7 +351,7 @@ export function registrarSesion(pi: ExtensionAPI, vault = vaultDir, recursos = p
       if (!sinLog) await new Promise<void>((resolve, reject) => {
         const sinCerrar = new Error("No se pudo cerrar la nota de la clase en Obsidian; la clase sigue abierta: repetí /fin.");
         const timer = setTimeout(() => reject(sinCerrar), 2000);
-        pi.events.emit("md-log:unlink", { file: rutaSegura(vault, a.log), onComplete(error?: string) { clearTimeout(timer); error ? reject(sinCerrar) : resolve(); } });
+        pi.events.emit("md-log:unlink", { file: rutaSegura(vault, a.nota ?? a.log), onComplete(error?: string) { clearTimeout(timer); error ? reject(sinCerrar) : resolve(); } });
       });
       pi.appendEntry("curso", null);
       olvidarActivo(ctx, a.curso);

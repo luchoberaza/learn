@@ -16,8 +16,9 @@ import { registrarPreparacion } from "../extensions/curso/preparacion.ts";
 import { guardarCurso, registrarCuracion } from "../extensions/curso/curacion.ts";
 
 // Remates de integración: md-log, sesión y progreso reales sobre un bus de eventos, backend Python real, sin modelos.
-async function clase(t, anterior = false) {
-  const vault = mkdtempSync(join(tmpdir(), "pi-remates-")), recursos = join(vault, ".pi"), raiz = join(vault, "cursos/ejemplo");
+// retomar: el vault de una clase anterior, que otro pi retoma desde session_start (sin /estudiar).
+async function clase(t, anterior = false, retomar) {
+  const vault = retomar ?? mkdtempSync(join(tmpdir(), "pi-remates-")), recursos = join(vault, ".pi"), raiz = join(vault, "cursos/ejemplo");
   t.after(() => rmSync(vault, { recursive: true, force: true }));
   for (const p of [join(recursos, "skills/teach"), join(raiz, "sesiones")]) mkdirSync(p, { recursive: true });
   writeFileSync(join(recursos, "skills/teach/SKILL.md"), "TEACH"); writeFileSync(join(recursos, "modo-curso.md"), "MODO");
@@ -37,7 +38,7 @@ async function clase(t, anterior = false) {
   const sesion = registrarSesion(pi, vault, recursos), progreso = registrarProgreso(pi, sesion, vault);
   const emitir = async (n, ev = {}) => { for (const h of handlers.get(n) || []) await h(ev, ctx); };
   await emitir("session_start", { type: "session_start", reason: "startup" });
-  await comandos.get("estudiar").handler("ejemplo derivacion", ctx);
+  if (!retomar) await comandos.get("estudiar").handler("ejemplo derivacion", ctx);
   const final = async texto => { const message = { role: "assistant", stopReason: "stop", content: [{ type: "text", text: texto }] }; await emitir("message_end", { message }); entradas.push({ type: "message", message }); };
   const guardar = extra => progreso.registrar("prueba", { resumen: "Probe", borde: { domina: ["Derivar un polinomio"] }, ...extra }, undefined, undefined, ctx);
   return { vault, raiz, pi, ctx, comandos, entradas, avisos, ordenes, selects, sesion, progreso, emitir, final, guardar };
@@ -59,6 +60,41 @@ test("H04: con la nota renombrada en Obsidian, /fin guarda con el nombre de la s
   assert.match(readFileSync(join(e.vault, nueva), "utf8"), /Pregunta 1\.[\s\S]*Resumen final\./);
   assert.ok(!existsSync(join(e.raiz, ".sesion-activa.json")));
   assert.deepEqual(e.avisos, [["info", "Sesión cerrada. El log se conserva en Obsidian."]]);
+});
+
+test("H04: la ruta nueva de la nota queda en el curso activo: un pi que retoma sólo con el registro propio (X01) la revincula y /fin cierra", async t => {
+  const e = await clase(t), log = e.sesion.actual().a.log, nueva = "cursos/ejemplo/sesiones/Clase renombrada.md";
+  renameSync(join(e.vault, log), join(e.vault, nueva));
+  await e.final("Pregunta 1.");
+  const cursos = e.entradas.filter(x => x.customType === "curso").map(x => x.data);
+  assert.deepEqual(cursos.at(-1), { ...cursos[0], nota: nueva });
+  assert.equal(JSON.parse(readFileSync(join(e.raiz, ".sesion-activa.json"), "utf8")).nota, nueva);
+  // pi se corta y su archivo de sesión perdió las entradas (disco lleno): queda el registro propio.
+  const f = await clase(t, false, e.vault);
+  await f.emitir("before_agent_start", { systemPromptOptions: { sections: {} } });
+  await f.final("Pregunta 2.");
+  await f.comandos.get("fin").handler("", f.ctx);
+  await f.guardar({ cierre: true });
+  await f.final("Resumen final.");
+  await f.emitir("agent_settled", {});
+  assert.equal(f.sesion.actual(), undefined);
+  assert.match(readFileSync(join(e.vault, nueva), "utf8"), /Pregunta 1\.[\s\S]*Pregunta 2\.[\s\S]*Resumen final\./);
+  assert.deepEqual(historial(f), [`log: ${log.slice("cursos/ejemplo/".length)}`]);
+  assert.deepEqual(f.avisos, [["info", "Sesión cerrada. El log se conserva en Obsidian."]]);
+});
+
+test("H04: una nota movida fuera de sesiones/ no invalida el curso al retomar y /fin la cierra", async t => {
+  const e = await clase(t), log = e.sesion.actual().a.log, movida = "cursos/ejemplo/Movida.md";
+  renameSync(join(e.vault, log), join(e.vault, movida));
+  await e.final("Pregunta 1.");
+  await e.emitir("session_start", { type: "session_start", reason: "resume" });
+  assert.ok(e.sesion.actual());
+  await e.comandos.get("fin").handler("", e.ctx);
+  await e.guardar({ cierre: true });
+  await e.final("Resumen final.");
+  await e.emitir("agent_settled", {});
+  assert.equal(e.sesion.actual(), undefined);
+  assert.match(readFileSync(join(e.vault, movida), "utf8"), /Pregunta 1\.[\s\S]*Resumen final\./);
 });
 
 test("H04: si el renombre se nota recién con el mensaje final, igual cierra", async t => {
