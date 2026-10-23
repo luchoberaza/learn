@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { cpSync, mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { cpSync, mkdtempSync, mkdirSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -63,7 +63,7 @@ test("H14: pi-learn abre el tutor sin ponytail ni skills globales y con las skil
   const h = hogar(t);
   const pi = piLearn(t, { home: h.home }).llamadas.find(l => l[0] === "pi").slice(1, -2);
   const { skills, secciones } = await cargar(t, h, pi);
-  assert.deepEqual(secciones.filter(s => !["teach", "modo_curso", "curso"].includes(s)), []);
+  assert.deepEqual(secciones.filter(s => !["teach", "modo_curso", "curso", "simulacro"].includes(s)), []);
   assert.deepEqual(skills.diagnostics.filter(d => d.type === "collision").map(d => d.message), []);
   const nombres = skills.skills.map(s => s.name);
   for (const n of ["teach", "curso-nuevo", "curso-agregar", "visualize"]) assert.ok(nombres.includes(n), n);
@@ -136,6 +136,15 @@ test("H80/H14/H09: el doctor del proyecto ve el prompt, las skills y el thinking
   assert.match(r.stdout, /^✓ Skills de cursos: teach, curso-nuevo y curso-agregar, sin colisiones/m);
   assert.match(r.stdout, /^✓ Thinking oculto/m);
   assert.match(r.stdout, /^[✓✗] Credenciales principal: openai-codex\/gpt-6\.1-sol: /m);
+});
+
+test("preventivo: la lista blanca de secciones del doctor cubre las que agrega el curso, también la de /simulacro", () => {
+  const blanca = JSON.parse(readFileSync(join(piDir, "scripts/doctor"), "utf8").match(/filter\(s => !(\[[^\]]+\])\.includes\(s\)\)/)[1]);
+  const dir = join(piDir, "extensions/curso"), fuentes = readdirSync(dir).map(f => readFileSync(join(dir, f), "utf8")).join("\n");
+  const propias = new Set([...fuentes.matchAll(/sections\.(\w+) =/g)].map(m => m[1]));
+  for (const m of fuentes.matchAll(/sections, \{([^}]+)\}/g)) for (const k of m[1].split(",")) propias.add(k.split(":")[0].trim());
+  assert.ok(propias.has("simulacro") && propias.has("modo_curso"));
+  assert.deepEqual([...propias].filter(s => !blanca.includes(s)), []);
 });
 
 test("H80/H14/H09: el doctor marca credenciales, secciones, colisiones y thinking, y avisa por otra versión de pi", t => {
