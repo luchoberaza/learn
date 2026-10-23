@@ -288,10 +288,21 @@ def main():
     print(json.dumps(r, ensure_ascii=False, default=str))
 
 
+def falla(e):
+    """Una línea para el alumno: el texto de un OSError viene en inglés y no se muestra."""
+    if not isinstance(e, OSError):
+        return f"Progreso no guardado: {e}"
+    if e.errno == errno.ENOSPC:
+        return "Disco lleno: no se guardó el progreso; liberá espacio y repetí /fin."
+    if e.errno in {errno.EACCES, errno.EPERM, errno.EROFS}:
+        curso = re.search(r"/cursos/([a-z0-9-]+)/", str(e.filename or ""))
+        return f"Progreso no guardado: no hay permiso para escribir el progreso; revisá los permisos de cursos/{curso[1] if curso else '<curso>'}/."
+    return "Progreso no guardado: falló la escritura del archivo de progreso; reintentá y, si sigue, corré .pi/scripts/doctor."
+
+
 if __name__ == "__main__":
     try:
         main()
     except (OSError, ValueError, TypeError, KeyError, RuntimeError, RecursionError) as e:
-        lleno = isinstance(e, OSError) and e.errno == errno.ENOSPC
-        print("Disco lleno: no se guardó el progreso; liberá espacio y repetí /fin." if lleno else f"Progreso no guardado: {e}", file=sys.stderr)
+        print(falla(e), file=sys.stderr)
         raise SystemExit(1)
