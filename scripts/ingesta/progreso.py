@@ -34,6 +34,8 @@ def contexto(raiz):
 
 def comprobar(p, ctx):
     validar_progreso(p, *ctx)
+    if any(not isinstance(t.get(k, ""), str) for t in p["temas"].values() for k in ["objetivo", "plan"]):
+        raise ValueError("progreso.yaml: objetivo y plan deben ser textos.")
     return p
 
 
@@ -105,7 +107,7 @@ def fusionar(anterior, nuevo, previo=False):
     if previo:
         # Evidencia más vieja que la guardada: suma sólo lo que no contradice y conserva estado y próximo paso.
         conocidos = {e["descripcion"] for e in anterior.get("errores_de_concepto", [])}
-        nuevo = {**{k: v for k, v in nuevo.items() if k not in {"estado", "proximo_paso"}}, "falla_resuelta": [],
+        nuevo = {**{k: v for k, v in nuevo.items() if k not in {"estado", "proximo_paso", "objetivo", "plan"}}, "falla_resuelta": [],
                  "borde": {"domina": [s for s in nuevo["borde"]["domina"] if s not in falla],
                            "falla": [s for s in nuevo["borde"]["falla"] if s not in domina + anterior.get("conceptos_firmes", [])]},
                  "conceptos_firmes": [s for s in nuevo["conceptos_firmes"] if s not in falla],
@@ -160,14 +162,16 @@ def rango(ids):
 def validar_datos(datos, ctx, dia=None):
     # Delta: sólo resumen es obligatorio; lo omitido se conserva al fusionar.
     listas = ["conceptos_firmes", "errores_de_concepto", "ejercicios", "discrepancias", "falla_resuelta"]
-    if not isinstance(datos, dict) or set(datos) - {"estado", "borde", "proximo_paso", "resumen", *listas} or "resumen" not in datos:
+    # objetivo y plan (H56) reemplazan los guardados sólo cuando vienen.
+    topes = {"resumen": 2000, "proximo_paso": 2000, "objetivo": 300, "plan": 1500}
+    if not isinstance(datos, dict) or set(datos) - {"estado", "borde", *topes, *listas} or "resumen" not in datos:
         raise ValueError("Registro sin resumen o con campos ajenos al esquema de progreso.")
     def cadena(s, maximo=2000):
         if not isinstance(s, str) or not s.strip() or len(s) > maximo:
             raise ValueError("El progreso necesita textos no vacíos y acotados.")
-    for k in ["resumen", "proximo_paso"]:
+    for k, maximo in topes.items():
         if k in datos:
-            cadena(datos[k])
+            cadena(datos[k], maximo)
     if datos.get("estado", "en_curso") not in {"sin_empezar", "en_curso", "dominado", "repasar"}:
         raise ValueError("Estado de progreso inválido.")
     if not isinstance(datos.get("borde", {}), dict) or set(datos.get("borde", {})) - {"domina", "falla"}:

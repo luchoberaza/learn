@@ -37,7 +37,7 @@ export default function (pi: ExtensionAPI) {
   });
   pi.registerTool({
     name: "registrar_progreso", label: "Guardar progreso del curso",
-    description: "Fusiona evidencia observada del tema activo, valida y guarda atómicamente con .bak. Mandá sólo lo nuevo desde el último guardado: lo omitido se conserva; sólo resumen es obligatorio y estado/proximo_paso van cuando cambian. Para quitar una falla superada, pasala en falla_resuelta con su texto exacto del borde; una falla nueva saca ese concepto de conceptos_firmes. No inventes resultados ni puntajes. cierre:true al terminar; el log se cierra tras el mensaje final. Para reconstruir leé leer_sesion_anterior y usá su log/SHA; requiere confirmación humana. Ad hoc no crea temas persistentes.",
+    description: "Fusiona evidencia observada del tema activo, valida y guarda atómicamente con .bak. Mandá sólo lo nuevo desde el último guardado: lo omitido se conserva; sólo resumen es obligatorio y estado/proximo_paso/objetivo/plan van cuando cambian. Para quitar una falla superada, pasala en falla_resuelta con su texto exacto del borde; una falla nueva saca ese concepto de conceptos_firmes. No inventes resultados ni puntajes. cierre:true al terminar; el log se cierra tras el mensaje final. Para reconstruir leé leer_sesion_anterior y usá su log/SHA; requiere confirmación humana. Ad hoc no crea temas persistentes.",
     parameters: Type.Object({
       estado: Type.Optional(Type.Union([Type.Literal("sin_empezar"), Type.Literal("en_curso"), Type.Literal("dominado"), Type.Literal("repasar")])),
       borde: Type.Optional(Type.Object({ domina: Type.Optional(listaProgreso), falla: Type.Optional(listaProgreso) })), conceptos_firmes: Type.Optional(listaProgreso),
@@ -47,6 +47,8 @@ export default function (pi: ExtensionAPI) {
         resultado: Type.Union([Type.Literal("correcto"), Type.Literal("parcial"), Type.Literal("incorrecto")]),
         puntaje: Type.Optional(Type.String({ maxLength: 200 })), notas: Type.Optional(Type.String({ maxLength: 2000 })) }), { maxItems: 100 })),
       discrepancias: Type.Optional(listaProgreso), proximo_paso: Type.Optional(textoProgreso), resumen: textoProgreso, cierre: Type.Optional(Type.Boolean()),
+      objetivo: Type.Optional(Type.String({ minLength: 1, maxLength: 300, description: "objetivo acordado con el estudiante; reemplaza al guardado" })),
+      plan: Type.Optional(Type.String({ minLength: 1, maxLength: 1500, description: "nodos del plan aprobado en orden, cada uno con su cita corta (doc y PDF p.); reemplaza al guardado" })),
       reconstruir_log: Type.Optional(Type.String()), huella_log: Type.Optional(Type.String({ pattern: "^[a-f0-9]{64}$" })),
     }), executionMode: "sequential",
     execute: (...args) => {

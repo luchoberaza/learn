@@ -8,7 +8,7 @@ export interface Tema { id: string; nombre: string; alias: string[]; unidad: num
   ejercicios?: { doc: string; items: string[] }[]; evaluaciones?: { doc: string; items: string[] }[] }
 interface Item { id: string; paginas: number[]; enunciado: string; solucion?: { doc: string; id: string }; solucion_de?: string; puntos?: number }
 export interface DatosCurso { curso: string; nombre?: string; contrato: string; documentos: Documento[]; temas: Tema[]; items: Record<string, Item[]>;
-  progreso: { temas: Record<string, { estado?: string; borde?: unknown; proximo_paso?: string }>; historial?: unknown[] };
+  progreso: { temas: Record<string, { estado?: string; borde?: unknown; proximo_paso?: string; objetivo?: string; plan?: string }>; historial?: unknown[] };
   avisos: string[]; validacion?: { errores: string[]; avisos: string[]; pendientes: unknown[] } }
 export interface Activo { curso: string; tema: string; log: string; adHoc?: Tema }
 export const esSlug = (s: string) => typeof s === "string" && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(s);
@@ -220,8 +220,10 @@ export function dossier(raiz: string, datos: DatosCurso, tema: Tema, maxTokens: 
   if (resto.length) lineas.push(acotar(`Más ítems del tema (leelos con leer_items): ${[ids(false), ids(true) && `asignados automáticamente: ${ids(true)}`].filter(Boolean).join("; ")}`, 800));
   const faltan = faltantesTema(raiz, datos, tema);
   if (faltan.length) lineas.push(`Preparación del tema: sin texto confiable todavía en ${faltan.join("; ")}. Se preparan solos en segundo plano; mientras, cotejá esas páginas con ver_pagina antes de citarlas.`);
+  // Objetivo y plan acordados (H56) comparten los 3000 B del progreso del tema: retomar no los vuelve a pedir ni pierde el borde.
+  const p = datos.progreso.temas[tema.id], acordado = [p?.objetivo && `Objetivo acordado: ${String(p.objetivo).slice(0, 300)}`, p?.plan && `Plan: ${String(p.plan).slice(0, 1500)}`].filter(Boolean).join("\n\n");
   // Lo que puede cortarse va al final: el progreso de los prerequisitos.
-  lineas.push(`Progreso ${tema.id}: ${progresoCompacto(datos.progreso.temas[tema.id], 3000)}`, "## Verificación previa", resumirVerificacion(verificacion));
+  lineas.push(...(acordado ? [acordado] : []), `Progreso ${tema.id}: ${progresoCompacto(p, 3000 - Buffer.byteLength(acordado))}`, "## Verificación previa", resumirVerificacion(verificacion));
   for (const id of tema.prerequisitos || []) lineas.push(`Progreso ${id} (prerequisito): ${progresoCompacto(datos.progreso.temas[id], 800)}`);
   return acotar(lineas.join("\n\n"), maxTokens * 4);
 }
