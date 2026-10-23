@@ -166,3 +166,11 @@ test("H47: el rechazo le habla al modelo; el alumno ve un aviso que no le pide n
   assert.doesNotMatch(visto, /llam|quiz:/i);
   assert.match(visto, /otra/);
 });
+
+test("A4: una opción larga de ask_user_question se envuelve y se ve entera", async () => {
+  const vistas = [], etiqueta = "Lo que pide el curso (distinguir y calcular los retardos de transmisión, propagación, procesamiento y cola, la tasa de transferencia y el producto ancho de banda-retardo; aparece en 2 de 5 parciales)";
+  await ask.execute("l1", { question: "¿Qué objetivo trabajamos?", options: [{ label: etiqueta }, { label: "Ajustar" }] }, undefined, () => {}, ui(["enter"], vistas));
+  const popup = vistas[0].split("\n");
+  assert.ok(popup.every(l => l.length <= 100));
+  assert.ok(popup.map(l => l.trim()).join(" ").includes(`1. ${etiqueta}`), vistas[0]);
+});

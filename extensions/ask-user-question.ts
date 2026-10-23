@@ -340,7 +340,10 @@ async function askSingleChoice(
 				const prefix = selected ? theme.fg("accent", "> ") : "  ";
 				const label = option.isOther ? option.label : `${option.index}. ${option.label}`;
 				const styled = selected ? theme.fg("accent", label) : theme.fg("text", label);
-				add(`${prefix}${styled}`);
+				// Una etiqueta larga (p. ej. el objetivo con su peso en los parciales) se envuelve: cortada, el alumno no la ve entera.
+				const [primera, ...resto] = wrapTextWithAnsi(styled, Math.max(1, width - 5));
+				add(`${prefix}${primera}`);
+				for (const linea of resto) add(`     ${linea}`);
 				if (option.description) {
 					addWrapped(lines, theme.fg("muted", option.description), width, "     ");
 				}
