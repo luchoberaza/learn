@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { dossier } from "../extensions/curso/material.ts";
+import { dossier, leerItems } from "../extensions/curso/material.ts";
 import { loadProject } from "../scripts/lib/pi-sdk.mjs";
 
 // Regresiones de la auditoría pedagógica: curso sintético, sin modelos.
@@ -57,4 +57,14 @@ test("H56: el dossier trae objetivo y plan dentro del presupuesto, sin perder bo
   // Sin objetivo ni plan guardados no hay líneas vacías.
   delete p.objetivo; delete p.plan;
   assert.ok(!/Objetivo acordado|^Plan:/m.test(dossier(c.raiz, c.d, c.tema, 3000, 2000)));
+});
+
+test("H72: leer_items muestra el puntaje oficial también cuando es texto", t => {
+  const c = curso(t);
+  c.d.documentos.push({ id: "parcial", titulo: "Parcial", tipo: "evaluaciones", archivo: "fuentes/evaluaciones/parcial.pdf", paginas: 2 });
+  c.d.items.parcial = [{ id: "1", paginas: [1], enunciado: "Calcule.", puntos: 12 }, { id: "2", paginas: [2], enunciado: "Explique.", puntos: "10 (a: 4, b: 6)" }, { id: "3", paginas: [2], enunciado: "Sin puntos." }];
+  const r = leerItems(c.d, "parcial", ["1", "2", "3"]);
+  assert.match(r, /^parcial\/1 \(12 puntos\)$/m);
+  assert.match(r, /^parcial\/2 \(10 \(a: 4, b: 6\)\)$/m);
+  assert.match(r, /^parcial\/3$/m);
 });
