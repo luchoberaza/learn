@@ -115,6 +115,8 @@ const REGLAS_I = {
   "sin preámbulo no es sin leer (F1)": "«sin preámbulo» es sin texto, no sin leer",
   "6a desde la bibliografía (F1)": "enseñá ya, en modo expositivo y desde la bibliografía",
   "retomar tras un corte (A3, D5)": "Al retomar tras un corte, una línea de «dónde quedamos» y la pregunta pendiente idéntica, sin agregar datos",
+  "peso del objetivo (A4, E2)": "su peso en curso.md: cae en N de M parciales",
+  "6a con peso y ajustable (A4)": "el objetivo del curso con su peso y que se puede ajustar",
 };
 test("modo-curso: reglas de fidelidad y evaluación de la etapa I", () => {
   const plano = readFileSync(join(piDir, "modo-curso.md"), "utf8").replace(/\s+/g, " ");
