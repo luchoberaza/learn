@@ -8,10 +8,10 @@ This is a personal system I built for myself, shared as-is. Built as a pi config
 
 ## Modo curso (este fork)
 
-Este fork suma un modo curso para estudiar una materia con su propio material, dentro de un vault de Obsidian (`~/Projects/pi-learning`). `teach` queda intacto; el modo curso lo complementa con `modo-curso.md`.
+Este fork suma un modo curso para estudiar una materia con su propio material, dentro de un vault de Obsidian (`~/Projects/pi-learning`). `teach` queda intacto; mientras hay un curso activo, `modo-curso.md` prevalece sobre él en lo que regula y declara cada conflicto (probe con tope, objetivo propuesto por el curso, plan aprobado con botones, popups sin LaTeX).
 
 - **Crear o ampliar un curso:** `/curso-nuevo <slug>` y `/curso-agregar <slug>` arman contrato e índice desde los PDFs de `_entrada/` (todo cambio a un curso ya guardado, con diff y confirmación) e ingieren todas las páginas en local, sin modelo.
-- **Estudiar:** `/estudiar <curso> <tema>` abre la clase con su nota en Obsidian, citas a la página del PDF y quizzes en español. La primera vez que se estudia un tema, su material se prepara solo en segundo plano con el modelo de visión (transcripción, ítems de parciales y prácticos, asignación por tema). `/fin` guarda el progreso; `/progreso` sugiere el próximo tema.
+- **Estudiar:** `/estudiar <curso> <tema>` abre la clase con su nota en Obsidian, citas a la página del PDF y quizzes en español. La primera vez que se estudia un tema, su material se prepara solo en segundo plano con el modelo de visión (transcripción, ítems de parciales y prácticos, asignación por tema). `/simulacro` rinde, como en el examen, una pregunta de parcial del tema que se reservó para eso. `/fin` guarda el progreso; `/progreso` sugiere el próximo tema.
 - **Componentes:** `extensions/curso/` (comandos y tools), `scripts/ingesta/` (ingesta y backend en Python), `skills/curso-nuevo/`, `skills/curso-agregar/`, `scripts/doctor` y `config/` (lanzador `pi-learn` y tmux).
 
 Se abre con `pi-learn`, no con `pi` a secas: así el tutor sólo ve las skills del proyecto. El researcher del curso corre como un `pi -p` propio y no necesita subagentes. Instalación, dependencias (también las globales), uso, doctor y pruebas: [`SETUP.md`](SETUP.md). Por qué cada cosa es como es: [`DECISIONES.md`](DECISIONES.md). Para este fork no uses el `git clone` de «Install»: seguí `SETUP.md`.
