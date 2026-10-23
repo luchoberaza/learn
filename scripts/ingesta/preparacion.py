@@ -1,6 +1,7 @@
 """Preparación por tema, sin red: qué falta transcribir, segmentar y clasificar, y el registro de lo hecho."""
 from __future__ import annotations
 
+from datetime import datetime, timedelta
 import hashlib
 import json
 from pathlib import Path
@@ -15,6 +16,11 @@ BANCOS = ("evaluaciones", "ejercicios")
 
 def huella(enunciado: str) -> str:
     return hashlib.sha256(enunciado.encode()).hexdigest()
+
+
+def entrada(*partes) -> str:
+    """Huella de lo que recibe el modelo: si no cambia, un fallo se repetiría."""
+    return hashlib.sha256(json.dumps(partes, ensure_ascii=False).encode()).hexdigest()
 
 
 def leer(raiz: Path, nombre: str) -> dict:
@@ -44,7 +50,17 @@ def trabajo(vault: Path, curso: str, tema: str, maximo: int) -> dict:
     t = next((t for t in indice["temas"] if t.get("id") == tema), None)
     if t is None:
         raise ValueError("El tema ya no está en el índice.")
-    hechos = leer(raiz, "_procesado/preparacion.json").get("documentos", {})
+    estado = leer(raiz, "_procesado/preparacion.json")
+    hechos, fallos = estado.get("documentos", {}), estado.get("fallos", {})
+    indice_sha = sha256(ruta_segura(raiz, "indice.yaml"))
+
+    def en_espera(clave, huella_entrada):
+        # Una segmentación o clasificación que falló con estas mismas entradas no se reintenta hasta el día siguiente.
+        f = fallos.get(clave) if isinstance(fallos, dict) else None
+        try:
+            return f["entrada"] == huella_entrada and datetime.fromisoformat(ahora()) - datetime.fromisoformat(f["fecha"]) < timedelta(days=1)
+        except (TypeError, KeyError, ValueError):
+            return False
 
     sin_base = set()
     def faltan(doc, paginas, todas):
@@ -73,9 +89,13 @@ def trabajo(vault: Path, curso: str, tema: str, maximo: int) -> dict:
                                  and not editado(raiz, d["id"])):
                 pendientes = faltan(d["id"], range(1, d["paginas"] + 1), True)
                 cola.append((d["id"], pendientes))
-                segmentar.append({"doc": d["id"], "tipo": tipo, "titulo": d["titulo"], "paginas": d["paginas"],
-                                  "listo": not pendientes and not any(doc == d["id"] for doc, _ in sin_base),
-                                  "requeridos": sorted(i for doc, i in en_indice if doc == d["id"])})
+                requeridos = sorted(i for doc, i in en_indice if doc == d["id"])
+                listo = not pendientes and not any(doc == d["id"] for doc, _ in sin_base)
+                textos = [ruta_segura(raiz, f"_procesado/{d['id']}/paginas/{p:04}.md") for p in range(1, d["paginas"] + 1)] if listo else []
+                huella_entrada = entrada(tipo, d["titulo"], requeridos, [sha256(t) if t.exists() else None for t in textos])
+                espera = listo and en_espera(f"segmentar/{d['id']}", huella_entrada)
+                segmentar.append({"doc": d["id"], "tipo": tipo, "titulo": d["titulo"], "paginas": d["paginas"], "requeridos": requeridos,
+                                  "listo": listo and not espera, "en_espera": espera, "entrada": huella_entrada})
     paginas, vistas, restantes = [], set(), len(sin_base)
     for doc, numeros in cola:
         nuevas = [p for p in numeros if (doc, p) not in vistas]
@@ -86,11 +106,12 @@ def trabajo(vault: Path, curso: str, tema: str, maximo: int) -> dict:
         restantes += len(nuevas[lugar:])
     previas = {(a.get("doc"), a.get("id")): a.get("huella") for a in leer(raiz, "_procesado/asignaciones.json").get("items", []) if isinstance(a, dict)}
     por_segmentar = {s["doc"] for s in segmentar}
-    clasificar = [{"doc": doc, "id": i["id"], "enunciado": i["enunciado"], "huella": huella(i["enunciado"])}
-                  for doc, items in bancos.items() if doc not in por_segmentar for i in items
-                  if "solucion_de" not in i and (doc, i["id"]) not in en_indice and previas.get((doc, i["id"])) != huella(i["enunciado"])]
-    return {"tema": tema, "indice": sha256(ruta_segura(raiz, "indice.yaml")), "paginas": paginas, "restantes": restantes,
-            "segmentar": segmentar, "clasificar": clasificar}
+    todos = [{"doc": doc, "id": i["id"], "enunciado": i["enunciado"], "huella": huella(i["enunciado"]), "entrada": entrada(indice_sha, huella(i["enunciado"]))}
+             for doc, items in bancos.items() if doc not in por_segmentar for i in items
+             if "solucion_de" not in i and (doc, i["id"]) not in en_indice and previas.get((doc, i["id"])) != huella(i["enunciado"])]
+    clasificar = [c for c in todos if not en_espera(f"clasificar/{c['doc']}/{c['id']}", c["entrada"])]
+    return {"tema": tema, "indice": indice_sha, "paginas": paginas, "restantes": restantes, "segmentar": segmentar, "clasificar": clasificar,
+            "en_espera": sum(s["en_espera"] for s in segmentar) + len(todos) - len(clasificar)}
 
 
 def asignar(vault: Path, curso: str, asignaciones: list) -> dict:
@@ -125,6 +146,9 @@ def registrar(vault: Path, curso: str, datos: dict) -> dict:
             grupo = estado.get(clave) if isinstance(estado.get(clave), dict) else {}
             grupo[valor["id"]] = {**{k: v for k, v in valor.items() if k != "id"}, "fecha": ahora()}
             estado[clave] = grupo
+    if isinstance(datos.get("fallos"), dict):
+        fallos = estado.get("fallos") if isinstance(estado.get("fallos"), dict) else {}
+        estado["fallos"] = {**fallos, **{clave: {"entrada": e, "fecha": ahora()} for clave, e in datos["fallos"].items()}}
     guardar_json(raiz, "_procesado/preparacion.json", estado)
     return estado
 

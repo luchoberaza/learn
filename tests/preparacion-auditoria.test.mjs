@@ -190,7 +190,7 @@ test("preparación: la primera vez transcribe, segmenta con soluciones y puntos,
   assert.deepEqual(e.mensajes[0][1], { deliverAs: "nextTurn" });
   assert.equal(e.mensajes[0][0].customType, "curso-preparacion");
   assert.equal(e.mensajes[0][0].display, false);
-  assert.match(e.mensajes[0][0].content, /1 ítems asignados a este tema/);
+  assert.match(e.mensajes[0][0].content, /1 ítem asignado a este tema, marcado/);
   assert.equal(e.activo.d.items.parcial.length, 2);
   // Tras las 2 páginas del libro (antes de parciales y prácticos) y al terminar.
   assert.deepEqual(e.refrescos, [2, 7]);
@@ -239,8 +239,9 @@ test("preparación: JSON inválido se reintenta una vez y queda para la próxima
   assert.match(segmentar[1].texto, /Tu respuesta anterior se rechazó: la respuesta no es JSON válido/);
   assert.ok(!existsSync(join(e.raiz, "_procesado/parcial/items.yaml")));
   assert.equal(e.json("preparacion.json").temas.derivacion.estado, "incompleta");
-  assert.deepEqual(e.avisos, [["warning", "Material de Derivación preparado en parte: 4 páginas transcriptas, 1 ítems nuevos; no se pudieron separar los ítems de parcial (la respuesta no es JSON válido), sigue la próxima vez."]]);
+  assert.deepEqual(e.avisos, [["warning", "Material de Derivación preparado en parte: 4 páginas transcriptas, 1 ítem nuevo; no se pudieron separar los ítems de parcial (la respuesta no es JSON válido), se reintenta mañana o si cambia el material."]]);
   e.llamadas.length = 0;
+  const prep = e.json("preparacion.json"); prep.fallos["segmentar/parcial"].fecha = "2000-01-01T00:00:00+00:00"; writeFileSync(join(e.raiz, "_procesado/preparacion.json"), JSON.stringify(prep));
   e.ctx.modelRegistry.streamSimple = modeloSimulado(e.llamadas);
   await e.turno("cursos/ejemplo/sesiones/2.md");
   assert.deepEqual(e.llamadas.map(l => l.tipo), ["segmentar", "clasificar"]);
@@ -301,7 +302,7 @@ test("preparación: un parcial sin ingesta base espera, sin cortar lo demás ni 
   rmSync(join(e.raiz, "_procesado/parcial"), { recursive: true });
   await e.turno();
   assert.deepEqual(e.llamadas.map(l => l.tipo), ["vision", "vision", "vision", "segmentar", "clasificar"]);
-  assert.deepEqual(e.avisos, [["warning", "Material de Derivación preparado en parte: 3 páginas transcriptas, 1 ítems nuevos; quedan 1 páginas, sigue la próxima vez."]]);
+  assert.deepEqual(e.avisos, [["warning", "Material de Derivación preparado en parte: 3 páginas transcriptas, 1 ítem nuevo; queda 1 página, sigue la próxima vez."]]);
   assert.equal(e.json("preparacion.json").temas.derivacion.estado, "incompleta");
   e.llamadas.length = 0;
   await e.turno("cursos/ejemplo/sesiones/2.md");

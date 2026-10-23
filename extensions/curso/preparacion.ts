@@ -14,9 +14,9 @@ const VIEJO = 6 * 3600_000;
 const OCUPADA = /Ya hay una ingesta escribiendo/;
 // El marcador de pipeline.SOLUCION: un enunciado que lo trae mostraría la solución antes del intento.
 const SOLUCION = /^(?:[\s#>*_]*(?:soluci[oó]n|resoluci[oó]n|rta\.?\s*:)|[\s#>]*(?:[*_]+\s*respuesta|respuestas?\s*(?::|$)))/im;
-type Segmento = { doc: string; tipo: string; titulo: string; paginas: number; listo: boolean; requeridos: string[] };
-type Pendiente = { doc: string; id: string; enunciado: string; huella: string };
-type Trabajo = { indice: string; paginas: { doc: string; paginas: number[] }[]; restantes: number; segmentar: Segmento[]; clasificar: Pendiente[] };
+type Segmento = { doc: string; tipo: string; titulo: string; paginas: number; listo: boolean; requeridos: string[]; entrada: string };
+type Pendiente = { doc: string; id: string; enunciado: string; huella: string; entrada: string };
+type Trabajo = { indice: string; paginas: { doc: string; paginas: number[] }[]; restantes: number; segmentar: Segmento[]; clasificar: Pendiente[]; en_espera: number };
 
 const SEGMENTAR = `Segmentás en ítems un documento de un curso a partir de sus páginas transcriptas. Respondé sólo un objeto JSON, sin texto alrededor:
 {"items":[{"id":"3","paginas":[2],"enunciado":"…","puntos":8},{"id":"3-solucion","paginas":[2,3],"enunciado":"…","solucion_de":"3"}]}
@@ -32,6 +32,7 @@ const CLASIFICAR = `Asignás ítems de práctica de un curso al tema que evalúa
 - tema: el id del tema cuyo contenido hace falta para resolverlo (el principal si toca varios), o null si ninguno corresponde. Sólo ids de tema recibidos.`;
 
 const mensaje = (e: unknown) => e instanceof Error ? e.message : String(e);
+const cuenta = (n: number, uno: string, varios: string) => `${n} ${n === 1 ? uno : varios}`;
 const vivo = (pid: number) => { try { process.kill(pid, 0); return true; } catch (e) { return (e as NodeJS.ErrnoException).code === "EPERM"; } };
 // Identidad que un pid reutilizado (también tras reiniciar) no repite: arranque del sistema y del proceso; en Linux.
 function proceso(pid: number) {
@@ -73,7 +74,7 @@ async function pedirJSON(ctx: Pick<ExtensionContext, "modelRegistry">, modelo: M
   if (r.stopReason !== "stop" || !salida) throw new Error(r.stopReason === "aborted" ? "el modelo no respondió en 5 minutos" : r.errorMessage || "respuesta vacía o cortada");
   try { return JSON.parse(salida.replace(/^```(?:json)?\s*|\s*```$/g, "")); } catch { throw new Error("la respuesta no es JSON válido"); }
 }
-// Una respuesta inválida se reintenta una vez con el motivo; si vuelve a fallar, queda para la próxima corrida.
+// Una respuesta inválida se reintenta una vez con el motivo; si vuelve a fallar, espera hasta mañana o hasta que cambien sus entradas.
 async function conReintento<T>(pedido: (error: string) => Promise<T>, signal: AbortSignal): Promise<T> {
   for (let intento = 0, error = ""; ; intento++) {
     try { return await pedido(error ? `\nTu respuesta anterior se rechazó: ${error}. Corregila.` : ""); }
@@ -116,8 +117,9 @@ export function registrarPreparacion(pi: ExtensionAPI, sesion: Pick<ReturnType<t
     corriendo.set(curso, control); intentados.add(clave);
     const estado = (texto?: string) => { try { ctx.ui.setStatus("preparacion", texto); } catch { /* ctx viejo tras /reload. */ } };
     const avisar = (texto: string, tipo: "info" | "warning") => { try { ctx.ui.notify(texto, tipo); } catch { /* ctx viejo tras /reload. */ } };
-    let ocupada = false, transcriptas = 0, nuevos = 0, asignadas = 0;
-    const avisos: string[] = [], segmentados: string[] = [];
+    let ocupada = false, transcriptas = 0, nuevos = 0, asignadas = 0, fallo = false;
+    // Segmentaciones y clasificaciones fallidas, con la huella de sus entradas: no se repiten hasta mañana o hasta que cambien.
+    const avisos: string[] = [], segmentados: string[] = [], fallos: Record<string, string> = {};
     // Red, cuota o credenciales: cada llamada siguiente fallaría igual, así que se corta la tanda con la causa.
     const cortar = (e: unknown) => { const corte = corteModelo(mensaje(e)); if (signal.aborted || OCUPADA.test(mensaje(e)) || corte) throw corte ? new Error(corte) : e; };
     try {
@@ -164,7 +166,9 @@ export function registrarPreparacion(pi: ExtensionAPI, sesion: Pick<ReturnType<t
             segmentados.push(s.doc);
           } catch (e) {
             cortar(e);
+            fallo ||= !avisos.length;
             avisos.push(`no se pudieron separar los ítems de ${s.doc} (${mensaje(e).slice(0, 150)})`);
+            fallos[`segmentar/${s.doc}`] = s.entrada;
           }
         }
         t = await pedir();
@@ -182,23 +186,27 @@ export function registrarPreparacion(pi: ExtensionAPI, sesion: Pick<ReturnType<t
             asignadas += asignaciones.filter((a: any) => a.tema === tema.id).length;
           } catch (e) {
             cortar(e);
-            avisos.push(`no se pudieron clasificar ${lote.length} ítems (${mensaje(e).slice(0, 150)})`);
+            fallo ||= !avisos.length;
+            avisos.push(`no se ${lote.length === 1 ? "pudo clasificar 1 ítem" : `pudieron clasificar ${lote.length} ítems`} (${mensaje(e).slice(0, 150)})`);
+            for (const x of lote) fallos[`clasificar/${x.doc}/${x.id}`] = x.entrada;
           }
         }
         t = await pedir();
       }
-      const pendientes = t.restantes + t.paginas.reduce((n, x) => n + x.paginas.length, 0), completa = !pendientes && !t.segmentar.length && !t.clasificar.length;
-      await python("registrar", { vault, curso, tema: { id: tema.id, estado: completa ? "completa" : "incompleta", indice: t.indice, pendientes } }, signal, "preparacion.py");
+      const pendientes = t.restantes + t.paginas.reduce((n, x) => n + x.paginas.length, 0), completa = !pendientes && !t.segmentar.length && !t.clasificar.length && !t.en_espera;
+      await python("registrar", { vault, curso, tema: { id: tema.id, estado: completa ? "completa" : "incompleta", indice: t.indice, pendientes }, fallos }, signal, "preparacion.py");
       if (!hubo) return;
       const e = sesion.actual();
       if (e?.a.curso === curso) {
         e.d.items = await python("bancos", { vault, curso }, signal, "preparacion.py");
         try { sesion.refrescar(); } catch { /* El tema dejó el índice: el próximo /estudiar lo informa. */ }
       }
-      const resultado = `${transcriptas} páginas transcriptas, ${nuevos} ítems nuevos`;
-      avisar(completa ? `Material de ${tema.nombre} listo: ${resultado}.` : `Material de ${tema.nombre} preparado en parte: ${resultado}; ${avisos[0]?.replace(/\.$/, "").slice(0, 200) || `quedan ${pendientes} páginas`}, sigue la próxima vez.`, completa ? "info" : "warning");
+      const resultado = `${cuenta(transcriptas, "página transcripta", "páginas transcriptas")}, ${cuenta(nuevos, "ítem nuevo", "ítems nuevos")}`;
+      const quedan = pendientes === 1 ? "queda 1 página" : `quedan ${pendientes} páginas`;
+      const detalle = avisos[0]?.replace(/\.$/, "").slice(0, 200) || (pendientes ? quedan : "quedan ítems que no se pudieron preparar");
+      avisar(completa ? `Material de ${tema.nombre} listo: ${resultado}.` : `Material de ${tema.nombre} preparado en parte: ${resultado}; ${detalle}, ${fallo || !avisos.length && !pendientes ? "se reintenta mañana o si cambia el material" : "sigue la próxima vez"}.`, completa ? "info" : "warning");
       if (e?.a.curso === curso && e.a.tema === tema.id) pi.sendMessage({ customType: "curso-preparacion", display: false,
-        content: `Preparación automática del material de «${tema.nombre}»: ${resultado}${segmentados.length ? ` (ítems de ${segmentados.join(", ")})` : ""}${asignadas ? `; ${asignadas} ítems asignados a este tema, marcados «asignado automáticamente» en el dossier` : ""}${completa ? "" : `; quedan ${pendientes} páginas sin transcribir`}. El dossier ya está actualizado: usá leer_paginas y leer_items con ese material.` }, { deliverAs: "nextTurn" });
+        content: `Preparación automática del material de «${tema.nombre}»: ${resultado}${segmentados.length ? ` (ítems de ${segmentados.join(", ")})` : ""}${asignadas ? `; ${cuenta(asignadas, "ítem asignado a este tema, marcado", "ítems asignados a este tema, marcados")} «asignado automáticamente» en el dossier` : ""}${pendientes ? `; ${quedan} sin transcribir` : ""}. El dossier ya está actualizado: usá leer_paginas y leer_items con ese material.` }, { deliverAs: "nextTurn" });
     } catch (e) {
       // Cancelada al cerrar pi, o la ingesta base tomó la salida: sin aviso; se reintenta después.
       if (ocupada) intentados.delete(clave);

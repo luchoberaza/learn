@@ -201,6 +201,28 @@ function preparacion(t) {
   return e;
 }
 
+test("preparación (a): una segmentación que falla siempre no gasta llamadas en cada /estudiar hasta mañana o hasta que cambien sus entradas", async t => {
+  const e = preparacion(t);
+  e.guion.segmentar = texto => texto.includes("Documento parcial") && respuesta("No encontré ítems.");
+  await e.turno();
+  assert.equal(e.llamadas.filter(x => x === "segmentar").length, 3);
+  assert.deepEqual(e.avisos, [["warning", "Material de Derivación preparado en parte: 4 páginas transcriptas, 1 ítem nuevo; no se pudieron separar los ítems de parcial (la respuesta no es JSON válido), se reintenta mañana o si cambia el material."]]);
+  e.llamadas.length = 0;
+  await e.turno();
+  assert.deepEqual([e.llamadas, e.avisos.length, e.json("preparacion.json").temas.derivacion.estado], [[], 1, "incompleta"]);
+  // Un día después se reintenta una vez más (2 llamadas) y vuelve a esperar.
+  const prep = e.json("preparacion.json"); prep.fallos["segmentar/parcial"].fecha = "2000-01-01T00:00:00+00:00";
+  writeFileSync(join(e.raiz, "_procesado/preparacion.json"), JSON.stringify(prep));
+  await e.turno(); await e.turno();
+  assert.deepEqual(e.llamadas, ["segmentar", "segmentar"]);
+  // El mismo día, si cambian sus entradas (el índice usa un id de ese parcial), también.
+  e.llamadas.length = 0; delete e.guion.segmentar;
+  writeFileSync(join(e.raiz, "indice.yaml"), readFileSync(join(e.raiz, "indice.yaml"), "utf8").replace("evaluaciones: []", "evaluaciones: [{doc: parcial, items: ['1']}]"));
+  await e.turno();
+  assert.deepEqual(e.llamadas, ["segmentar"]);
+  assert.equal(e.json("preparacion.json").temas.derivacion.estado, "completa");
+});
+
 test("preparación (b, c): red, cuota o credenciales cortan la tanda en la primera falla; un plazo vencido se dice en español", async t => {
   const e = preparacion(t);
   e.guion.vision = () => respuesta("", { stopReason: "error", errorMessage: "429 Too Many Requests: You have hit your usage limit" });
