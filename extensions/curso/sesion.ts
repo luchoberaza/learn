@@ -280,7 +280,7 @@ export function registrarSesion(pi: ExtensionAPI, vault = vaultDir, recursos = p
         await cortarTurno(pi, ctx, "al cambiar de tema");
         if (viejo && eleccion === "Guardar y cambiar") {
           pi.appendEntry("curso-cierre", { log: viejo.log, adHoc: false });
-          ordenar(pi, "Cambiamos de tema. Llamá registrar_progreso con cierre:true, resumen y sólo la evidencia observada desde el último guardado; después cerrá con una línea de resumen, sin preguntas.");
+          ordenar(pi, "Cambiamos de tema. Llamá registrar_progreso con cierre:true, la evidencia observada desde el último guardado (lo omitido se conserva) y un resumen de toda la sesión, no sólo de lo nuevo: qué se aprendió, qué falló y qué sigue; después cerrá con una línea de resumen, sin preguntas.");
           await ctx.waitForIdle();
           if (activo === viejo) { ctx.ui.notify(`No se confirmó el guardado: seguís en «${nombre}»; repetí /estudiar o elegí «Cambiar sin guardar».`, "warning"); return; }
           d = await cargar(curso, true);
