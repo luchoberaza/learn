@@ -339,7 +339,7 @@ Límites conocidos de la reserva: antes de que se segmente un parcial (pasa en s
 
 **Sin Python, sin disco, sin credenciales.**
 
-- Si `.pi/.venv` no responde, la sesión usa la última carga buena (`cursos/<c>/.sesion-cargada.json`) y avisa «Material desde la última carga; el entorno de ingesta no respondió: corré .pi/scripts/doctor.» (si Python dio un error propio, como un disco lleno, «Material desde la última carga. <ese error>»). Sin esa copia, `/estudiar` falla con ese mismo consejo. Al restaurar espera hasta 30 s a Python. `ver_pagina`, la preparación por tema y `registrar_progreso` necesitan Python: sin él fallan con una línea y la clase sigue; sin el venv, «Falta el entorno de ingesta (Python): corré .pi/scripts/doctor.».
+- Si `.pi/.venv` no responde, la sesión usa la última carga buena (`cursos/<c>/.sesion-cargada.json`) y avisa «Material desde la última carga; el entorno de ingesta no respondió: corré .pi/scripts/doctor.» (si Python dio un error propio, como un disco lleno, «Material desde la última carga. <ese error>»). Sin esa copia, `/estudiar` falla con ese mismo consejo. Al restaurar espera hasta 30 s a Python. `ver_pagina`, la preparación por tema y `registrar_progreso` necesitan Python: sin él fallan con una línea y la clase sigue; sin el venv, la preparación y el progreso dicen «Falta el entorno de ingesta (Python): corré .pi/scripts/doctor.».
 - Con el disco lleno, el progreso no se guarda («Disco lleno: no se guardó el progreso; liberá espacio y repetí /fin.») y `progreso.yaml` queda intacto.
 - Sin credenciales, `/estudiar` no arranca, la preparación por tema y el researcher no llaman al modelo, y un error del proveedor a mitad de clase se explica en español (ver «Modelos»).
 
