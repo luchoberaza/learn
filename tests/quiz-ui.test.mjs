@@ -41,7 +41,7 @@ test("H45: popups, renders y respuestas al modelo de quiz y ask en español", as
   const a1 = await ask.execute("a1", { question: "¿Seguimos?", options: [{ label: "Sí" }, { label: "No" }] }, undefined, () => {}, ui(["down", "down", "enter", ..."otra cosa", "enter"], vistas));
   const a2 = await ask.execute("a2", { question: "¿Qué repasamos?", multiSelect: true, options: [{ label: "A" }, { label: "B" }] }, undefined, () => {}, ui(["space", "down", "down", "enter", ..."C", "enter", "down", "enter"], vistas));
   const a3 = await ask.execute("a3", { question: "¿Algo más?", options: [{ label: "Sí" }, { label: "No" }] }, undefined, () => {}, ui(["esc"], vistas));
-  const a4 = await ask.execute("a4", { question: "Contame tu objetivo" }, undefined, () => {}, ui([], vistas));
+  const a4 = await ask.execute("a4", { question: "Contame tu objetivo" }, undefined, () => {}, ui([..."aprobar", "enter"], vistas));
   for (const r of [a1, a2, a3, a4]) { modelo.push(r.content[0].text); vistas.push(render(ask.renderResult(r, {}, theme))); }
   vistas.push(render(ask.renderCall({ question: "¿Seguimos?", multiSelect: true, options: [{ label: "Sí" }, { label: "No" }] }, theme)));
   const ingles = /\b(I don't know|Note|Correct|Incorrect|Submit|Other|navigate|toggle|select|cancel|continue|Write your|Recommended|response|You said|Your note|Type note|newline|back|unknown|Awaiting|User|ask_user_question|Options?|empty)\b/;

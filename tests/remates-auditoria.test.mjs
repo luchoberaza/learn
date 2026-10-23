@@ -96,6 +96,24 @@ test("H26/H25: cortar el turno (/fin, /estudiar) cierra un quiz o una pregunta a
   } finally { await p.close(); }
 });
 
+test("H26/H25, H45: la respuesta libre de ask_user_question se cierra al cortar el turno y dibuja sus atajos en español", async () => {
+  const p = await loadProject();
+  const theme = { fg: (_c, s) => s, bg: (_c, s) => s, bold: s => s, italic: s => s, underline: s => s, strikethrough: s => s };
+  const tui = { requestRender() {}, terminal: { rows: 40, columns: 100 } };
+  try {
+    const tool = p.session.extensionRunner.getToolDefinition("ask_user_question"), corte = new AbortController(), pantallas = [];
+    // Como pi 1.4.0: ui.editor no recibe el signal y sólo se cierra con Esc (interactive-mode.js:2192-2200).
+    const ctx = { hasUI: true, ui: { editor: () => new Promise(() => {}),
+      custom: factory => new Promise(res => { pantallas.push(factory(tui, theme, {}, res).render(100).join("\n")); setTimeout(() => corte.abort(), 10); }) } };
+    const r = await Promise.race([tool.execute("x", { question: "Contame tu objetivo" }, corte.signal, () => {}, ctx), new Promise(res => setTimeout(() => res({ details: { status: "abierto" } }), 1500))]);
+    assert.equal(r.details.status, "cancelled");
+    assert.match(pantallas[0], /Contame tu objetivo[\s\S]*Enter enviar • Ctrl\+J nueva línea • Esc cancelar/);
+    // En RPC custom no existe (devuelve undefined): sigue el editor del cliente.
+    const rpc = await tool.execute("y", { question: "Contame tu objetivo" }, undefined, () => {}, { hasUI: true, mode: "rpc", ui: { editor: async () => "Aprobar el parcial", custom: async () => undefined } });
+    assert.equal(rpc.content[0].text, "Respuesta del alumno: Aprobar el parcial");
+  } finally { await p.close(); }
+});
+
 test("H45: las confirmaciones se dibujan en español y Esc o un corte valen como no", async t => {
   const vistas = [], si = respuesta => async (titulo, opciones) => (vistas.push([titulo.split("\n")[0], opciones]), respuesta === "si" ? opciones[0] : respuesta);
   // Reconstrucción del progreso (la ve el alumno en clase).

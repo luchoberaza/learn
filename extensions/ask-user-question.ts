@@ -200,6 +200,42 @@ function buildResult(question: string, context: string | undefined, mode: AskUse
 	};
 }
 
+// Respuesta libre: ui.editor de pi no recibe el signal y dibuja sus atajos en inglés (extension-editor.js:59-64).
+async function askText(ctx: any, question: string, context: string | undefined, signal?: AbortSignal): Promise<string | null> {
+	return ctx.ui.custom<string | null>((tui: any, theme: any, _kb: any, done: (result: string | null) => void) => {
+		const cortar = () => done(null);
+		if (signal?.aborted) cortar();
+		else signal?.addEventListener("abort", cortar, { once: true });
+		const editor = new Editor(tui, createEditorTheme(theme));
+		editor.onSubmit = (value) => done(value);
+		return {
+			render(width: number): string[] {
+				const lines: string[] = [];
+				const add = (text: string) => lines.push(truncateToWidth(text, width));
+				add(theme.fg("accent", "─".repeat(width)));
+				addWrapped(lines, theme.fg("text", ` ${question}`), width);
+				if (context) {
+					lines.push("");
+					addWrapped(lines, theme.fg("muted", ` ${context}`), width);
+				}
+				lines.push("");
+				for (const line of editor.render(Math.max(1, width - 2))) add(` ${line}`);
+				lines.push("");
+				add(theme.fg("dim", " Enter enviar • Ctrl+J nueva línea • Esc cancelar"));
+				add(theme.fg("accent", "─".repeat(width)));
+				return lines;
+			},
+			invalidate: () => editor.invalidate(),
+			handleInput(data: string) {
+				if (matchesKey(data, Key.escape)) return done(null);
+				editor.handleInput(data);
+				tui.requestRender();
+			},
+			dispose: () => signal?.removeEventListener("abort", cortar),
+		};
+	});
+}
+
 async function askSingleChoice(
 	ctx: any,
 	question: string,
@@ -613,9 +649,9 @@ export default function askUserQuestion(pi: ExtensionAPI) {
 
 			return withUILock(async () => {
 				if (mode === "text") {
-					const editorTitle = context ? `${params.question}\n\n${context}` : params.question;
-					const answer = await ctx.ui.editor(editorTitle);
-					if (answer === undefined) {
+					// En RPC no hay custom (rpc-mode.js:152-155) y el editor lo dibuja el cliente.
+					const answer = ctx.mode === "rpc" ? await ctx.ui.editor(context ? `${params.question}\n\n${context}` : params.question) : await askText(ctx, params.question, context, signal);
+					if (answer == null) {
 						return cancelledResult(params.question, mode, context);
 					}
 					return buildResult(params.question, context, mode, [
