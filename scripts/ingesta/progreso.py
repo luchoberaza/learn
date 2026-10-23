@@ -339,6 +339,8 @@ def falla(e):
     """Una línea para el alumno: el texto de un OSError o de un error interno de Python viene en inglés y no se muestra."""
     if isinstance(e, (TypeError, KeyError, RecursionError)):
         return "Progreso no guardado: un dato del registro no tiene el formato esperado; reintentá y, si sigue, corré .pi/scripts/doctor."
+    if isinstance(e, UnicodeError):
+        return "Progreso no guardado: un archivo del curso está dañado (no es texto); revisá progreso.yaml, su .bak e indice.yaml del curso."
     if not isinstance(e, OSError):
         return f"Progreso no guardado: {e}"
     if e.errno == errno.ENOSPC:

@@ -78,6 +78,16 @@ class PedagogiaAuditoriaTest(unittest.TestCase):
         self.assertEqual(falla(OSError(errno.ENOSPC, 'No space left on device')), 'Disco lleno: no se guardó el progreso; liberá espacio y repetí /fin.')
         self.assertEqual(falla(ValueError('Estado de progreso inválido.')), 'Progreso no guardado: Estado de progreso inválido.')
 
+    def test_un_archivo_corrupto_no_llega_en_ingles(self):
+        # Un .bak o un índice que no es UTF-8 daba «'utf-8' codec can't decode byte 0xff…».
+        self.guardar()
+        (self.raiz / 'progreso.yaml.bak').write_bytes(b'\xff\xfe basura')
+        entrada = json.dumps({'vault': str(self.vault), 'curso': 'ejemplo', 'tema': 'derivacion', 'log': self.log, 'datos': {'resumen': 'otro registro'}})
+        r = subprocess.run([sys.executable, str(SCRIPT), 'registrar'], input=entrada, capture_output=True, text=True)
+        self.assertEqual(r.returncode, 1)
+        self.assertTrue(r.stderr.startswith('Progreso no guardado: '), r.stderr)
+        self.assertNotRegex(r.stderr, r'codec|decode|byte|Traceback')
+
     def test_errores_internos_de_python_no_llegan_en_ingles(self):
         # Una fecha imposible que mande el modelo («2026-02-30») daba «day is out of range for month».
         for fecha in ['2026-02-30', '2026-13-01']:
