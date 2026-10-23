@@ -37,7 +37,7 @@ export function registrarSimulacro(pi: ExtensionAPI, sesion: Pick<ReturnType<typ
       if (!e) { ctx.ui.notify("Empezá con /estudiar <tema> y después /simulacro.", "info"); return; }
       if (enCurso(ctx, e)) { ctx.ui.notify(`Ya estás en el simulacro de «${nombre(e)}»: entregá tu resolución o terminá con /fin.`, "info"); return; }
       const x = e.a.adHoc ? undefined : reservas(e.r, e.d)[e.a.tema], item = x && e.d.items[x.doc]?.find(i => i.id === x.id);
-      if (!x || !item) { ctx.ui.notify(`«${nombre(e)}» no tiene un ítem de evaluación reservado para simulacro: faltan parciales de este tema en el material.`, "info"); return; }
+      if (!x || !item) { ctx.ui.notify(`«${nombre(e)}» no tiene un ítem de evaluación para simulacro: todavía no hay parciales del tema preparados o ya se usaron todos.`, "info"); return; }
       // Como /fin: pi ya vació el editor, así que se corta el turno en curso (p. ej. un quiz abierto) en vez de perder el comando.
       if (!ctx.isIdle()) { ctx.abort(); await ctx.waitForIdle(); }
       // Visto es usado (E3): queda anotado antes de mostrarlo, así no vuelve a reservarse aunque la clase se corte antes de la entrega.

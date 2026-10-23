@@ -241,7 +241,8 @@ test("E9: /simulacro sin tema activo o sin ítem reservado lo dice en una línea
   e.d.items.parcial = e.d.items.parcial.filter(i => i.id === "2-solucion");
   await e.comandos.get("estudiar").handler("redes retardos", e.ctx);
   await e.comandos.get("simulacro").handler("", e.ctx);
-  assert.match(e.avisos.at(-1)[1], /^«Retardos» no tiene un ítem de evaluación reservado para simulacro/);
+  // Sin parciales preparados todavía (la preparación sigue en segundo plano) o con todos ya usados: no se afirma que falten en el material.
+  assert.deepEqual(e.avisos.at(-1), ["info", "«Retardos» no tiene un ítem de evaluación para simulacro: todavía no hay parciales del tema preparados o ya se usaron todos."]);
   assert.ok(!e.entradas.some(x => x.customType === "curso-simulacro"));
 });
 
