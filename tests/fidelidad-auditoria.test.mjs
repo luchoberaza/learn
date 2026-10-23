@@ -188,15 +188,15 @@ test("E9, 6d: /simulacro con el tema sin dominar pregunta antes de gastar el res
   const ordenes = e.ordenes.length, progreso = e.progreso();
   e.ctx.respuesta = () => undefined;
   await e.comandos.get("simulacro").handler("", e.ctx);
-  assert.deepEqual(e.preguntas, [["Todavía no terminaste el tema: el simulacro usa el único ítem reservado y no se repite. ¿Rendirlo ahora?", ["Sí, rendirlo ahora", "No, seguir estudiando"]]]);
+  assert.deepEqual(e.preguntas, [["Todavía no terminaste el tema: el simulacro usa el único ítem reservado y no se repite. ¿Rendirlo ahora?", ["No, seguir estudiando", "Sí, rendirlo ahora"]]], "lo seguro va primero: un Enter de más no gasta el reservado");
   assert.deepEqual(e.avisos.at(-1), ["info", "Seguimos estudiando: el simulacro queda reservado para cuando termines el tema."]);
   assert.ok(!e.entradas.some(x => x.customType === "curso-simulacro"));
   assert.deepEqual([e.cortes, e.ordenes.length, e.progreso()], [[], ordenes, progreso]);
-  e.ctx.respuesta = o => o[1];
+  e.ctx.respuesta = o => o[0];
   await e.comandos.get("simulacro").handler("", e.ctx);
   assert.deepEqual([e.cortes, e.ordenes.length, e.progreso()], [[], ordenes, progreso]);
   // Confirmado, corta el turno, lo marca usado y lo presenta.
-  e.ctx.respuesta = o => o[0];
+  e.ctx.respuesta = o => o[1];
   await e.comandos.get("simulacro").handler("", e.ctx);
   assert.deepEqual(e.cortes, ["abort"]);
   assert.match(e.progreso(), /- doc: parcial\n\s+id: '3'\n\s+usado: true/);

@@ -43,7 +43,7 @@ export function registrarSimulacro(pi: ExtensionAPI, sesion: Pick<ReturnType<typ
       if (e.d.progreso.temas[e.a.tema]?.estado !== "dominado") {
         const si = "Sí, rendirlo ahora";
         if (!ctx.hasUI) { ctx.ui.notify("Todavía no terminaste el tema: rendí el simulacro cuando lo termines.", "info"); return; }
-        if (await elegir(ctx, "Todavía no terminaste el tema: el simulacro usa el único ítem reservado y no se repite. ¿Rendirlo ahora?", [si, "No, seguir estudiando"]) !== si) { ctx.ui.notify("Seguimos estudiando: el simulacro queda reservado para cuando termines el tema.", "info"); return; }
+        if (await elegir(ctx, "Todavía no terminaste el tema: el simulacro usa el único ítem reservado y no se repite. ¿Rendirlo ahora?", ["No, seguir estudiando", si]) !== si) { ctx.ui.notify("Seguimos estudiando: el simulacro queda reservado para cuando termines el tema.", "info"); return; }
       }
       // Como /fin: pi ya vació el editor, así que se corta el turno en curso (p. ej. un quiz abierto) en vez de perder el comando.
       if (!ctx.isIdle()) { ctx.abort(); await ctx.waitForIdle(); }
