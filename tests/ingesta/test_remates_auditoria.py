@@ -36,5 +36,21 @@ class FallosEnEsperaTest(base.CursoPreparacion):
         self.assertEqual(([c["id"] for c in self.trabajo()["clasificar"]], self.trabajo()["en_espera"]), (["1", "2"], 0))
 
 
+class EstadoTest(base.CursoPreparacion):
+    def test_curso_check_dice_por_tema_el_estado_y_los_items_asignados(self):
+        self.assertEqual(preparacion.estado(self.vault, "ejemplo"), ["Preparación de derivacion: sin preparar; 0 ítems asignados automáticamente.",
+                                                                     "Preparación de integracion: sin preparar; 0 ítems asignados automáticamente."])
+        self.segmentar("practico", [{"id": "1", "paginas": [1], "enunciado": "Integre."}, {"id": "2", "paginas": [2], "enunciado": "Grafique."}])
+        preparacion.asignar(self.vault, "ejemplo", [{"doc": "practico", "id": "1", "tema": "integracion"}, {"doc": "practico", "id": "2", "tema": "integracion"}])
+        indice = preparacion.trabajo(self.vault, "ejemplo", "derivacion", 150)["indice"]
+        preparacion.registrar(self.vault, "ejemplo", {"tema": {"id": "derivacion", "estado": "incompleta", "indice": indice, "pendientes": 1}})
+        preparacion.registrar(self.vault, "ejemplo", {"tema": {"id": "integracion", "estado": "completa", "indice": indice, "pendientes": 0}})
+        self.assertEqual(preparacion.estado(self.vault, "ejemplo"), ["Preparación de derivacion: incompleta (1 página pendiente); 0 ítems asignados automáticamente.",
+                                                                     "Preparación de integracion: completa; 2 ítems asignados automáticamente."])
+        self.indice["temas"][0]["alias"] = ["derivada"]
+        self.guardar_indice(self.indice)
+        self.assertIn("cambió el índice", preparacion.estado(self.vault, "ejemplo")[1])
+
+
 if __name__ == "__main__":
     unittest.main()

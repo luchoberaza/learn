@@ -13,7 +13,7 @@ import { registrarProgreso } from "../extensions/curso/progreso.ts";
 import { loadProject, piDir } from "../scripts/lib/pi-sdk.mjs";
 import { python, transcribir } from "../extensions/curso/ingesta.ts";
 import { registrarPreparacion } from "../extensions/curso/preparacion.ts";
-import { guardarCurso } from "../extensions/curso/curacion.ts";
+import { guardarCurso, registrarCuracion } from "../extensions/curso/curacion.ts";
 
 // Remates de integración: md-log, sesión y progreso reales sobre un bus de eventos, backend Python real, sin modelos.
 async function clase(t, anterior = false) {
@@ -253,4 +253,13 @@ test("preparación (e, f): sólo se borra el lock propio y un pid reutilizado tr
   await e.turno();
   assert.equal(e.llamadas.filter(x => x === "vision").length, 4);
   assert.equal(readFileSync(lock, "utf8"), ajeno);
+});
+
+test("/curso-check suma una línea por tema con la preparación automática, y sin ella igual valida", async () => {
+  const comandos = new Map(), mensajes = [];
+  registrarCuracion({ registerCommand: (n, d) => comandos.set(n, d), sendMessage: m => mensajes.push(m.content),
+    exec: async () => ({ code: 0, killed: false, stderr: "", stdout: JSON.stringify({ ok: true, errores: [], avisos: ["Aviso de validar."], pendientes: [] }) }) });
+  for (const curso of ["redes", "no-existe"]) await comandos.get("curso-check").handler(curso, { ui: { notify: assert.fail } });
+  assert.match(mensajes[0], /Aviso de validar\.\n(Preparación de [a-z-]+: [^\n]+; \d+ ítems? asignados? automáticamente\.\n){2,}Informe:/);
+  assert.match(mensajes[1], /^no-existe: estructura válida; 0 páginas referidas pendientes\.\nAviso de validar\.\nInforme:/);
 });

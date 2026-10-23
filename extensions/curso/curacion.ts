@@ -2,6 +2,7 @@ import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-a
 import { readdirSync } from "node:fs";
 import { join } from "node:path";
 import { piDir, vaultDir } from "../../scripts/lib/pi-sdk.mjs";
+import { python } from "./ingesta.ts";
 import { fallaPython } from "./sesion.ts";
 
 const patron = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
@@ -37,8 +38,10 @@ export function registrarCuracion(pi: ExtensionAPI) {
     async handler(args, ctx) {
       try {
         const c = args.trim(), r = await ejecutar(pi, "validar", c);
+        // Estado de la preparación automática por tema: es informativo, sin él la validación igual vale.
+        const preparacion: string[] = await python("estado", { vault: vaultDir, curso: c }, undefined, "preparacion.py").catch(() => []);
         const preparar = r.sin_transcripcion?.length ? `\n${r.sin_transcripcion.length} sin transcripción; preparalas sin modelo desde la raíz del vault:\n.pi/.venv/bin/python .pi/scripts/ingesta/cursos.py manifiesto --curso ${c} --pendientes\n.pi/.venv/bin/python .pi/scripts/ingesta/ingestar.py iniciar --manifiesto _procesado/manifiesto-${c}.json --salida cursos/${c}/_procesado` : "";
-        pi.sendMessage({ customType: "curso-check", display: true, content: `${c}: ${r.ok ? "estructura válida" : "con errores"}; ${r.pendientes.length} páginas referidas pendientes.${preparar}\n${[...r.errores, ...r.avisos].join("\n")}\nInforme: cursos/${c}/informe-ingesta.md`, details: r });
+        pi.sendMessage({ customType: "curso-check", display: true, content: `${c}: ${r.ok ? "estructura válida" : "con errores"}; ${r.pendientes.length} páginas referidas pendientes.${preparar}\n${[...r.errores, ...r.avisos, ...preparacion].join("\n")}\nInforme: cursos/${c}/informe-ingesta.md`, details: r });
       } catch (e) { ctx.ui.notify(e instanceof Error ? e.message : "No se pudo validar el curso.", "error"); }
     },
   });

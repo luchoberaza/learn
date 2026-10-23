@@ -153,6 +153,21 @@ def registrar(vault: Path, curso: str, datos: dict) -> dict:
     return estado
 
 
+def estado(vault: Path, curso: str) -> list:
+    """Para /curso-check, una línea por tema: estado de la preparación automática y cuántos ítems le asignó."""
+    raiz = carpeta(vault, curso)
+    indice, hechos = cargar_yaml(texto(raiz, "indice.yaml")), leer(raiz, "_procesado/preparacion.json").get("temas", {})
+    asignados = [a.get("tema") for a in leer(raiz, "_procesado/asignaciones.json").get("items", []) if isinstance(a, dict)]
+    actual, lineas = sha256(ruta_segura(raiz, "indice.yaml")), []
+    for t in indice["temas"]:
+        h = hechos.get(t["id"], {})
+        n, p = asignados.count(t["id"]), h.get("pendientes", 0)
+        situacion = ("sin preparar" if not h else "cambió el índice: se rehace al estudiarlo" if h.get("indice") != actual
+                     else "completa" if h.get("estado") == "completa" else f"incompleta ({p} {'página pendiente' if p == 1 else 'páginas pendientes'})")
+        lineas.append(f"Preparación de {t['id']}: {situacion}; {n} {'ítem asignado' if n == 1 else 'ítems asignados'} automáticamente.")
+    return lineas
+
+
 def main():
     accion = sys.argv[1]
     datos = json.load(sys.stdin)
@@ -163,6 +178,8 @@ def main():
         return asignar(vault, datos["curso"], datos["asignaciones"])
     if accion == "registrar":
         return registrar(vault, datos["curso"], datos)
+    if accion == "estado":
+        return estado(vault, datos["curso"])
     if accion == "bancos":
         from sesion import cargar
         return cargar(vault, datos["curso"])["items"]
