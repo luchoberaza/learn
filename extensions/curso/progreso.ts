@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { join, relative } from "node:path";
 import { python } from "./ingesta.ts";
 import { elegir } from "../comun/elegir.ts";
+import { cortarTurno } from "../comun/corte.ts";
 import { acotar, leer, ordenarTemas, reservas, type DatosCurso } from "./material.ts";
 import { ordenar, type registrarSesion } from "./sesion.ts";
 import { enCurso } from "./simulacro.ts";
@@ -66,8 +67,7 @@ export function registrarProgreso(pi: ExtensionAPI, sesion: ReturnType<typeof re
     async handler(_args, ctx) {
       const e = sesion.actual();
       if (!e) { ctx.ui.notify("No hay una sesión de curso activa.", "info"); return; }
-      // pi ya vació el editor: rechazar /fin perdería el comando; se corta el turno (p. ej. un quiz abierto) y se cierra.
-      if (!ctx.isIdle()) { ctx.abort(); await ctx.waitForIdle(); }
+      await cortarTurno(pi, ctx, "al cerrar la clase");
       pi.appendEntry("curso-cierre", { log: e.a.log, adHoc: !!e.a.adHoc });
       ordenar(pi, e.a.adHoc ? "Terminemos esta sesión ad hoc. Resumí lo observado y ofrecé curar el tema con /curso-agregar, sin escribir progreso de un tema inexistente ni hacer más preguntas." : "Terminemos la sesión. Llamá registrar_progreso con cierre:true, la evidencia observada desde el último guardado (lo omitido se conserva) y un resumen de toda la sesión, no sólo de lo nuevo: qué se aprendió, qué falló y qué sigue. Después mostrá ese resumen breve y el próximo paso. El log se cerrará automáticamente al terminar tu mensaje, sólo si el guardado tuvo éxito. No hagas más preguntas.");
     },

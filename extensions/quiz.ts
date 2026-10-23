@@ -9,6 +9,7 @@ import {
 	wrapTextWithAnsi,
 } from "@mariozechner/pi-tui";
 import { Type } from "@sinclair/typebox";
+import { cortable } from "./comun/corte.ts";
 
 // ────────────────────────────────────────────────────────────────────────────
 // quiz — a GRADED sibling of ask_user_question.
@@ -962,7 +963,7 @@ export default function quiz(pi: ExtensionAPI) {
 		],
 		parameters: QuizParams,
 
-		async execute(_toolCallId, params, signal, onUpdate, ctx) {
+		execute: cortable(pi, async (_toolCallId, params, signal, onUpdate, ctx) => {
 			const question = sinEnlaces(textoPlano(params.question));
 			const context = sinEnlaces(textoPlano(params.details?.trim() ?? "")) || undefined;
 			const explanation = params.explanation.trim();
@@ -1043,7 +1044,7 @@ export default function quiz(pi: ExtensionAPI) {
 				}
 				return buildResult(question, context, mode, options, response, correctIndices, explanation);
 			});
-		},
+		}),
 
 		renderCall(args, theme) {
 			// NOTE: never render correctAnswer or explanation here — it would leak

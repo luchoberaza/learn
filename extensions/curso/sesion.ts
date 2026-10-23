@@ -9,6 +9,7 @@ import { buscarMaterial, cita, copiaEnPagina, documento, dossier, esSlug, leer, 
 
 import { verificacionPrevia } from "./researcher.ts";
 import { elegir } from "../comun/elegir.ts";
+import { cortarTurno } from "../comun/corte.ts";
 
 type Config = { max_tokens_dossier: number; max_tokens_curso_md: number };
 // Tools del estudio; read queda para las fotos del alumno, que pi 1.4.0 pega como ruta de texto (interactive-mode.js:2477-2483).
@@ -274,11 +275,9 @@ export function registrarSesion(pi: ExtensionAPI, vault = vaultDir, recursos = p
         const viejo = activo && !activo.adHoc && ctx.hasUI ? activo : undefined, nombre = viejo && (datos?.temas.find(t => t.id === viejo.tema)?.nombre || viejo.tema);
         const eleccion = viejo && await elegir(ctx, `Estás en «${nombre}»`, ["Guardar y cambiar", "Cambiar sin guardar", "Cancelar"]);
         if (viejo && eleccion !== "Guardar y cambiar" && eleccion !== "Cambiar sin guardar") return;
-        // pi ya vació el editor: como /fin, se corta el turno en vez de perder el comando, recién ahora para que cancelar no lo corte; una pregunta abierta se confirma antes.
-        if (!ctx.isIdle()) {
-          if (preguntas && !viejo && await elegir(ctx, "Hay una pregunta abierta", ["Cortarla y cambiar de tema", "Seguir con la pregunta"]) !== "Cortarla y cambiar de tema") return;
-          ctx.abort(); await ctx.waitForIdle();
-        }
+        // Recién ahora, para que cancelar no corte el turno; una pregunta abierta se confirma antes.
+        if (!ctx.isIdle() && preguntas && !viejo && await elegir(ctx, "Hay una pregunta abierta", ["Cortarla y cambiar de tema", "Seguir con la pregunta"]) !== "Cortarla y cambiar de tema") return;
+        await cortarTurno(pi, ctx, "al cambiar de tema");
         if (viejo && eleccion === "Guardar y cambiar") {
           pi.appendEntry("curso-cierre", { log: viejo.log, adHoc: false });
           ordenar(pi, "Cambiamos de tema. Llamá registrar_progreso con cierre:true, resumen y sólo la evidencia observada desde el último guardado; después cerrá con una línea de resumen, sin preguntas.");

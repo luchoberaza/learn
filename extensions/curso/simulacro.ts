@@ -1,6 +1,7 @@
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { elegir } from "../comun/elegir.ts";
 import { python } from "./ingesta.ts";
+import { cortarTurno } from "../comun/corte.ts";
 import { reservas, type Activo, type DatosCurso, type Ref } from "./material.ts";
 import { ordenar, type registrarSesion } from "./sesion.ts";
 import { vaultDir } from "../../scripts/lib/pi-sdk.mjs";
@@ -46,7 +47,7 @@ export function registrarSimulacro(pi: ExtensionAPI, sesion: Pick<ReturnType<typ
         if (await elegir(ctx, "Todavía no terminaste el tema: el simulacro usa el único ítem reservado y no se repite. ¿Rendirlo ahora?", ["No, seguir estudiando", si]) !== si) { ctx.ui.notify("Seguimos estudiando: el simulacro queda reservado para cuando termines el tema.", "info"); return; }
       }
       // Como /fin: pi ya vació el editor, así que se corta el turno en curso (p. ej. un quiz abierto) en vez de perder el comando.
-      if (!ctx.isIdle()) { ctx.abort(); await ctx.waitForIdle(); }
+      await cortarTurno(pi, ctx, "al empezar el simulacro");
       // Visto es usado (E3): queda anotado antes de mostrarlo, así no vuelve a reservarse aunque la clase se corte antes de la entrega.
       try { sesion.actualizarProgreso((await python("usar", { vault, curso: e.a.curso, tema: e.a.tema, doc: x.doc, item: x.id }, undefined, "progreso.py")).progreso); sesion.refrescar(); }
       catch { ctx.ui.notify("No se pudo anotar el simulacro en el progreso; se reintenta al guardar tu intento.", "warning"); }

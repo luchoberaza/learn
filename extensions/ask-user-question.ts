@@ -9,6 +9,7 @@ import {
 	wrapTextWithAnsi,
 } from "@mariozechner/pi-tui";
 import { Type } from "@sinclair/typebox";
+import { cortable } from "./comun/corte.ts";
 
 interface AskOption {
 	label: string;
@@ -634,7 +635,7 @@ export default function askUserQuestion(pi: ExtensionAPI) {
 		],
 		parameters: AskUserQuestionParams,
 
-		async execute(_toolCallId, params, signal, _onUpdate, ctx) {
+		execute: cortable(pi, async (_toolCallId, params, signal, _onUpdate, ctx) => {
 			const options = normalizeOptions(params.options);
 			const context = params.details?.trim() || undefined;
 			const mode: AskUserQuestionMode = options.length === 0 ? "text" : params.multiSelect ? "multi-select" : "single-select";
@@ -673,7 +674,7 @@ export default function askUserQuestion(pi: ExtensionAPI) {
 				}
 				return buildResult(params.question, context, mode, answers);
 			});
-		},
+		}),
 
 		renderCall(args, theme) {
 			// Los args llegan a medias durante el streaming ({} en la opción en curso).
