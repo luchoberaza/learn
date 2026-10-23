@@ -47,6 +47,9 @@ class EstadoTest(base.CursoPreparacion):
         preparacion.registrar(self.vault, "ejemplo", {"tema": {"id": "integracion", "estado": "completa", "indice": indice, "pendientes": 0}})
         self.assertEqual(preparacion.estado(self.vault, "ejemplo"), ["Preparación de derivacion: incompleta (1 página pendiente); 0 ítems asignados automáticamente.",
                                                                      "Preparación de integracion: completa; 2 ítems asignados automáticamente."])
+        # Sin páginas pendientes, lo que falta son ítems (en espera tras un fallo, por ejemplo).
+        preparacion.registrar(self.vault, "ejemplo", {"tema": {"id": "derivacion", "estado": "incompleta", "indice": indice, "pendientes": 0}})
+        self.assertEqual(preparacion.estado(self.vault, "ejemplo")[0], "Preparación de derivacion: incompleta (quedan ítems por separar o clasificar); 0 ítems asignados automáticamente.")
         self.indice["temas"][0]["alias"] = ["derivada"]
         self.guardar_indice(self.indice)
         self.assertIn("cambió el índice", preparacion.estado(self.vault, "ejemplo")[1])

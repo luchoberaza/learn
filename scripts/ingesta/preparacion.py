@@ -163,7 +163,8 @@ def estado(vault: Path, curso: str) -> list:
         h = hechos.get(t["id"], {})
         n, p = asignados.count(t["id"]), h.get("pendientes", 0)
         situacion = ("sin preparar" if not h else "cambió el índice: se rehace al estudiarlo" if h.get("indice") != actual
-                     else "completa" if h.get("estado") == "completa" else f"incompleta ({p} {'página pendiente' if p == 1 else 'páginas pendientes'})")
+                     else "completa" if h.get("estado") == "completa" else f"incompleta ({p} {'página pendiente' if p == 1 else 'páginas pendientes'})" if p
+                     else "incompleta (quedan ítems por separar o clasificar)")
         lineas.append(f"Preparación de {t['id']}: {situacion}; {n} {'ítem asignado' if n == 1 else 'ítems asignados'} automáticamente.")
     return lineas
 
