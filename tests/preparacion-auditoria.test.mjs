@@ -87,7 +87,7 @@ test("el dossier nunca lista ítems de solución aunque el índice los referenci
     soluciones: [{ id: "1", paginas: [1], enunciado: "SOLUCION SEPARADA" }] };
   c.tema.evaluaciones = [{ doc: "parcial", items: ["1", "1-solucion"] }, { doc: "soluciones", items: ["1", "2"] }];
   const r = dossier(c.raiz, c.d, c.tema, 3000, 1500);
-  assert.match(r, /evaluaciones: parcial\/1 · ENUNCIADO 1/);
+  assert.match(r, /reservado para \/simulacro/); // E3: parcial/1, el único ítem real de evaluación, queda reservado
   assert.doesNotMatch(r, /SOLUCION|1-solucion|soluciones\//);
 });
 
@@ -196,7 +196,7 @@ test("preparación: la primera vez transcribe, segmenta con soluciones y puntos,
   assert.deepEqual(e.refrescos, [2, 7]);
   assert.ok(!existsSync(join(e.raiz, "_procesado/.preparacion.lock")));
   const r = dossier(e.raiz, e.activo.d, e.activo.d.temas[0], 3000, 1500);
-  assert.match(r, /evaluaciones: parcial\/1 \(asignado automáticamente\) · Calcule la derivada\./);
+  assert.match(r, /reservado para \/simulacro/); // E3: el único ítem de evaluación asignado queda reservado
   assert.doesNotMatch(r, /Dos equis|practico\/1/);
   const muchos = { ...e.activo.d, items: { ...e.activo.d.items, parcial: Array.from({ length: 300 }, (_, i) => ({ id: String(i + 1), paginas: [1], enunciado: "Calcule la derivada de la función compuesta. ".repeat(4) })) } };
   const reales = readFileSync(join(e.raiz, "_procesado/asignaciones.json"), "utf8");

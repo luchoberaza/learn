@@ -78,5 +78,65 @@ class PedagogiaAuditoriaTest(unittest.TestCase):
         self.assertEqual(falla(ValueError('Estado de progreso inválido.')), 'Progreso no guardado: Estado de progreso inválido.')
 
 
+class ReservaTest(unittest.TestCase):
+    """E3: el ítem reservado para /simulacro se fija en progreso.yaml y se marca usado al rendirlo."""
+    def setUp(self):
+        self.b = test_progreso.ProgresoTest()
+        self.b.setUp()
+        self.addCleanup(self.b.doCleanups)
+        self.vault, self.raiz, self.log = self.b.vault, self.b.raiz, self.b.log
+        indice = yaml.safe_load((self.raiz / 'indice.yaml').read_text())
+        indice['documentos'].append({'id': 'parcial', 'tipo': 'evaluaciones'})
+        (self.raiz / 'indice.yaml').write_text(yaml.safe_dump(indice))
+        (self.raiz / '_procesado/parcial').mkdir()
+        self.banco('1', '2')
+
+    def banco(self, *ids):
+        items = [{'id': i, 'enunciado': f'Pregunta {i}', 'puntos': 10} for i in ids] + [{'id': f'{i}-solucion', 'enunciado': 'Solución', 'solucion_de': i} for i in ids]
+        (self.raiz / '_procesado/parcial/items.yaml').write_text(yaml.safe_dump({'items': items}))
+
+    def guardar(self, datos=None, **kw):
+        return registrar(self.vault, 'ejemplo', 'derivacion', self.log, datos or {'resumen': 'probe'}, **kw)
+
+    def temas(self):
+        return yaml.safe_load((self.raiz / 'progreso.yaml').read_text())['temas']
+
+    def test_la_primera_reserva_queda_fija(self):
+        self.guardar(reservas={'derivacion': {'doc': 'parcial', 'id': '1'}, 'limites': {'doc': 'parcial', 'id': '2'}})
+        self.guardar(reservas={'derivacion': {'doc': 'parcial', 'id': '2'}})
+        self.assertEqual(self.temas()['derivacion']['reservado'], [{'doc': 'parcial', 'id': '1'}])
+        # Un tema sin evidencia queda sin_empezar, sólo con su reserva.
+        self.assertEqual(self.temas()['limites'], {'estado': 'sin_empezar', 'reservado': [{'doc': 'parcial', 'id': '2'}]})
+
+    def test_un_intento_o_un_simulacro_lo_marcan_usado_y_despues_se_fija_otro(self):
+        self.guardar(reservas={'derivacion': {'doc': 'parcial', 'id': '1'}})
+        intento = {'resumen': 'simulacro', 'ejercicios': [{'doc': 'parcial', 'item': 'Pregunta 1(b)', 'resultado': 'parcial', 'puntaje': '≈ 6/10'}]}
+        self.guardar(intento, reservas={'derivacion': {'doc': 'parcial', 'id': '1'}})
+        self.assertEqual(self.temas()['derivacion']['reservado'], [{'doc': 'parcial', 'id': '1', 'usado': True}])
+        self.guardar(reservas={'derivacion': {'doc': 'parcial', 'id': '2'}})
+        self.assertEqual(self.temas()['derivacion']['reservado'], [{'doc': 'parcial', 'id': '1', 'usado': True}, {'doc': 'parcial', 'id': '2'}])
+        self.guardar(simulacro={'doc': 'parcial', 'id': '2'})
+        self.assertTrue(self.temas()['derivacion']['reservado'][1]['usado'])
+
+    def test_si_el_reservado_desaparece_se_elige_otro(self):
+        self.guardar(reservas={'derivacion': {'doc': 'parcial', 'id': '1'}})
+        self.banco('2')
+        self.guardar(reservas={'derivacion': {'doc': 'parcial', 'id': '2'}})
+        self.assertEqual(self.temas()['derivacion']['reservado'], [{'doc': 'parcial', 'id': '2'}])
+
+    def test_nunca_reserva_una_solucion_ni_un_practico_ni_un_tema_ajeno(self):
+        self.guardar(reservas={'derivacion': {'doc': 'parcial', 'id': '1-solucion'}, 'limites': {'doc': 'practico', 'id': '1'}, 'otro': {'doc': 'parcial', 'id': '1'}})
+        self.assertNotIn('reservado', self.temas()['derivacion'])
+        self.assertNotIn('limites', self.temas())
+        self.assertNotIn('otro', self.temas())
+
+    def test_una_reserva_fuera_del_esquema_invalida_el_progreso(self):
+        self.guardar(reservas={'derivacion': {'doc': 'parcial', 'id': '1'}})
+        p = yaml.safe_load((self.raiz / 'progreso.yaml').read_text())
+        p['temas']['derivacion']['reservado'] = [{'doc': 'parcial', 'id': 1}]
+        (self.raiz / 'progreso.yaml').write_text(yaml.safe_dump(p))
+        self.assertNotIn('derivacion', leer(self.vault, 'ejemplo')['progreso']['temas'])
+
+
 if __name__ == '__main__':
     unittest.main()

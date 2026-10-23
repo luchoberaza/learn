@@ -8,9 +8,10 @@ export interface Tema { id: string; nombre: string; alias: string[]; unidad: num
   ejercicios?: { doc: string; items: string[] }[]; evaluaciones?: { doc: string; items: string[] }[] }
 interface Item { id: string; paginas: number[]; enunciado: string; solucion?: { doc: string; id: string }; solucion_de?: string; puntos?: number | string }
 export interface DatosCurso { curso: string; nombre?: string; contrato: string; documentos: Documento[]; temas: Tema[]; items: Record<string, Item[]>;
-  progreso: { temas: Record<string, { estado?: string; borde?: unknown; proximo_paso?: string; objetivo?: string; plan?: string }>; historial?: unknown[] };
+  progreso: { temas: Record<string, { estado?: string; borde?: unknown; proximo_paso?: string; objetivo?: string; plan?: string; ejercicios?: unknown; reservado?: unknown }>; historial?: unknown[] };
   avisos: string[]; validacion?: { errores: string[]; avisos: string[]; pendientes: unknown[] } }
 export interface Activo { curso: string; tema: string; log: string; adHoc?: Tema }
+export type Ref = { doc: string; id: string };
 export const esSlug = (s: string) => typeof s === "string" && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(s);
 
 export function rutaSegura(base: string, relativa: string): string {
@@ -71,45 +72,93 @@ export function ordenarTemas(datos: DatosCurso): Tema[] {
 const conSolucion = (datos: DatosCurso, d: Documento) => d.tipo === "evaluaciones" || d.tipo === "soluciones" || (datos.items[d.id] || []).some(i => i.solucion_de !== undefined);
 const sinEnlace = (paginas: number[]) => `PDF p. ${paginas.join(", ")} (el enlace va después del intento)`;
 const esSolucion = (d: Documento, i: Item) => d.tipo === "soluciones" || i.solucion_de !== undefined;
-export function buscarMaterial(raiz: string, datos: DatosCurso, consulta: string, tipo?: string) {
+const lista = (xs: unknown): any[] => (Array.isArray(xs) ? xs : []);
+// Ítems del tema: primero los del índice curado y después los que asignó la preparación automática.
+function itemsDelTema(raiz: string, datos: DatosCurso, tema: Tema) {
+  const r: (Ref & { clase: string; automatico: boolean })[] = [];
+  for (const clase of ["ejercicios", "evaluaciones"] as const) for (const ref of tema[clase] || []) for (const id of ref.items) r.push({ clase, doc: ref.doc, id, automatico: false });
+  let automaticas: { doc?: string; id?: string; tema?: string | null }[] = [];
+  try { automaticas = JSON.parse(leer(raiz, "_procesado/asignaciones.json")).items || []; } catch { /* Sin preparación automática todavía. */ }
+  for (const clase of ["evaluaciones", "ejercicios"]) for (const a of automaticas) {
+    const d = datos.documentos.find(d => d.id === a?.doc);
+    if (a?.tema === tema.id && d?.tipo === clase && datos.items[d.id]?.some(i => i.id === a.id)) r.push({ clase, doc: d.id, id: String(a.id), automatico: true });
+  }
+  return r;
+}
+// E3: por tema, un ítem real de evaluación sin practicar queda para /simulacro, con solución oficial y puntos si hay.
+// El primero vigente que guardó progreso.yaml manda: los ítems nuevos no lo cambian; usado o desaparecido, se elige otro.
+export function reservas(raiz: string, datos: DatosCurso): Record<string, Ref> {
+  const enunciado = (x: Ref) => datos.documentos.some(d => d.id === x?.doc && d.tipo === "evaluaciones") ? datos.items[x.doc]?.find(i => i.id === x.id && i.solucion_de === undefined) : undefined;
+  const conSolucionOficial = (x: Ref) => !!enunciado(x)?.solucion || (datos.items[x.doc] || []).some(i => i.solucion_de === x.id);
+  const progresos = Object.values(datos.progreso.temas), r: Record<string, Ref> = {};
+  const tocados = new Set([...progresos.flatMap(p => lista(p?.ejercicios).map(e => `${e?.doc}/${e?.item}`)), ...progresos.flatMap(p => lista(p?.reservado).map(x => `${x?.doc}/${x?.id}`))]);
+  for (const tema of datos.temas) {
+    const fijado = lista(datos.progreso.temas[tema.id]?.reservado).find(x => !x?.usado && enunciado(x));
+    const peso = (x: Ref) => 2 * Number(conSolucionOficial(x)) + Number(enunciado(x)!.puntos !== undefined);
+    const elegido = fijado || itemsDelTema(raiz, datos, tema).filter(x => x.clase === "evaluaciones" && enunciado(x) && !tocados.has(`${x.doc}/${x.id}`)).sort((a, b) => peso(b) - peso(a))[0];
+    if (elegido) { r[tema.id] = { doc: elegido.doc, id: elegido.id }; tocados.add(`${elegido.doc}/${elegido.id}`); }
+  }
+  return r;
+}
+// Lo que no se muestra fuera del simulacro: los reservados de todos los temas y sus soluciones, salvo el que se está rindiendo.
+export function reservados(raiz: string, datos: DatosCurso, permitido?: Ref): Set<string> {
+  const s = new Set<string>();
+  for (const x of Object.values(reservas(raiz, datos))) {
+    if (x.doc === permitido?.doc && x.id === permitido.id) continue;
+    s.add(`${x.doc}/${x.id}`);
+    for (const i of datos.items[x.doc] || []) if (i.solucion_de === x.id) s.add(`${x.doc}/${i.id}`);
+    const sol = datos.items[x.doc]?.find(i => i.id === x.id)?.solucion;
+    if (sol) s.add(`${sol.doc}/${sol.id}`);
+  }
+  return s;
+}
+export const paginasReservadas = (datos: DatosCurso, doc: string, reservados: Set<string>) => new Set((datos.items[doc] || []).filter(i => reservados.has(`${doc}/${i.id}`)).flatMap(i => i.paginas));
+export function buscarMaterial(raiz: string, datos: DatosCurso, consulta: string, tipo?: string, reservados = new Set<string>()) {
   const indice = JSON.parse(leer(raiz, "_procesado/busqueda.json", 50_000_000)) as IndiceBM25;
   return buscar(indice, consulta, 5, tipo).flatMap(r => {
     const d = datos.documentos.find(d => d.id === r.doc);
     if (!d) return [];
     if (!conSolucion(datos, d)) return [{ doc: r.doc, pagina: r.pagina, seccion: r.seccion, fragmento: r.fragmento, pendiente: r.pendiente, cita: cita(datos, r.doc, r.pagina) }];
-    const items = (datos.items[r.doc] || []).filter(i => !esSolucion(d, i) && i.paginas.includes(r.pagina)).map(i => i.id);
+    const items = (datos.items[r.doc] || []).filter(i => !esSolucion(d, i) && !reservados.has(`${r.doc}/${i.id}`) && i.paginas.includes(r.pagina)).map(i => i.id);
     const como = d.tipo === "soluciones" ? "son soluciones: pedilas con leer_items e incluir_solucion después del intento" : items.length ? `leé el enunciado con leer_items (ítems: ${items.join(", ")})` : "leé el enunciado con leer_paginas, que omite la parte resuelta";
     return [{ doc: r.doc, pagina: r.pagina, seccion: /^(pregunta|ejercicio|problema)\b/i.test(r.seccion || "") ? r.seccion : null, pendiente: r.pendiente, cita: sinEnlace([r.pagina]),
       fragmento: `Sin texto antes del intento: ${como}.` }];
   });
 }
-// Quita de todo el documento lo que va de «Solución» a la próxima «Pregunta N»; si alguna pregunta no trae su marca, no se separa.
-function sinSoluciones(raiz: string, d: Documento, noSeparable: Error): string[] {
+// Quita de todo el documento lo que va de «Solución» a la próxima «Pregunta N» y las preguntas reservadas enteras; si alguna pregunta no trae su marca, no se separa.
+function sinSoluciones(raiz: string, d: Documento, noSeparable: Error, reservadas = new Set<string>(), soluciones = true): string[] {
   if (d.tipo === "soluciones") throw noSeparable;
-  const omitida = "[Solución omitida hasta después del intento.]", paginas: string[] = [];
-  let en = false, marcada = true, preguntas = 0;
+  const omitida = "[Solución omitida hasta después del intento.]", reservada = "[Pregunta reservada para /simulacro.]", paginas: string[] = [], vistas = new Set<string>();
+  let en = false, fuera = false, marcada = true, preguntas = 0;
   for (let p = 1; p <= d.paginas; p++) {
     let texto: string;
     try { texto = leer(raiz, `_procesado/${d.id}/paginas/${String(p).padStart(4, "0")}.md`, 200_000); } catch { throw noSeparable; }
-    const lineas = en ? [omitida] : [];
+    const lineas = fuera ? [reservada] : en ? [omitida] : [];
     for (const linea of texto.split("\n")) {
-      const t = normalizar(linea).replace(/^(?:[\s#>*_|•-]|<[^>]*>)+/, "");
-      if (/^(solucion|resolucion|respuesta)/.test(t)) { if (!en) lineas.push(omitida); en = marcada = true; }
-      else if (/^(pregunta|ejercicio|problema)\s*(n\S{0,2}\s*)?\d/.test(t)) { if (!marcada) throw noSeparable; en = marcada = false; preguntas++; }
-      if (!en) lineas.push(linea);
+      const t = normalizar(linea).replace(/^(?:[\s#>*_|•-]|<[^>]*>)+/, ""), pregunta = t.match(/^(?:pregunta|ejercicio|problema)\s*(?:n\S{0,2}\s*)?(\d+)/);
+      if (soluciones && /^(solucion|resolucion|respuesta)/.test(t)) { if (!en && !fuera) lineas.push(omitida); en = marcada = true; }
+      else if (pregunta) {
+        if (!marcada) throw noSeparable;
+        en = false; marcada = !soluciones; fuera = reservadas.has(pregunta[1]); preguntas++;
+        if (fuera) { vistas.add(pregunta[1]); lineas.push(reservada); }
+      }
+      if (!en && !fuera) lineas.push(linea);
     }
     paginas.push(lineas.join("\n").replace(/\[\[[^\]]*\]\]/g, ""));
   }
-  if (!preguntas || !marcada) throw noSeparable;
+  if (!preguntas || !marcada || [...reservadas].some(id => !vistas.has(id))) throw noSeparable;
   return paginas;
 }
-export function leerPaginas(raiz: string, datos: DatosCurso, doc: string, desde: number, hasta: number, despuesDelIntento = false): string {
+export function leerPaginas(raiz: string, datos: DatosCurso, doc: string, desde: number, hasta: number, despuesDelIntento = false, reservados = new Set<string>()): string {
   const d = documento(datos, doc);
   if (![desde, hasta].every(Number.isInteger) || desde < 1 || hasta < desde || hasta > d.paginas) throw new Error("Rango PDF inválido (base 1, extremos incluidos).");
-  const reservadas = !despuesDelIntento && conSolucion(datos, d) ? sinSoluciones(raiz, d, new Error(`No se puede separar el enunciado de la solución en ${doc}: leé el enunciado con leer_items; el texto completo, sólo después del intento del estudiante (despues_del_intento:true).`)) : undefined;
+  // Un ítem reservado (E3) no se ve ni después de otro intento: se omite su pregunta entera o se rechaza el rango.
+  const enRango = [...paginasReservadas(datos, doc, reservados)].some(p => desde <= p && p <= hasta);
+  const omitir = new Set(enRango ? (datos.items[doc] || []).filter(i => i.solucion_de === undefined && reservados.has(`${doc}/${i.id}`)).map(i => i.id) : []);
+  const separadas = (!despuesDelIntento && conSolucion(datos, d)) || enRango ? sinSoluciones(raiz, d, new Error(enRango ? `Esas páginas de ${doc} traen un ítem reservado para /simulacro; elegí otro rango o leé los ítems con leer_items.` : `No se puede separar el enunciado de la solución en ${doc}: leé el enunciado con leer_items; el texto completo, sólo después del intento del estudiante (despues_del_intento:true).`), omitir, !despuesDelIntento) : undefined;
   let salida = "";
   for (let p = desde; p <= hasta && Buffer.byteLength(salida) < 30000; p++) {
-    try { salida += reservadas ? `\n${reservadas[p - 1]}\n${sinEnlace([p])}\n` : `\n${leer(raiz, `_procesado/${doc}/paginas/${String(p).padStart(4, "0")}.md`, 200_000)}\n${cita(datos, doc, p)}\n`; }
+    try { salida += separadas ? `\n${separadas[p - 1]}\n${sinEnlace([p])}\n` : `\n${leer(raiz, `_procesado/${doc}/paginas/${String(p).padStart(4, "0")}.md`, 200_000)}\n${cita(datos, doc, p)}\n`; }
     catch { salida += `\nPágina PDF ${p} sin transcripción utilizable; consultá ver_pagina. ${cita(datos, doc, p)}\n`; }
     try {
       const q = JSON.parse(leer(raiz, `_procesado/${doc}/calidad.json`)).paginas?.[String(p)];
@@ -119,12 +168,13 @@ export function leerPaginas(raiz: string, datos: DatosCurso, doc: string, desde:
   if (Buffer.byteLength(salida) >= 30000) salida += "\n[Rango incompleto; pedí menos páginas o ver_pagina para una página extensa.]";
   return acotar(salida, 32000);
 }
-export function leerItems(datos: DatosCurso, doc: string, ids: string[], incluirSolucion = false): string {
+export function leerItems(datos: DatosCurso, doc: string, ids: string[], incluirSolucion = false, reservados = new Set<string>()): string {
   const d = documento(datos, doc);
   if (!["ejercicios", "evaluaciones", "soluciones"].includes(d.tipo) || !ids.length || ids.length > 100) throw new Error("Indicá ids de un banco de ítems del curso.");
   return acotar(ids.map(id => {
     const i = datos.items[doc]?.find(i => i.id === id);
     if (!i) return `${doc}/${id}: ítem no preparado.`;
+    if (reservados.has(`${doc}/${id}`)) return `${doc}/${id}: Ese ítem está reservado para /simulacro; elegí otro.`;
     if (!incluirSolucion && esSolucion(d, i)) return `${doc}/${id}: es una solución; pedila con incluir_solucion después del intento.`;
     let t = `${doc}/${i.id}${typeof i.puntos === "number" ? ` (${i.puntos} punto${i.puntos === 1 ? "" : "s"})` : typeof i.puntos === "string" ? ` (${i.puntos})` : ""}\n${i.enunciado}\n${incluirSolucion || !conSolucion(datos, d) ? i.paginas.map(p => cita(datos, doc, p)).join(" ") : sinEnlace(i.paginas)}\nRevisión humana pendiente.`;
     if (incluirSolucion) {
@@ -158,7 +208,7 @@ export function faltantesTema(raiz: string, datos: DatosCurso, tema: Tema): stri
 // acotar corta el final: primero estado, próximo paso, fallas, errores sin resolver y últimos ejercicios (H28).
 function progresoCompacto(p: any, bytes: number): string {
   if (!p) return "sin registro";
-  const lista = (xs: unknown): any[] => (Array.isArray(xs) ? xs : []), corto = (s: unknown) => String(s ?? "").slice(0, 200);
+  const corto = (s: unknown) => String(s ?? "").slice(0, 200);
   // Las entradas más recientes que entran en su parte del presupuesto: una lista larga no desplaza a las otras.
   const recientes = (xs: any[], parte: number) => {
     const r: any[] = [];
@@ -193,21 +243,14 @@ export function dossier(raiz: string, datos: DatosCurso, tema: Tema, maxTokens: 
     try { const d = documento(datos, ref.doc); lineas.push(`${ref.doc} · ${d.titulo} · ${d.prioridad} · ${ref.seccion} · PDF ${ref.paginas.join("–")} · ${cita(datos, ref.doc, ref.paginas[0])}`); }
     catch { lineas.push("Referencia bibliográfica no disponible; no reconstruirla desde memoria."); }
   }
-  const items: { linea: string; id: string; automatico: boolean }[] = [], vistos = new Set<string>();
-  const agregar = (clase: string, doc: string, id: string, marca = "") => {
-    const i = datos.items[doc]?.find(i => i.id === id), d = datos.documentos.find(d => d.id === doc);
-    // Una solución nunca entra al prompt antes del intento, aunque el índice la referencie.
-    if ((d && i ? esSolucion(d, i) : d?.tipo === "soluciones") || vistos.has(`${doc}/${id}`)) return;
+  const items: { linea: string; id: string; automatico: boolean }[] = [], vistos = reservados(raiz, datos);
+  // Lo que la preparación automática asignó al tema va después del índice curado, que manda.
+  for (const { clase, doc, id, automatico } of itemsDelTema(raiz, datos, tema)) {
+    const i = datos.items[doc]?.find(i => i.id === id), d = datos.documentos.find(d => d.id === doc), marca = automatico ? " (asignado automáticamente)" : "";
+    // Una solución nunca entra al prompt antes del intento, aunque el índice la referencie; un reservado, nunca fuera del simulacro.
+    if ((d && i ? esSolucion(d, i) : d?.tipo === "soluciones") || vistos.has(`${doc}/${id}`)) continue;
     vistos.add(`${doc}/${id}`);
-    items.push({ id: `${doc}/${id}`, automatico: !!marca, linea: `${clase}: ${doc}/${id}${marca} · ${i?.enunciado.replace(/\s+/g, " ").slice(0, 140) || "sin preparar"}` });
-  };
-  for (const clase of ["ejercicios", "evaluaciones"] as const) for (const ref of tema[clase] || []) for (const id of ref.items) agregar(clase, ref.doc, id);
-  // Lo que la preparación automática asignó al tema; el índice curado manda y va primero.
-  let automaticas: { doc?: string; id?: string; tema?: string | null }[] = [];
-  try { automaticas = JSON.parse(leer(raiz, "_procesado/asignaciones.json")).items || []; } catch { /* Sin preparación automática todavía. */ }
-  for (const clase of ["evaluaciones", "ejercicios"]) for (const a of automaticas) {
-    const d = datos.documentos.find(d => d.id === a?.doc);
-    if (a?.tema === tema.id && d?.tipo === clase && datos.items[d.id]?.some(i => i.id === a.id)) agregar(clase, d.id, String(a.id), " (asignado automáticamente)");
+    items.push({ id: `${doc}/${id}`, automatico, linea: `${clase}: ${doc}/${id}${marca} · ${i?.enunciado.replace(/\s+/g, " ").slice(0, 140) || "sin preparar"}` });
   }
   // Las vistas previas ocupan hasta 2400 B; el resto va sólo con su id (leer_items lo trae).
   let bytes = 0;
@@ -218,6 +261,7 @@ export function dossier(raiz: string, datos: DatosCurso, tema: Tema, maxTokens: 
   }
   const ids = (automatico: boolean) => resto.filter(i => i.automatico === automatico).map(i => i.id).join(", ");
   if (resto.length) lineas.push(acotar(`Más ítems del tema (leelos con leer_items): ${[ids(false), ids(true) && `asignados automáticamente: ${ids(true)}`].filter(Boolean).join("; ")}`, 800));
+  if (reservas(raiz, datos)[tema.id]) lineas.push("Simulacro: un ítem de evaluación del tema está reservado para /simulacro; no figura acá ni se puede leer. Al cerrar el tema, ofrecé /simulacro.");
   const faltan = faltantesTema(raiz, datos, tema);
   if (faltan.length) lineas.push(`Preparación del tema: sin texto confiable todavía en ${faltan.join("; ")}. Se preparan solos en segundo plano; mientras, cotejá esas páginas con ver_pagina antes de citarlas.`);
   // Objetivo y plan acordados (H56) comparten los 3000 B del progreso del tema: retomar no los vuelve a pedir ni pierde el borde.

@@ -4,8 +4,8 @@ import { homedir } from "node:os";
 import { basename, join, resolve, sep } from "node:path";
 import { piDir, vaultDir } from "../../scripts/lib/pi-sdk.mjs";
 import { normalizar } from "../../scripts/ingesta/bm25.ts";
-import { buscarMaterial, cita, documento, dossier, esSlug, leer, leerItems, leerPaginas, ordenarTemas, resolverTemas, rutaSegura,
-  type Activo, type DatosCurso, type Tema } from "./material.ts";
+import { buscarMaterial, cita, documento, dossier, esSlug, leer, leerItems, leerPaginas, ordenarTemas, paginasReservadas, reservados, resolverTemas, rutaSegura,
+  type Activo, type DatosCurso, type Ref, type Tema } from "./material.ts";
 
 import { verificacionPrevia } from "./researcher.ts";
 
@@ -342,12 +342,14 @@ export function registrarSesion(pi: ExtensionAPI, vault = vaultDir, recursos = p
       ctx.ui.setStatus("curso", undefined);
     },
     refrescar: () => { if (activo && datos) preparar(activo, datos); return resumen; },
-    leer_paginas({ doc, desde, hasta, despues_del_intento = false }: { doc: string; desde: number; hasta: number; despues_del_intento?: boolean }) { const { d, r } = actual(); return leerPaginas(r, d, doc, desde, hasta, despues_del_intento); },
-    buscar_material({ consulta, tipo }: { consulta: string; tipo?: string }) { const { d, r } = actual(); return JSON.stringify(buscarMaterial(r, d, consulta, tipo)); },
-    leer_items({ doc, ids, incluir_solucion = false }: { doc: string; ids: string[]; incluir_solucion?: boolean }) { return leerItems(actual().d, doc, ids, incluir_solucion); },
+    // Los ítems reservados para /simulacro (E3) no se muestran por ninguna vía; leer_items sí el que se está rindiendo.
+    leer_paginas({ doc, desde, hasta, despues_del_intento = false }: { doc: string; desde: number; hasta: number; despues_del_intento?: boolean }) { const { d, r } = actual(); return leerPaginas(r, d, doc, desde, hasta, despues_del_intento, reservados(r, d)); },
+    buscar_material({ consulta, tipo }: { consulta: string; tipo?: string }) { const { d, r } = actual(); return JSON.stringify(buscarMaterial(r, d, consulta, tipo, reservados(r, d))); },
+    leer_items({ doc, ids, incluir_solucion = false }: { doc: string; ids: string[]; incluir_solucion?: boolean }, permitido?: Ref) { const { d, r } = actual(); return leerItems(d, doc, ids, incluir_solucion, reservados(r, d, permitido)); },
     async ver_pagina({ doc, pagina, despues_del_intento = false }: { doc: string; pagina: number; despues_del_intento?: boolean }, signal?: AbortSignal) {
       const { a, d, r } = actual(), fuente = documento(d, doc);
       if (!Number.isInteger(pagina) || pagina < 1 || pagina > fuente.paginas) throw new Error("Página PDF fuera de rango.");
+      if (paginasReservadas(d, doc, reservados(r, d)).has(pagina)) throw new Error("Esa página trae un ítem reservado para /simulacro; elegí otra.");
       if (!despues_del_intento && (["evaluaciones", "soluciones"].includes(fuente.tipo) || d.items[doc]?.some(i => i.solucion_de !== undefined))) throw new Error("La imagen de esta página trae la solución: leé el enunciado con leer_items y mostrala recién después del intento (despues_del_intento:true).");
       const resultado = await pi.exec(join(recursos, ".venv/bin/python"), [join(recursos, "scripts/ingesta/sesion.py"), "renderizar", "--vault", vault, "--curso", a.curso, "--doc", doc, "--pagina", String(pagina)], { timeout: 10000, signal });
       if (resultado.killed || resultado.code !== 0) throw new Error(fallaPython(resultado));

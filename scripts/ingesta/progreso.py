@@ -34,8 +34,11 @@ def contexto(raiz):
 
 def comprobar(p, ctx):
     validar_progreso(p, *ctx)
-    if any(not isinstance(t.get(k, ""), str) for t in p["temas"].values() for k in ["objetivo", "plan"]):
-        raise ValueError("progreso.yaml: objetivo y plan deben ser textos.")
+    for t in p["temas"].values():
+        reservado = t.get("reservado", [])
+        if any(not isinstance(t.get(k, ""), str) for k in ["objetivo", "plan"]) or not isinstance(reservado, list) or any(
+                not isinstance(r, dict) or not isinstance(r.get("doc"), str) or not isinstance(r.get("id"), str) or not isinstance(r.get("usado", False), bool) for r in reservado):
+            raise ValueError("progreso.yaml: objetivo, plan o reservado fuera del esquema.")
     return p
 
 
@@ -137,6 +140,25 @@ def fusionar(anterior, nuevo, previo=False):
     return r, avisos
 
 
+def reservar(p, ctx, propuestas, usados):
+    """E3: el primer reservado vigente de cada tema queda fijo; un intento registrado o un simulacro lo marcan usado."""
+    temas, documentos, items = ctx
+    def vigente(r):
+        item = items.get(r.get("doc"), {}).get(r.get("id")) if isinstance(r, dict) else None
+        return isinstance(item, dict) and "solucion_de" not in item and documentos[r["doc"]].get("tipo") == "evaluaciones" and not r.get("usado")
+    for t in p["temas"].values():
+        for r in t.get("reservado", []):
+            if not r.get("usado") and (r["doc"], r["id"]) in usados:
+                r["usado"] = True
+    tomados = {(r["doc"], r["id"]) for t in p["temas"].values() for r in t.get("reservado", [])} | usados
+    for tema, r in (propuestas or {}).items():
+        t = p["temas"].get(tema, {})
+        previas = [x for x in t.get("reservado", []) if x.get("usado") or vigente(x)]
+        if tema in temas and vigente(r) and (r["doc"], r["id"]) not in tomados and not any(vigente(x) for x in previas):
+            p["temas"][tema] = {"estado": "sin_empezar", **t, "reservado": previas + [{"doc": r["doc"], "id": r["id"]}]}
+            tomados.add((r["doc"], r["id"]))
+
+
 ETIQUETA = re.compile(r"^(?:ejercicio|problema|pregunta|[ií]tem|ej)\.?\s*", re.I)
 
 
@@ -225,7 +247,7 @@ def orden(log, tema):
     return (m[1], int(m[2] or 1)) if m else None
 
 
-def registrar(vault: Path, curso: str, tema: str, log: str, datos: dict, cierre=False, reconstruido=False, huella_log=None):
+def registrar(vault: Path, curso: str, tema: str, log: str, datos: dict, cierre=False, reconstruido=False, huella_log=None, reservas=None, simulacro=None):
     raiz = carpeta(vault, curso)
     if not re.fullmatch(SLUG, tema) or type(cierre) is not bool or type(reconstruido) is not bool:
         raise ValueError("Tema o flags de progreso inválidos.")
@@ -251,6 +273,8 @@ def registrar(vault: Path, curso: str, tema: str, log: str, datos: dict, cierre=
         posterior = reconstruido and any(orden(h["log"], tema) > orden(log, tema) for h in p["historial"] if h["tema"] == tema and orden(h["log"], tema))
         p["temas"][tema], fusion = fusionar(actual, nuevo, posterior)
         avisos += fusion
+        rendido = {(simulacro.get("doc"), simulacro.get("id"))} if isinstance(simulacro, dict) else set()
+        reservar(p, ctx, reservas, {(e["doc"], e["item"]) for e in nuevo["ejercicios"]} | rendido)
         historia = {"fecha": log.split("/")[1][:10], "tema": tema, "log": log, "resumen": datos["resumen"], "cierre": cierre}
         if reconstruido:
             historia["reconstruido"] = True
