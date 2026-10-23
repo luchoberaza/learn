@@ -286,3 +286,41 @@ test("E9: el tiempo proporcional sale de curso.md", () => {
   assert.deepEqual(tiempo("Duración: 90 minutos. Consta de 3 preguntas."), { minutos: 30, examen: "90 minutos para 3 preguntas" });
   assert.equal(tiempo("Sin duración declarada."), undefined);
 });
+
+// modo-curso.md se inyecta en cada turno: cada regla clave por una frase estable y un tope de tamaño.
+test("modo-curso: prevalece sobre teach con sus conflictos explícitos y trae las reglas de la auditoría", () => {
+  const m = readFileSync(join(piDir, "modo-curso.md"), "utf8"), plano = m.replace(/\s+/g, " ");
+  assert.ok(Buffer.byteLength(m) <= 11 * 1024, String(Buffer.byteLength(m)));
+  const reglas = {
+    "precedencia (H12)": "este protocolo prevalece sobre `teach` en todo lo que regula",
+    "LaTeX en popups (H46)": "LaTeX sólo en `explanation` y en el chat",
+    "sin subagentes (H44)": "durante el estudio no hay subagentes; se hace con `investigar_tema`",
+    "objetivo propuesto (A4)": "se propone el del curso y sólo se entrevista si elige ajustar",
+    "turno nunca quieto (H11)": "Cada turno tuyo termina con un `quiz`, un `ask_user_question` o un pedido explícito",
+    "tope del probe (6a)": "tope de 4 preguntas en un tema nuevo; con borde previo, hasta 3 para confirmarlo",
+    "pedido de explicación (H12, 6a)": "cortá el probe en ese momento",
+    "cierre del probe (B7)": "un diagnóstico de una frase que decide socrático o expositivo",
+    "piso y techo (B7)": "una línea por hebra con piso",
+    "aprobación con botones (H56, 6b)": "pedí la aprobación con `ask_user_question`",
+    "retomar sin repetir (H56, 6b)": "Si el dossier trae «Objetivo acordado» y «Plan», no los vuelvas a pedir",
+    "C5 (H48)": "nunca dos quizzes seguidos sin texto de clase en el medio",
+    "figuras (H48)": "Nunca preguntes por una figura o tabla que el alumno no vio",
+    "criterios antes (E5, H20)": "Antes del intento: los criterios que vas a mirar",
+    "contra qué (E6, H20)": "decí contra qué corregís",
+    "forma de la corrección (E7, 6c)": "«≈ x/N» por pregunta (y por inciso si la escala oficial lo desglosa), con coma decimal y descuentos explícitos («(−0,5)»)",
+    "sin escala (6c)": "sin escala, criterios sin número",
+    "error a nodo (E7)": "cada error mapeado a un nodo del plan",
+    "notación de la cátedra (E8, F6, H51, X12)": "Manda la notación de la cátedra",
+    "reservado (E3)": "Nunca lo uses ni lo parafrasees al enseñar",
+    "rozado (E3)": "si algo lo rozó, declaralo",
+    "simulacro (E9)": "sin pistas ni correcciones hasta la entrega",
+    "práctica al final (6e)": "Al final del tema",
+    "delta del progreso": "sólo lo nuevo desde el último guardado",
+    "nunca soluciones antes": "Nunca muestres una solución antes del intento",
+  };
+  for (const [nombre, frase] of Object.entries(reglas)) assert.ok(plano.includes(frase), nombre);
+  // Ni subagent ni researcher como tool del estudio: sólo se nombran para decir que no hay.
+  assert.doesNotMatch(m, /`(subagent|researcher)`/);
+  for (const linea of m.split("\n").filter(l => /subagent/i.test(l))) assert.match(linea, /no hay subagentes/);
+  assert.doesNotMatch(plano, /cada bloque|Esperá aprobación|Seguí el proceso completo de `teach`/);
+});
