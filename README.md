@@ -6,6 +6,8 @@ Fork de [amosblomqvist/learn](https://github.com/amosblomqvist/learn), el sistem
 
 [![video](assets/thumbnail.png)](https://www.youtube.com/watch?v=kzcI5F4tGiU)
 
+**¿Ya está instalado? Empezá por [`GET_STARTED.md`](GET_STARTED.md): cómo se usa, paso a paso.**
+
 ## Qué hace
 
 - **Crear un curso.** `/curso-nuevo <slug>` arma el contrato y el índice de temas desde los PDFs que pongas en `_entrada/` (bibliografía, prácticos, parciales con solución) e indexa todas las páginas en local, sin modelo. `/curso-agregar <slug>` suma material; todo cambio a un curso guardado muestra un diff y pide confirmación.
@@ -42,10 +44,11 @@ Fork de [amosblomqvist/learn](https://github.com/amosblomqvist/learn), el sistem
    ```
 4. Instalar los paquetes de pi del proyecto, el venv de Python y el lanzador (comandos en SETUP), y apuntar `ruta_tesseract` de `curso.config.json` a tu Tesseract.
 5. Comprobar con `node .pi/scripts/doctor`.
-6. Abrir con `pi-learn`, no con `pi` a secas: así el tutor ve sólo las skills del proyecto.
+6. Abrir con `pi-learn`, no con `pi` a secas: así el tutor ve sólo las skills del proyecto. Desde ahí, seguí [`GET_STARTED.md`](GET_STARTED.md).
 
 ## Documentación
 
+- [`GET_STARTED.md`](GET_STARTED.md): cómo se usa, de crear un curso a rendir el simulacro.
 - [`SETUP.md`](SETUP.md): instalación, dependencias, uso de cada comando, doctor y pruebas.
 - [`DECISIONES.md`](DECISIONES.md): por qué cada cosa es como es.
 - [`informes/`](informes/): informes de cada fase de la implementación.
