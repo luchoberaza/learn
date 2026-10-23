@@ -123,6 +123,7 @@ const REGLAS_I = {
   "descuento estimado por inciso (E7)": "si la escala oficial es sólo por pregunta, cada inciso con su descuento estimado («c) ≈ (−3)», no oficial)",
   "frase textual de la solución (E7)": "con una frase textual de la solución oficial por inciso",
   "notación o errata del enunciado (E8)": "si un enunciado usa otra notación o trae una errata, decilo una vez",
+  "ya lo tengo antes del plan (6e)": "si el alumno dice que ya lo tiene antes de terminar el plan, preguntá con `ask_user_question` «Seguir con <nodo siguiente>» / «Practicar lo visto»",
 };
 test("modo-curso: reglas de fidelidad y evaluación de la etapa I", () => {
   const plano = readFileSync(join(piDir, "modo-curso.md"), "utf8").replace(/\s+/g, " ");
