@@ -77,6 +77,26 @@ class PedagogiaAuditoriaTest(unittest.TestCase):
         self.assertEqual(falla(OSError(errno.ENOSPC, 'No space left on device')), 'Disco lleno: no se guardó el progreso; liberá espacio y repetí /fin.')
         self.assertEqual(falla(ValueError('Estado de progreso inválido.')), 'Progreso no guardado: Estado de progreso inválido.')
 
+    def test_errores_internos_de_python_no_llegan_en_ingles(self):
+        # Una fecha imposible que mande el modelo («2026-02-30») daba «day is out of range for month».
+        for fecha in ['2026-02-30', '2026-13-01']:
+            with self.assertRaisesRegex(ValueError, '^Fecha de evidencia inválida o futura.$'):
+                self.guardar({'resumen': 'x', 'ejercicios': [{'doc': 'practico', 'item': '1', 'resultado': 'correcto', 'fecha': fecha}]})
+        for e in [KeyError('doc'), TypeError("unhashable type: 'list'"), RecursionError('maximum recursion depth exceeded')]:
+            texto = falla(e)
+            self.assertTrue(texto.startswith('Progreso no guardado: '), texto)
+            self.assertNotRegex(texto, r"'doc'|unhashable|recursion")
+
+    def test_errores_internos_de_python_no_llegan_en_ingles(self):
+        # Una fecha imposible que mande el modelo («2026-02-30») daba «day is out of range for month».
+        for fecha in ['2026-02-30', '2026-13-01']:
+            with self.assertRaisesRegex(ValueError, '^Fecha de evidencia inválida o futura.$'):
+                self.guardar({'resumen': 'x', 'ejercicios': [{'doc': 'practico', 'item': '1', 'resultado': 'correcto', 'fecha': fecha}]})
+        for e in [KeyError('doc'), TypeError("unhashable type: 'list'"), RecursionError('maximum recursion depth exceeded')]:
+            texto = falla(e)
+            self.assertTrue(texto.startswith('Progreso no guardado: '), texto)
+            self.assertNotRegex(texto, r"'doc'|unhashable|recursion")
+
 
 class ReservaTest(unittest.TestCase):
     """E3: el ítem reservado para /simulacro se fija en progreso.yaml y se marca usado al rendirlo."""

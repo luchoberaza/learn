@@ -237,7 +237,11 @@ def validar_datos(datos, ctx, dia=None):
     t.update(ejercicios=ejercicios, actualizado=hoy.isoformat())
     for e, campo in [(e, "detectado") for e in t["errores_de_concepto"]] + [(e, "fecha") for e in t["ejercicios"]]:
         f = e.setdefault(campo, min(dia or hoy, hoy).isoformat())
-        if not isinstance(f, str) or not re.fullmatch(r"\d{4}-\d{2}-\d{2}", f) or date.fromisoformat(f) > hoy:
+        try:
+            valida = isinstance(f, str) and re.fullmatch(r"\d{4}-\d{2}-\d{2}", f) and date.fromisoformat(f) <= hoy
+        except ValueError:  # «2026-02-30»: el texto de Python viene en inglés
+            valida = False
+        if not valida:
             raise ValueError("Fecha de evidencia inválida o futura.")
     return t, avisos
 
@@ -330,7 +334,9 @@ def main():
 
 
 def falla(e):
-    """Una línea para el alumno: el texto de un OSError viene en inglés y no se muestra."""
+    """Una línea para el alumno: el texto de un OSError o de un error interno de Python viene en inglés y no se muestra."""
+    if isinstance(e, (TypeError, KeyError, RecursionError)):
+        return "Progreso no guardado: un dato del registro no tiene el formato esperado; reintentá y, si sigue, corré .pi/scripts/doctor."
     if not isinstance(e, OSError):
         return f"Progreso no guardado: {e}"
     if e.errno == errno.ENOSPC:
