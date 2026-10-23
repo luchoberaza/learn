@@ -107,6 +107,9 @@ test("E3: la reserva elige un ítem real de evaluación con solución y puntos, 
   c.d.items.parcial.push({ id: "4", paginas: [2], enunciado: "CUATRO", puntos: 12 }, { id: "4-solucion", paginas: [2], enunciado: "S4", solucion_de: "4" });
   c.escribir("_procesado/asignaciones.json", JSON.stringify({ items: [{ doc: "parcial", id: "4", tema: "retardos" }] }));
   assert.deepEqual(reservas(c.raiz, c.d).retardos, { doc: "parcial", id: "2" });
+  // Lo asignado por la preparación sigue en el dossier con su marca; el reservado, no.
+  assert.match(dossier(c.raiz, c.d, c.tema, 3000, 1500), /evaluaciones: parcial\/4 \(asignado automáticamente\) · CUATRO/);
+  assert.doesNotMatch(dossier(c.raiz, c.d, c.tema, 3000, 1500), /parcial\/2 |ENUNCIADO DOS/);
   // La fijada en progreso.yaml manda; usada, se elige otra que no se haya practicado ni reservado.
   c.d.progreso.temas.retardos = { estado: "en_curso", reservado: [{ doc: "parcial", id: "3" }] };
   assert.deepEqual(reservas(c.raiz, c.d).retardos, { doc: "parcial", id: "3" });
