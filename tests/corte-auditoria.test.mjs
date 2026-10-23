@@ -33,7 +33,9 @@ async function sesion(t) {
     const turno = session.prompt("Sigamos");
     for (let i = 0; i < 100 && abiertos === antes; i++) await new Promise(r => setTimeout(r, 20));
     assert.equal(abiertos, antes + 1, "la pregunta llegó a mostrarse");
-    await cortarTurno(pi, { isIdle: () => session.isIdle, abort: () => { void session.abort(); }, waitForIdle: () => session.waitForIdle() }, motivo);
+    // Sin motivo, un aborto ajeno a /fin, /estudiar y /simulacro.
+    if (motivo) await cortarTurno(pi, { isIdle: () => session.isIdle, abort: () => { void session.abort(); }, waitForIdle: () => session.waitForIdle() }, motivo);
+    else await session.abort();
     await turno;
     const mensajes = session.messages.slice(session.messages.findLastIndex(m => m.role === "user"));
     return { mensajes, resultado: mensajes.find(m => m.role === "toolResult") };
@@ -45,11 +47,11 @@ const quiz = { question: "¿Qué retardo depende de L/R?", options: [{ label: "T
 test("P2: cortar el turno con una pregunta abierta no arranca otra llamada ni muestra «Error: This operation was aborted»", async t => {
   const s = await sesion(t);
   for (const [herramienta, args, motivo] of [["quiz", quiz, "al cerrar la clase"], ["ask_user_question", { question: "¿Seguimos?", options: [{ label: "Sí" }, { label: "Más tarde" }] }, "al cambiar de tema"],
-    ["quiz", { ...quiz, multiSelect: true, correctAnswer: ["Transmisión"] }, "al empezar el simulacro"]]) {
+    ["quiz", { ...quiz, multiSelect: true, correctAnswer: ["Transmisión"] }, "al empezar el simulacro"], ["quiz", quiz, undefined]]) {
     const { mensajes, resultado } = await s.cortar(herramienta, args, motivo);
     assert.deepEqual(mensajes.filter(m => m.role === "assistant").map(m => m.stopReason), ["toolUse"], `${herramienta}: ${JSON.stringify(mensajes.at(-1))}`);
     assert.equal(resultado.details.status, "cancelled");
-    assert.equal(resultado.details.motivo, motivo);
+    assert.equal(resultado.details.motivo, motivo ?? "al interrumpirse el turno");
   }
 });
 

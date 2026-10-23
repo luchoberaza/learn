@@ -18,6 +18,6 @@ export function cortable(pi: ExtensionAPI, execute: Execute): Execute {
   return async (id, params, signal, onUpdate, ctx) => {
     motivo = undefined;
     const r = await execute(id, params, signal, onUpdate, ctx);
-    return signal?.aborted ? { ...r, terminate: true, details: { ...r.details, motivo: motivo ?? "al cortar el turno" } } : r;
+    return signal?.aborted ? { ...r, terminate: true, details: { ...r.details, motivo: motivo ?? "al interrumpirse el turno" } } : r;
   };
 }
