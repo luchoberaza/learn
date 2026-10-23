@@ -73,6 +73,30 @@ class IngestaTest(unittest.TestCase):
             self.assertFalse(clase["posible_matematica"])
             self.assertFalse(calidad(pdf[2].get_text(), clase, 0.6)["pendiente"])
 
+    def test_capa_ocr_previa_que_pasa_el_control_evita_tesseract(self):
+        # Escaneo con capa de texto invisible: prosa buena en la p. 1, basura en la p. 2.
+        png = pymupdf.open(self.fuente)[0].get_pixmap(dpi=100).tobytes("png")
+        escaneo = self.vault / "escaneo.pdf"
+        with pymupdf.open() as pdf:
+            for capa in ["La derivada expresa la razón de cambio de una función y permite estudiar cómo cambia una cantidad cuando cambia otra.",
+                         "qzxv wq " * 20]:
+                pagina = pdf.new_page(width=500, height=700)
+                pagina.insert_image(pagina.rect, stream=png)
+                pagina.insert_textbox(pymupdf.Rect(45, 140, 450, 430), capa, fontsize=12, render_mode=3)
+            pdf.save(escaneo)
+        manifiesto = {**self.manifiesto, "motores": {"digital": "pymupdf", "escaneada": "ocrmypdf", "mixta": "pymupdf"},
+                      "documentos": [{"id": "escaneo", "titulo": "Escaneo", "tipo": "bibliografia", "archivo": "escaneo.pdf", "paginas": [1, 2]}]}
+        llamadas = []
+        def extractor(pdf, numero, motor, idiomas):
+            llamadas.append((numero, motor))
+            return extraer(pdf, numero, "pymupdf", idiomas) if motor == "pymupdf" else "Texto de Tesseract para la página dos, con palabras reconocibles de prueba."
+        with patch("pipeline.identidad_motor", lambda motor, idiomas: {"motor": motor}):
+            ejecutar(manifiesto, self.vault, self.salida, extractor=extractor)
+        self.assertEqual(llamadas, [(1, "pymupdf"), (2, "pymupdf"), (2, "ocrmypdf")])
+        paginas = self.leer("escaneo/calidad.json")["paginas"]
+        self.assertEqual((paginas["1"]["motor"], paginas["1"]["ruta"], paginas["1"].get("capa_ocr_previa")), ("pymupdf", "ocr", True))
+        self.assertEqual((paginas["2"]["motor"], paginas["2"].get("capa_ocr_previa")), ("ocrmypdf", None))
+
     def test_no_suma_imagenes_superpuestas(self):
         self.assertEqual(area_union([(0, 0, 10, 10), (0, 0, 10, 10), (5, 0, 15, 10)]), 150)
 

@@ -362,9 +362,18 @@ def ejecutar(manifiesto: dict, vault: Path, salida: Path, *, limite_paginas: int
                                 titulos[numero] = encabezados(pagina)
                                 resultado.update(clave=clave, clasificacion=clase, motor=motor, identidad_motor=identidad(motor),
                                                  impresa=impresa, metodo_etiqueta=metodo_etiqueta, encabezados=titulos[numero])
-                                texto = extractor(pdf, numero, motor, idiomas)
-                                if motor == "ocrmypdf":
-                                    clase["posible_matematica"] |= matematica_ocr(texto)
+                                texto = None
+                                if motor == "ocrmypdf" and clase["capa_ocr_probable"]:
+                                    # La capa OCR que ya trae el escaneo vale si pasa el mismo control: evita ~40 s de Tesseract por página.
+                                    previa = extractor(pdf, numero, "pymupdf", idiomas)
+                                    control = calidad(previa, {**clase, "posible_matematica": clase["posible_matematica"] or matematica_ocr(previa)}, umbral)
+                                    if not control["pendiente"]:
+                                        texto, clase["posible_matematica"] = previa, clase["posible_matematica"] or matematica_ocr(previa)
+                                        resultado.update(motor="pymupdf", identidad_motor=identidad("pymupdf"), capa_ocr_previa=True)
+                                if texto is None:
+                                    texto = extractor(pdf, numero, motor, idiomas)
+                                    if motor == "ocrmypdf":
+                                        clase["posible_matematica"] |= matematica_ocr(texto)
                                 resultado.update(calidad(texto, clase, umbral))
                                 if clase["operadores_cifrados"]:
                                     resultado["avisos"].append("En esta página «5» puede ser «=», «1» «+» y «2» «−»: verificá con la imagen.")
