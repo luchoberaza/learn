@@ -198,7 +198,7 @@ function recoger(vault: string, p: Pedido, dir: string): { estado: string; file?
   }
 }
 export function registrarResearcher(pi: ExtensionAPI, actual: () => Estado | undefined, refrescar: () => string, vault: string, recursos: string, comando = ["pi"], plazo = 180) {
-  const esperas = new Set<string>();
+  const esperas = new Map<string, string[] | undefined>();
   const pendientes = (ctx: ExtensionContext) => {
     // Un trabajo relanzado reutiliza su nombre: cada fin cierra el inicio anterior.
     const abiertos = new Map<string, Inicio>();
@@ -235,7 +235,7 @@ export function registrarResearcher(pi: ExtensionAPI, actual: () => Estado | und
         if (!modelo || !ctx.modelRegistry.hasConfiguredAuth(modelo)) throw new Error("Verificación externa no disponible: el modelo del researcher no tiene credenciales; seguí con el material.");
         // La preparación del tema está reescribiendo anclas: se lanza cuando termine con ellas (en recibir), así verifica el texto definitivo.
         if (p.modo === "alcance" && p.pendientes.length && preparando(estado.r)) {
-          esperas.add(`${p.curso}/${p.tema}`);
+          esperas.set(`${p.curso}/${p.tema}`, args.afirmaciones);
           return { content: [{ type: "text", text: "Verificación en segundo plano; seguí con el material." }], details: { espera: true } };
         }
         rmSync(dir, { recursive: true, force: true });
@@ -250,7 +250,7 @@ export function registrarResearcher(pi: ExtensionAPI, actual: () => Estado | und
     const listos = [...esperas], e = actual();
     esperas.clear();
     // Si la preparación sigue con las anclas, investigar lo vuelve a dejar en espera.
-    for (const k of listos) if (e && `${e.a.curso}/${e.a.tema}` === k) void investigar("", { modo: "alcance" }, undefined, undefined, ctx as ExtensionToolContext);
+    for (const [k, afirmaciones] of listos) if (e && `${e.a.curso}/${e.a.tema}` === k) void investigar("", { modo: "alcance", afirmaciones }, undefined, undefined, ctx as ExtensionToolContext);
     for (const inicio of pendientes(ctx)) {
       const p = inicio.pedido;
       let r: ReturnType<typeof recoger>, avisar = false;

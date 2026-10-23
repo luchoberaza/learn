@@ -105,6 +105,8 @@ test('P1: con la preparación reescribiendo anclas, el alcance espera a que term
   await e.eventos.get('message_end')({message:{role:'assistant'}},e.ctx);assert.equal(e.llamadas,0,'la preparación sigue con la ancla');
   writeFileSync(e.pagina,'<!-- p. PDF 1 -->\nLa derivada de $x^2$ es $2x$ (transcripta con visión).');writeFileSync(calidad,JSON.stringify(transcripta));
   await e.eventos.get('message_end')({message:{role:'assistant'}},e.ctx);assert.equal(e.llamadas,1,'la ancla ya es definitiva aunque la preparación siga');
+  const nombre=e.entradas.findLast(x=>x.data.tipo==='inicio').data.nombre;
+  assert.match(readFileSync(join(e.raiz,'notas/verificaciones/.trabajos',nombre,'tarea.md'),'utf8'),/A1: "La derivada de x² es x\."/,'la espera conserva las afirmaciones');
   await e.responder();
   assert.equal(e.entregas.at(-1)[1].estado,'guardada');assert.deepEqual(e.avisos,['Verificación del material lista.']);
   assert.match(verificacionPrevia(e.vault,e.recursos,e.d,e.tema),/Caché de alcance vigente/);
