@@ -15,7 +15,7 @@ async function entorno(t, anterior=false) {
   const d={curso:'ejemplo',nombre:'Ejemplo',contrato:'Contrato',documentos:[],temas:[{id:'derivacion',nombre:'Derivación',unidad:1,alias:[],objetivos:[],prerequisitos:[]}],items:{},progreso:{temas:{},historial:[]},avisos:[]};
   const comandos=new Map(),tools=new Map(),eventos=new Map(),entradas=[],avisos=[],bus=[],mensajes=[];
   const pi={registerCommand:(n,c)=>comandos.set(n,c),registerTool:c=>tools.set(c.name,c),on:(n,h)=>eventos.set(n,h),appendEntry:(customType,data)=>entradas.push({type:'custom',customType,data}),setSessionName:()=>{},sendUserMessage:m=>mensajes.push(m),sendMessage:m=>mensajes.push(m.content),getAllTools:()=>[],getActiveTools:()=>[],setActiveTools:()=>{},exec:async()=>({code:0,stdout:JSON.stringify(d)}),events:{emit:(n,p)=>{bus.push(n);p.onComplete?.();}}};
-  const ctx={isIdle:()=>true,hasUI:true,sessionManager:{getBranch:()=>entradas,getSessionId:()=>'prueba'},model:{provider:'prueba',id:'modelo'},modelRegistry:{hasConfiguredAuth:()=>true},ui:{notify:m=>avisos.push(m),setStatus:()=>{},confirm:async()=>true}};
+  const ctx={isIdle:()=>true,hasUI:true,sessionManager:{getBranch:()=>entradas,getSessionId:()=>'prueba'},model:{provider:'prueba',id:'modelo'},modelRegistry:{hasConfiguredAuth:()=>true},ui:{notify:m=>avisos.push(m),setStatus:()=>{},select:async(_t,o)=>o[0]}};
   const sesion=registrarSesion(pi,vault,recursos),progreso=registrarProgreso(pi,sesion,vault);tools.set('registrar_progreso',{execute:progreso.registrar});tools.set('leer_sesion_anterior',{execute:progreso.leerAnterior});await comandos.get('estudiar').handler('ejemplo derivacion',ctx);
   const args={estado:'en_curso',borde:{domina:['Derivar un polinomio'],falla:['Identificar la interna']},conceptos_firmes:['Tasa de cambio'],errores_de_concepto:[],ejercicios:[],discrepancias:[],resumen:'Intento sintético',proximo_paso:'Composición'};
   const final=()=>entradas.push({type:'message',message:{role:'assistant',stopReason:'stop',content:[{type:'text',text:'Resumen final.'}]}});
@@ -42,9 +42,9 @@ test('cierre natural usa el mismo camino; errores y busy dejan el log activo',as
 test('reconstrucción lee el log sin tocarlo, pide confirmación y no cierra la sesión actual',async t=>{
   const e=await entorno(t,true),r=await e.tools.get('leer_sesion_anterior').execute();const texto=r.content[0].text;assert.match(texto,/pregunta sin respuesta/);
   const log=e.sesion.actual().pendiente,antes=readFileSync(join(e.raiz,log));const huella=texto.match(/SHA-256: ([a-f0-9]{64})/)[1];
-  e.ctx.ui.confirm=async()=>false;await assert.rejects(()=>e.guardar({reconstruir_log:log,huella_log:huella}),/sin confirmar/);
+  e.ctx.ui.select=async()=>'No';await assert.rejects(()=>e.guardar({reconstruir_log:log,huella_log:huella}),/sin confirmar/);
   e.ctx.hasUI=false;await assert.rejects(()=>e.guardar({reconstruir_log:log,huella_log:huella}),/sin confirmar/);
-  e.ctx.hasUI=true;e.ctx.ui.confirm=async()=>true;await e.guardar({estado:'sin_empezar',borde:{domina:[],falla:[]},conceptos_firmes:[],reconstruir_log:log,huella_log:huella});
+  e.ctx.hasUI=true;e.ctx.ui.select=async(_t,o)=>o[0];await e.guardar({estado:'sin_empezar',borde:{domina:[],falla:[]},conceptos_firmes:[],reconstruir_log:log,huella_log:huella});
   assert.equal(e.sesion.actual().pendiente,undefined);await e.eventos.get('agent_settled')({},e.ctx);assert.ok(e.sesion.actual());assert.deepEqual(readFileSync(join(e.raiz,log)),antes);
 });
 test('un registro sólo del probe sigue pendiente; el registro final y el historial legado no se reconstruyen',async t=>{

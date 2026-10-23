@@ -27,7 +27,7 @@ ejecutar({'version':1,'motores':{c:'pymupdf' for c in ['digital','escaneada','mi
   assert.equal(resultado.status, 0, resultado.stderr);
   solicitud = { vault, salida: join(vault, "_procesado/prueba"), doc: "practico", paginas: [1, 3] };
   llamadas = [];
-  ctx = { hasUI: true, ui: { confirm: async () => true }, modelRegistry: {
+  ctx = { hasUI: true, ui: { select: async (_t, o) => o[0] }, modelRegistry: {
     find: () => ({ input: ["text", "image"] }), hasConfiguredAuth: () => true,
     streamSimple: (_modelo, contexto, opciones) => {
       llamadas.push({ contexto, opciones });
@@ -64,13 +64,13 @@ test("deduplica páginas y reutiliza caché sin nuevas llamadas", async () => {
 });
 test("más de 50 páginas pide permiso antes de renderizar o llamar al modelo", async () => {
   solicitud.paginas = Array.from({ length: 51 }, (_, i) => i + 1);
-  ctx.ui.confirm = async (titulo, mensaje) => { assert.match(mensaje, /51/); return false; };
+  ctx.ui.select = async titulo => { assert.match(titulo, /51/); return "No"; };
   assert.equal((await transcribir(ctx, solicitud, config)).resumen.cancelada, true);
   assert.equal(llamadas.length, 0);
 });
 test("la aprobación interactiva permite la tanda sobre el límite configurado", async () => {
   let confirmaciones = 0;
-  ctx.ui.confirm = async () => { confirmaciones++; return true; };
+  ctx.ui.select = async (_t, o) => { confirmaciones++; return o[0]; };
   const resultado = await transcribir(ctx, solicitud, { ...config, max_paginas_vision_sin_confirmar: 1 });
   assert.equal(confirmaciones, 1);
   assert.equal(resultado.resumen.transcritas, 2);

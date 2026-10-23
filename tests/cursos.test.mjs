@@ -42,7 +42,7 @@ test("rechazar o no tener UI nunca aplica una actualización del curso", async (
   const e = entorno();
   const tool = e.tools.get("guardar_curso");
   await assert.rejects(() => tool.execute("x", args, undefined, undefined, { hasUI: false }), /confirmación interactiva/);
-  const r = await tool.execute("x", args, undefined, undefined, { hasUI: true, ui: { confirm: async () => false } });
+  const r = await tool.execute("x", args, undefined, undefined, { hasUI: true, ui: { select: async () => "No" } });
   assert.equal(r.details.cancelada, true);
   assert.deepEqual(e.llamadas, ["revisar", "revisar"]);
 });
@@ -51,8 +51,8 @@ test("la confirmación ve el diff y aplica exactamente las huellas revisadas", a
   let aplica;
   const original = e.pi.exec;
   e.pi.exec = async (programa, parametros, opciones) => { if (parametros[1] === "aplicar") aplica = parametros; return original(programa, parametros, opciones); };
-  const r = await e.tools.get("guardar_curso").execute("x", args, undefined, undefined, { hasUI: true, ui: { confirm: async () => {
-    assert.equal(e.mensajes[0].content, "+Un tema nuevo"); return true;
+  const r = await e.tools.get("guardar_curso").execute("x", args, undefined, undefined, { hasUI: true, ui: { select: async (_t, o) => {
+    assert.equal(e.mensajes[0].content, "+Un tema nuevo"); return o[0];
   } } });
   assert.deepEqual(e.llamadas, ["revisar", "aplicar"]);
   assert.ok(aplica.includes("base-revisada") && aplica.includes("propuesta-revisada"));

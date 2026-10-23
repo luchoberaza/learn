@@ -13,11 +13,12 @@ export function python(accion: string, datos: object, signal?: AbortSignal, scri
     let salida = "", error = "";
     hijo.stdout.on("data", bloque => { salida += bloque; });
     hijo.stderr.on("data", bloque => { error += bloque; });
-    hijo.on("error", reject);
+    // Sin venv, spawn falla con «spawn … ENOENT» en inglés.
+    hijo.on("error", e => reject((e as NodeJS.ErrnoException).code === "ENOENT" ? new Error("Falta el entorno de ingesta (Python): corré .pi/scripts/doctor.") : e));
     hijo.stdin.on("error", reject);
     hijo.on("close", codigo => {
       if (codigo !== 0) return reject(new Error(error.trim() || "No se completó la operación local."));
-      try { resolve(JSON.parse(salida)); } catch { reject(new Error("El backend local devolvió un resultado inválido.")); }
+      try { resolve(JSON.parse(salida)); } catch { reject(new Error("El entorno de ingesta (Python) devolvió un resultado inválido: corré .pi/scripts/doctor.")); }
     });
     hijo.stdin.end(JSON.stringify(datos));
   });
@@ -57,8 +58,9 @@ export async function transcribir(ctx: Pick<ExtensionContext, "modelRegistry" | 
   const { modelo } = vision;
   if (paginas.length > config.max_paginas_vision_sin_confirmar) {
     if (!ctx.hasUI) throw new Error(`La tanda de ${paginas.length} páginas necesita confirmación interactiva; no se envió ninguna página.`);
-    resumen.cancelada = !(await ctx.ui.confirm("Confirmar gasto de visión",
-      `Solicitaste ${paginas.length} páginas con ${config.modelo_vision}. Se reutilizará la caché disponible. ¿Autorizás esta tanda?`, { signal }));
+    // ui.confirm de pi dibuja «Yes»/«No»; Esc o un corte valen como no.
+    resumen.cancelada = await ctx.ui.select(`Confirmar gasto de visión\nSolicitaste ${paginas.length} páginas con ${config.modelo_vision}. Se reutilizará la caché disponible. ¿Autorizás esta tanda?`,
+      ["Sí, transcribir", "No"], { signal }) !== "Sí, transcribir";
     if (resumen.cancelada) return { resumen, usage: undefined };
   }
   let usage: Usage | undefined;

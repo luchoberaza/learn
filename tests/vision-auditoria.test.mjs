@@ -25,7 +25,7 @@ ejecutar({'version':1,'motores':{c:'pymupdf' for c in ['digital','escaneada','mi
   assert.equal(r.status, 0, r.stderr);
   solicitud = { vault, salida: join(vault, "_procesado/prueba"), doc: "libro", paginas: [3] };
   llamadas = []; confirmaciones = 0;
-  ctx = { hasUI: true, ui: { confirm: async () => { confirmaciones++; return true; } }, modelRegistry: {
+  ctx = { hasUI: true, ui: { select: async (_t, o) => { confirmaciones++; return o[0]; } }, modelRegistry: {
     find: (provider, id) => ({ provider, id, input: ["text", "image"] }), hasConfiguredAuth: () => true, getProviderAuth: async () => undefined,
     streamSimple: (...args) => { llamadas.push(args); return { result: async () => ({ stopReason: "error", errorMessage: "401 Unauthorized: token vencido", content: [], usage: structuredClone(uso) }) }; },
   } };

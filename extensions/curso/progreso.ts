@@ -28,7 +28,9 @@ export function registrarProgreso(pi: ExtensionAPI, sesion: ReturnType<typeof re
       const log = reconstruir_log || relative(e.r, join(vault, e.a.log));
       if (reconstruir_log) {
         if (reconstruir_log !== e.pendiente || !huella_log) throw new Error("Releé la última sesión pendiente antes de reconstruirla.");
-        if (!ctx.hasUI || !(await ctx.ui.confirm("Reconstruir progreso desde el log", `${reconstruir_log}\n${acotar(JSON.stringify(datos, null, 2), 12000)}\n¿Guardar esta reconstrucción?`, { signal }))) throw new Error("Reconstrucción sin confirmar: se preservaron log y progreso.");
+        // ui.confirm de pi dibuja «Yes»/«No»; Esc o un corte valen como no.
+        const si = "Sí, guardar la reconstrucción";
+        if (!ctx.hasUI || await ctx.ui.select(`Reconstruir el progreso de la clase anterior\n${reconstruir_log}\n${acotar(JSON.stringify(datos, null, 2), 12000)}\n¿Guardar esta reconstrucción?`, [si, "No"], { signal }) !== si) throw new Error("Reconstrucción sin confirmar: se preservaron log y progreso.");
       }
       const solicitud = ctx.sessionManager.getBranch().findLast(x => x.type === "custom" && x.customType === "curso-cierre") as any;
       const final = reconstruir_log ? true : cierre;

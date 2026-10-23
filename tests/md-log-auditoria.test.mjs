@@ -115,7 +115,7 @@ test("H49: un quiz rechazado por forma no deja «Quiz — no disponible» en la 
   e.entradas.push(asistente("q9", { ...pregunta, options: pregunta.options.slice(0, 2) }), { type: "message", message: { role: "toolResult", toolCallId: "q9", toolName: "quiz", details: rechazo } },
     asistente("q1", pregunta), { type: "message", message: { role: "toolResult", toolCallId: "q1", toolName: "quiz", details: { status: "answered", context: "Con L = 1000 bits", options: opciones, answers: [{ index: 2, label: "A" }], correctIndices: [2], correct: true } } });
   const comandos = new Map(); mdLog({ on: () => {}, events: { on: () => {} }, registerCommand: (n, c) => comandos.set(n, c), appendEntry: () => {} });
-  e.ctx.hasUI = true; e.ctx.ui.confirm = async () => true;
+  e.ctx.hasUI = true; e.ctx.ui.select = async (_t, o) => o[0];
   await comandos.get("md-log").handler(e.file, e.ctx);
   const texto = readFileSync(e.file, "utf8");
   assert.doesNotMatch(texto, /no disponible|descartada|#page=|\[\[/);
@@ -168,7 +168,7 @@ test("H48: la página que el tutor muestra con ver_pagina queda enlazada en la n
   e.entradas.push({ type: "message", message: { role: "toolResult", toolName: "ver_pagina", isError: false, content: [{ type: "text", text: cita }, imagen] } },
     { type: "message", message: { role: "toolResult", toolName: "ver_pagina", isError: true, content: [{ type: "text", text: "rechazada [[parcial.pdf#page=3]]" }] } });
   const comandos = new Map(); mdLog({ on: () => {}, events: { on: () => {} }, registerCommand: (n, c) => comandos.set(n, c), appendEntry: () => {} });
-  e.ctx.hasUI = true; e.ctx.ui.confirm = async () => true;
+  e.ctx.hasUI = true; e.ctx.ui.select = async (_t, o) => o[0];
   await comandos.get("md-log").handler(e.file, e.ctx);
   assert.equal(readFileSync(e.file, "utf8"), `> [!info] Página mostrada\n> ${cita}\n`);
 });

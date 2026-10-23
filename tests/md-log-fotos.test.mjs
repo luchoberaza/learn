@@ -54,7 +54,7 @@ test("historial con ruta nativa reutiliza el mismo adjunto sin reescribir la fot
   const e = await entorno(t), foto = join(e.dir, "foto.png"); writeFileSync(foto, png);
   const mensaje = { role: "user", timestamp: 123456, content: [{ type: "text", text: foto }] };
   e.entradas.push({ type: "message", message: mensaje }); await e.enviar(mensaje.content);
-  const [nombre] = readdirSync(e.adjuntos); e.ctx.hasUI = true; e.ctx.ui.confirm = async () => true;
+  const [nombre] = readdirSync(e.adjuntos); e.ctx.hasUI = true; e.ctx.ui.select = async (_t, o) => o[0];
   await e.comandos.get("md-log").handler(e.file, e.ctx); const texto = readFileSync(e.file, "utf8");
   await e.comandos.get("md-log").handler(e.file, e.ctx);
   assert.deepEqual(readdirSync(e.adjuntos), [nombre]); assert.equal(readFileSync(e.file, "utf8"), texto); assert.deepEqual(readFileSync(foto), png);
@@ -97,7 +97,7 @@ test("recuperar historial reutiliza adjuntos aun sin timestamp y confirma la not
   const e = await entorno(t), mensaje = { role: "user", content: [imagen()] };
   e.entradas.push({ type: "message", message: mensaje }); await e.handlers.get("message_end")({ message: mensaje }, e.ctx);
   const [nombre] = readdirSync(e.adjuntos); let confirmaciones = 0;
-  e.ctx.hasUI = true; e.ctx.ui.confirm = async () => { confirmaciones++; return true; };
+  e.ctx.hasUI = true; e.ctx.ui.select = async (_t, o) => { confirmaciones++; return o[0]; };
   await e.comandos.get("md-log").handler(e.file, e.ctx); const primera = readFileSync(e.file, "utf8");
   await e.comandos.get("md-log").handler(e.file, e.ctx);
   assert.equal(confirmaciones, 2); assert.deepEqual(readdirSync(e.adjuntos), [nombre]);

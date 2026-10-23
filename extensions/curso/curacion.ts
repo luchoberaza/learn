@@ -71,7 +71,8 @@ export async function guardarCurso(pi: ExtensionAPI, args: { curso: string; prop
     if (!ctx.hasUI) throw new Error("Actualizar un curso existente requiere confirmación interactiva; no se guardó nada.");
     informar?.(r.diff);
     pi.sendMessage({ customType: "curso-diff", display: true, content: r.diff, details: undefined });
-    const acepta = await ctx.ui.confirm("Guardar cambios del curso", `${r.copias.length} PDFs nuevos. Revisá el diff mostrado antes de confirmar. No se modifica progreso.yaml ni se reemplazan PDFs existentes.`, { signal });
+    // ui.confirm de pi dibuja «Yes»/«No»; Esc o un corte valen como no.
+    const acepta = await ctx.ui.select(`Guardar cambios del curso\n${r.copias.length} PDFs nuevos. Revisá el diff mostrado antes de confirmar. No se modifica progreso.yaml ni se reemplazan PDFs existentes.`, ["Sí, guardar los cambios", "No"], { signal }) === "Sí, guardar los cambios";
     if (!acepta) return { content: [{ type: "text", text: "Cambios rechazados; el curso se preservó." }], details: { cancelada: true } };
   }
   const guardado = await ejecutar(pi, "aplicar", args.curso, [...extras, "--base", r.base, "--huella", r.huella], signal);

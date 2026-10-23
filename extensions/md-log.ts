@@ -505,7 +505,9 @@ export default function mdLog(pi: ExtensionAPI) {
 				return;
 			}
 
-			if (fs.statSync(resolved).size > 0 && (!ctx.hasUI || !await ctx.ui.confirm("Reemplazar nota con el historial", "La nota tiene contenido. ¿Confirmás reemplazarlo con la rama activa? Si querés conservarlo, elegí otra nota vacía."))) {
+			// ui.confirm de pi dibuja «Yes»/«No»; Esc vale como no.
+			const si = "Sí, reemplazar la nota";
+			if (fs.statSync(resolved).size > 0 && (!ctx.hasUI || await ctx.ui.select("Reemplazar nota con el historial\nLa nota tiene contenido. ¿Confirmás reemplazarlo con la rama activa? Si querés conservarlo, elegí otra nota vacía.", [si, "No"]) !== si)) {
 				ctx.ui.notify("Nota preservada; no se cambió el vínculo.", "info");
 				return;
 			}
