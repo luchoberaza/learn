@@ -373,7 +373,9 @@ export function registrarSesion(pi: ExtensionAPI, vault = vaultDir, recursos = p
       if (!despues_del_intento && (["evaluaciones", "soluciones"].includes(fuente.tipo) || d.items[doc]?.some(i => i.solucion_de !== undefined))) throw new Error("La imagen de esta página trae la solución: leé el enunciado con leer_items y mostrala recién después del intento (despues_del_intento:true).");
       const resultado = await pi.exec(join(recursos, ".venv/bin/python"), [join(recursos, "scripts/ingesta/sesion.py"), "renderizar", "--vault", vault, "--curso", a.curso, "--doc", doc, "--pagina", String(pagina)], { timeout: 10000, signal });
       if (resultado.killed || resultado.code !== 0) throw new Error(fallaPython(resultado));
-      return { imagen: readFileSync(rutaSegura(r, `_procesado/${doc}/render/${String(pagina).padStart(4, "0")}.png`)).toString("base64"), cita: cita(d, doc, pagina) };
+      // render: la imagen queda en el vault y md-log la embebe en la nota (C5).
+      const render = rutaSegura(r, `_procesado/${doc}/render/${String(pagina).padStart(4, "0")}.png`);
+      return { imagen: readFileSync(render).toString("base64"), cita: cita(d, doc, pagina), render };
     },
   };
 }

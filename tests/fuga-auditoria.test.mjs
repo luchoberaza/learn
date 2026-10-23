@@ -60,6 +60,14 @@ function curso(t, d = datos(), paginas = PAGINAS) {
   return { raiz, d, tools: registrarSesion(pi, vault, recursos), activar: () => comandos.get("estudiar").handler("calculo derivacion", ctx) };
 }
 
+test("H48, C5: ver_pagina devuelve su render, que vive en el curso, para que la nota lo embeba", async t => {
+  const e = curso(t);
+  await e.activar();
+  const r = await e.tools.ver_pagina({ doc: "libro", pagina: 1 });
+  assert.equal(r.render, join(e.raiz, "_procesado/libro/render/0001.png"));
+  assert.equal(Buffer.from(r.imagen, "base64").toString(), readFileSync(r.render, "utf8"));
+});
+
 test("buscar_material: de evaluaciones y soluciones sólo da ubicación, con y sin tipo", t => {
   const { raiz, d } = curso(t);
   for (const tipo of [undefined, "evaluaciones", "soluciones"]) {

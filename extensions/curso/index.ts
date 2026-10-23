@@ -86,7 +86,7 @@ export default function (pi: ExtensionAPI) {
     parameters: Type.Object({ doc: slug, pagina: Type.Integer({ minimum: 1 }), despues_del_intento: Type.Optional(Type.Boolean()) }), executionMode: "sequential",
     async execute(_id, args, signal) {
       const r = await sesion.ver_pagina(args, signal);
-      return { content: [{ type: "text", text: r.cita }, { type: "image", data: r.imagen, mimeType: "image/png" }], details: undefined };
+      return { content: [{ type: "text", text: r.cita }, { type: "image", data: r.imagen, mimeType: "image/png" }], details: { render: r.render } };
     },
   });
   pi.registerTool({

@@ -55,6 +55,8 @@ export default function mdLog(pi: ExtensionAPI) {
 	let origen: string | null = null;
 	let nota: Nota | undefined;
 	let contexto: ExtensionContext | undefined;
+	// Último bloque escrito: la misma página mostrada dos veces seguidas no se repite.
+	let ultimo: string | null = null;
 
 	// --- State restoration on session restart ---
 
@@ -133,6 +135,7 @@ export default function mdLog(pi: ExtensionAPI) {
 			if (!fs.lstatSync(logFile).isFile()) throw new Error("El log dejó de ser un archivo regular.");
 			const prefix = fs.statSync(logFile).size > 0 ? "\n\n" : "";
 			fs.appendFileSync(logFile, prefix + text + "\n", "utf-8");
+			ultimo = text;
 		} catch {
 			contexto?.ui.notify("No se pudo escribir el log; el chat continúa y no se reemplazó la nota.", "warning");
 		}
@@ -241,10 +244,13 @@ export default function mdLog(pi: ExtensionAPI) {
 		);
 	}
 
-	// Lo que el tutor muestra con ver_pagina también queda en la nota, como enlace a la página.
-	function paginaMostrada(content: any): string | null {
+	// Lo que el tutor muestra con ver_pagina también queda en la nota (C5): el enlace a la página y, si su render vive en el vault, la imagen.
+	function paginaMostrada(content: any, details: any, cwd: string): string | null {
 		const cita = Array.isArray(content) ? content.find((c: any) => c.type === "text")?.text?.trim() : undefined;
-		return cita ? callout("info", "Página mostrada", [cita]) : null;
+		if (!cita) return null;
+		const render = typeof details?.render === "string" ? path.relative(cwd, details.render) : "";
+		const dentro = render && !render.startsWith(`..${path.sep}`) && !path.isAbsolute(render) && fs.existsSync(details.render);
+		return callout("info", "Página mostrada", dentro ? [cita, `![[${render.split(path.sep).join("/")}]]`] : [cita]);
 	}
 
 	function assistantBlock(text: string): string {
@@ -419,12 +425,12 @@ export default function mdLog(pi: ExtensionAPI) {
 		await withLock(() => appendToFile(block));
 	});
 
-	pi.on("tool_result", async (event, _ctx) => {
+	pi.on("tool_result", async (event, ctx) => {
 		if (!logFile) return;
 		const toolName = (event as any).toolName;
 		if (toolName === "ver_pagina") {
-			const bloque = (event as any).isError ? null : paginaMostrada((event as any).content);
-			if (bloque) await withLock(() => appendToFile(bloque));
+			const bloque = (event as any).isError ? null : paginaMostrada((event as any).content, (event as any).details, ctx.cwd);
+			if (bloque) await withLock(() => { if (bloque !== ultimo) appendToFile(bloque); });
 			return;
 		}
 		if (!QA_TOOLS.has(toolName)) return;
@@ -443,6 +449,7 @@ export default function mdLog(pi: ExtensionAPI) {
 		logFile = file;
 		origen = file;
 		nota = identidad(file);
+		ultimo = null;
 		pi.appendEntry("md-log", { file, origen, ...nota });
 		const written = rellenar ? backfill(ctx) : 0;
 		ctx.ui.setStatus("md-log", `🗒 ${path.basename(file)}`);
@@ -570,8 +577,8 @@ export default function mdLog(pi: ExtensionAPI) {
 			}
 
 			if (msg.role === "toolResult") {
-				const pagina = msg.toolName === "ver_pagina" && !msg.isError ? paginaMostrada(msg.content) : null;
-				if (pagina) blocks.push(pagina);
+				const pagina = msg.toolName === "ver_pagina" && !msg.isError ? paginaMostrada(msg.content, msg.details, ctx.cwd) : null;
+				if (pagina && pagina !== blocks.at(-1)) blocks.push(pagina);
 				if (!QA_TOOLS.has(msg.toolName)) continue;
 				// Un quiz no disponible nunca llegó a mostrarse.
 				if (msg.toolName === "quiz" && msg.details?.status === "unavailable") continue;
@@ -603,6 +610,7 @@ export default function mdLog(pi: ExtensionAPI) {
 			}
 		}
 
+		ultimo = blocks.at(-1) ?? null;
 		if (blocks.length > 0) {
 			try {
 				fs.writeFileSync(logFile, blocks.join("\n\n") + "\n", "utf-8");

@@ -173,6 +173,30 @@ test("H48: la página que el tutor muestra con ver_pagina queda enlazada en la n
   assert.equal(readFileSync(e.file, "utf8"), `> [!info] Página mostrada\n> ${cita}\n`);
 });
 
+test("H48, C5: la página mostrada queda embebida en la nota si su render vive en el vault, sin repetirla si se muestra dos veces seguidas", async t => {
+  const e = entorno(t); await e.handlers.get("session_start")({}, e.ctx); await e.vincular();
+  const render = p => join(e.dir, `cursos/redes/_procesado/kurose-7/render/${p}.png`), imagen = { type: "image", mimeType: "image/png", data: png.toString("base64") };
+  mkdirSync(join(e.dir, "cursos/redes/_procesado/kurose-7/render"), { recursive: true });
+  for (const p of ["0056", "0057"]) writeFileSync(render(p), png);
+  const resultado = (p, extra = {}) => ({ toolName: "ver_pagina", isError: false, content: [{ type: "text", text: `[[cursos/redes/fuentes/kurose-7.pdf#page=${Number(p)}]]` }, imagen], details: { render: render(p) }, ...extra });
+  const bloque = p => `> [!info] Página mostrada\n> [[cursos/redes/fuentes/kurose-7.pdf#page=${Number(p)}]]\n> ![[cursos/redes/_procesado/kurose-7/render/${p}.png]]`;
+  for (const r of [resultado("0056"), resultado("0056"), resultado("0057", { isError: true }), resultado("0057"), resultado("0056")]) await e.handlers.get("tool_result")(r, e.ctx);
+  await e.enviar("Ya la vi");
+  await e.handlers.get("tool_result")(resultado("0056"), e.ctx);
+  // Fuera del vault (o sin render) queda sólo el enlace al PDF.
+  await e.handlers.get("tool_result")(resultado("0057", { details: { render: "/otro/lado/0057.png" } }), e.ctx);
+  const bloques = [bloque("0056"), bloque("0057"), bloque("0056"), "> [!quote] VOS\n\nYa la vi", bloque("0056"), "> [!info] Página mostrada\n> [[cursos/redes/fuentes/kurose-7.pdf#page=57]]"];
+  assert.equal(readFileSync(e.file, "utf8"), `${bloques.join("\n\n\n")}\n`);
+  // El historial reconstruye lo mismo.
+  for (const r of [resultado("0056"), resultado("0056"), resultado("0057", { isError: true }), resultado("0057"), resultado("0056")]) e.entradas.push({ type: "message", message: { role: "toolResult", ...r } });
+  e.entradas.push({ type: "message", message: { role: "user", content: "Ya la vi" } }, { type: "message", message: { role: "toolResult", ...resultado("0056") } },
+    { type: "message", message: { role: "toolResult", ...resultado("0057", { details: { render: "/otro/lado/0057.png" } }) } });
+  const comandos = new Map(); mdLog({ on: () => {}, events: { on: () => {} }, registerCommand: (n, c) => comandos.set(n, c), appendEntry: () => {} });
+  e.ctx.hasUI = true; e.ctx.ui.select = async (_t, o) => o[0];
+  await comandos.get("md-log").handler(e.file, e.ctx);
+  assert.equal(readFileSync(e.file, "utf8"), `${bloques.join("\n\n")}\n`);
+});
+
 test("H49: la limpieza de enlaces de md-log es la misma que la de quiz (D5)", () => {
   const funcion = archivo => readFileSync(new URL(`../extensions/${archivo}`, import.meta.url), "utf8").match(/function sinEnlaces[\s\S]*?\n\t?}\n/)[0].replace(/^\t+/gm, "");
   assert.equal(funcion("md-log.ts"), funcion("quiz.ts"));
