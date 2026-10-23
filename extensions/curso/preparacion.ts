@@ -45,6 +45,11 @@ function ingestando(salida: string) {
   try { const e = JSON.parse(readFileSync(join(salida, "estado-ingesta.json"), "utf8")); return ["iniciando", "en_curso"].includes(e.estado) && vivo(e.pid); }
   catch { return false; }
 }
+const vigente = (raw: string) => { const l = JSON.parse(raw); return vivo(l.pid) && Date.now() - l.inicio < VIEJO && (!l.proceso || l.proceso === proceso(l.pid)); };
+// Si alguna sesión de pi está preparando el curso (el researcher espera a que termine con sus anclas).
+export function preparando(raiz: string) {
+  try { return vigente(readFileSync(join(raiz, "_procesado/.preparacion.lock"), "utf8")); } catch { return false; }
+}
 // Una preparación por curso entre procesos; el lock de un pi muerto (kill), de otro proceso con su pid o muy viejo se reemplaza.
 // Devuelve el contenido escrito: sólo quien lo escribió lo borra.
 function tomar(file: string): string | undefined {
@@ -56,7 +61,7 @@ function tomar(file: string): string | undefined {
       return propio;
     } catch (e) { if ((e as NodeJS.ErrnoException).code !== "EEXIST") throw e; }
     let raw = "";
-    try { raw = readFileSync(file, "utf8"); const l = JSON.parse(raw); if (vivo(l.pid) && Date.now() - l.inicio < VIEJO && (!l.proceso || l.proceso === proceso(l.pid))) return; }
+    try { raw = readFileSync(file, "utf8"); if (vigente(raw)) return; }
     catch { /* Ilegible: lo cortó un kill mientras se escribía. */ }
     try { if (readFileSync(file, "utf8") === raw) unlinkSync(file); } catch { /* Ya lo soltó o tomó otro proceso. */ }
   }

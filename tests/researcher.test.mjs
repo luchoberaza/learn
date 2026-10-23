@@ -96,3 +96,26 @@ test('informe sin contraste o con cita inventada no se guarda como caché válid
   const e=entorno(t);await e.investigar('1',args,undefined,undefined,e.ctx);await e.responder({},'## Resumen\nNo alcanza https://openstax.org/');assert.match(e.entregas.at(-1)[1].error,/incompleto/);
   await e.investigar('2',args,undefined,undefined,e.ctx);await e.responder({},'## Resumen\n## Contra el material del curso\nconcuerda [[cursos/calculo/fuentes/bibliografia/libro.pdf#page=2]] https://openstax.org/\n## Extensiones útiles\nNinguna');assert.match(e.entregas.at(-1)[1].error,/ajenas/);
 });
+// P1: la preparación del tema transcribe con visión las anclas dudosas mientras el researcher las lee.
+const dudosa={paginas:{1:{motor:'pymupdf',requiere_vision:true,ruta:'pendiente'}}},transcripta={paginas:{1:{motor:'vision',requiere_vision:false,ruta:'vision',vision:{modelo:'openai/gpt-6-luna'}}}};
+test('P1: con la preparación reescribiendo anclas, el alcance espera a que termine y se guarda contra el texto definitivo',async t=>{
+  const e=entorno(t),calidad=join(e.raiz,'_procesado/libro/calidad.json'),lock=join(e.raiz,'_procesado/.preparacion.lock');
+  writeFileSync(calidad,JSON.stringify(dudosa));writeFileSync(lock,JSON.stringify({pid:process.pid,inicio:Date.now()}));
+  const r=await e.investigar('1',args,undefined,undefined,e.ctx);assert.match(r.content[0].text,/segundo plano/);assert.equal(r.isError,undefined);assert.equal(e.llamadas,0);
+  await e.eventos.get('message_end')({message:{role:'assistant'}},e.ctx);assert.equal(e.llamadas,0,'la preparación sigue con la ancla');
+  writeFileSync(e.pagina,'<!-- p. PDF 1 -->\nLa derivada de $x^2$ es $2x$ (transcripta con visión).');writeFileSync(calidad,JSON.stringify(transcripta));
+  await e.eventos.get('message_end')({message:{role:'assistant'}},e.ctx);assert.equal(e.llamadas,1,'la ancla ya es definitiva aunque la preparación siga');
+  await e.responder();
+  assert.equal(e.entregas.at(-1)[1].estado,'guardada');assert.deepEqual(e.avisos,['Verificación del material lista.']);
+  assert.match(verificacionPrevia(e.vault,e.recursos,e.d,e.tema),/Caché de alcance vigente/);
+});
+test('P1: sin preparación en curso lanza enseguida, declara las anclas pendientes y la caché pasa a previa cuando cambian',async t=>{
+  const e=entorno(t);writeFileSync(join(e.raiz,'_procesado/libro/calidad.json'),JSON.stringify(dudosa));
+  await e.investigar('1',args,undefined,undefined,e.ctx);assert.equal(e.llamadas,1);
+  const nombre=e.entradas.findLast(x=>x.data.tipo==='inicio').data.nombre;
+  assert.match(readFileSync(join(e.raiz,'notas/verificaciones/.trabajos',nombre,'tarea.md'),'utf8'),/Pendientes de transcripción con visión.*: libro\/1\./);
+  await e.responder();
+  assert.match(readFileSync(join(e.raiz,'notas/verificaciones/derivadas.md'),'utf8'),/Páginas pendientes de transcripción al verificar \(lo dicho sobre ellas no está verificado contra su transcripción definitiva\): libro\/1\.\n\n## Resumen/);
+  writeFileSync(e.pagina,'Transcripta con visión');
+  assert.match(verificacionPrevia(e.vault,e.recursos,e.d,e.tema),/Caché de alcance previa/);
+});
