@@ -322,7 +322,7 @@ test("E9: el tiempo proporcional sale de curso.md", () => {
 // modo-curso.md se inyecta en cada turno: cada regla clave por una frase estable y un tope de tamaño.
 test("modo-curso: prevalece sobre teach con sus conflictos explícitos y trae las reglas de la auditoría", () => {
   const m = readFileSync(join(piDir, "modo-curso.md"), "utf8"), plano = m.replace(/\s+/g, " ");
-  assert.ok(Buffer.byteLength(m) <= 11 * 1024, String(Buffer.byteLength(m)));
+  assert.ok(Buffer.byteLength(m) <= 11.5 * 1024, String(Buffer.byteLength(m)));
   const reglas = {
     "precedencia (H12)": "este protocolo prevalece sobre `teach` en todo lo que regula",
     "LaTeX en popups (H46)": "LaTeX sólo en `explanation` y en el chat",

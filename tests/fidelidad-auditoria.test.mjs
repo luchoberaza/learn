@@ -66,6 +66,15 @@ test("E3: la reserva prefiere un ítem de evaluación sin casi copias visibles y
   assert.match(leerPaginas(c.raiz, c.d, "practico", 1, 1, false, new Set()), /geoestacionario[\s\S]*practico\.pdf#page=1/);
 });
 
+test("F1, F2: el dossier muestra la bibliografía del tema con su tool y su rango, antes de los ítems y sin enlace al comienzo del rango", t => {
+  const c = curso(t), d = dossier(c.raiz, c.d, c.tema, 3000, 1500);
+  assert.match(d, /^Bibliografía del tema: antes de enseñar cada nodo, leé con leer_paginas la página que lo define y citá esa\.\n\n- leer_paginas libro PDF 1–3 · 1\.4 · Libro \(principal\)$/m);
+  assert.ok(d.indexOf("- leer_paginas libro") < d.indexOf("ejercicios: practico/"));
+  assert.doesNotMatch(d, /libro\.pdf#page=/);
+  c.tema.bibliografia = [];
+  assert.match(dossier(c.raiz, c.d, c.tema, 3000, 1500), /^Bibliografía del tema: ninguna; lo que no conste en el material va marcado «sin respaldo en el material»\.$/m);
+});
+
 const redes = () => JSON.parse(execFileSync(join(piDir, ".venv/bin/python"), [join(piDir, "scripts/ingesta/sesion.py"), "cargar", "--vault", vaultDir, "--curso", "redes"], { env: { ...process.env, PYTHONDONTWRITEBYTECODE: "1" } }));
 
 test("E3 con el curso real: el Ej. 10 del Práctico 1, casi copia de la Pregunta 3 del parcial 2023, no se ve mientras esa pregunta esté reservada", t => {
@@ -87,6 +96,28 @@ test("E3 con el curso real: el Ej. 10 del Práctico 1, casi copia de la Pregunta
   assert.ok(!texto.includes("practico-1/10") && !texto.includes("geoestacionario"));
   assert.match(texto, /practico-1\/9/);
   for (const x of buscarMaterial(raiz, d, "satélite geoestacionario fotografía por minuto", "ejercicios", r)) assert.ok(!/geoestacionario|fotograf/i.test(JSON.stringify(x)), JSON.stringify(x));
+});
+
+test("F1, F2 con el curso real: el dossier de retardos nombra la tool y los rangos de Kurose dentro del presupuesto", t => {
+  if (!existsSync(join(vaultDir, "cursos/redes/indice.yaml"))) return t.skip("sin el curso redes");
+  const d = redes(), r = dossier(join(vaultDir, "cursos/redes"), d, d.temas.find(x => x.id === "retardos"), 3000, 2000);
+  assert.ok(Buffer.byteLength(r) <= 12000);
+  assert.match(r, /^- leer_paginas kurose-7 PDF 54–64 · 1\.4 Retardos, pérdidas y tasa de transferencia · /m);
+  assert.match(r, /^- leer_paginas kurose-7 PDF 82–89 · /m);
+});
+
+// modo-curso.md: cada regla de la etapa I por una frase estable (el tamaño lo controla el test de la auditoría pedagógica).
+const REGLAS_I = {
+  "leer la bibliografía antes de cada nodo (F1)": "Antes de establecer cada nodo, leé con `leer_paginas` la página de la bibliografía del tema que lo define",
+  "un enunciado no respalda una definición (F2)": "un enunciado de ejercicio nunca respalda una definición",
+  "sin bibliografía, decirlo (F1)": "decilo en una línea y marcá «sin respaldo en el material» lo que no conste",
+  "leer al arrancar sin demorar (F1)": "en una misma tanda: `leer_paginas` con 2–3 páginas del comienzo de la bibliografía e `investigar_tema`",
+  "sin preámbulo no es sin leer (F1)": "«sin preámbulo» es sin texto, no sin leer",
+  "6a desde la bibliografía (F1)": "enseñá ya, en modo expositivo y desde la bibliografía",
+};
+test("modo-curso: reglas de fidelidad y evaluación de la etapa I", () => {
+  const plano = readFileSync(join(piDir, "modo-curso.md"), "utf8").replace(/\s+/g, " ");
+  for (const [nombre, frase] of Object.entries(REGLAS_I)) assert.ok(plano.includes(frase), nombre);
 });
 
 // Vault sintético con pi simulado: /simulacro con Python real para el progreso.

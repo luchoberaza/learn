@@ -51,7 +51,7 @@ test("resuelve ids, alias, tildes, errores leves y conserva ambigüedades", () =
 test("el dossier está acotado, conserva contrato y mapa sin soluciones", t => {
   const e = entorno(t), d = datos();
   const r = dossier(e.raiz, d, d.temas[0], 3000, 1500);
-  assert.ok(r.includes(d.contrato)); assert.match(r, /PDF 1–2/); assert.match(r, /#page=1/);
+  assert.ok(r.includes(d.contrato)); assert.match(r, /^- leer_paginas libro PDF 1–2 · Derivadas · Libro \(principal\)$/m); assert.doesNotMatch(r, /#page=/);
   assert.ok(!r.includes("SOLUCIÓN RESERVADA"));
   d.temas[0].nombre = "Á😀".repeat(4000);
   assert.ok(Buffer.byteLength(dossier(e.raiz, d, d.temas[0], 100, 1500)) <= 400);

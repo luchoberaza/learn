@@ -252,9 +252,11 @@ export function dossier(raiz: string, datos: DatosCurso, tema: Tema, maxTokens: 
   const contrato = Buffer.byteLength(datos.contrato) <= Math.min(maxContrato, maxTokens) * 4 ? datos.contrato : "Contrato excede el presupuesto: revisalo antes de inferir objetivos o rúbrica.";
   const lineas = [`# ${datos.curso} · ${tema.nombre} (${tema.id})`, ...datos.avisos, "## Contrato del curso", contrato,
     "## Mapa del tema", `Objetivos: ${(tema.objetivos || []).map(id => datos.contrato.split("\n").find(l => l.startsWith(`- ${id}:`)) || id).join("; ")}`,
-    `Prerequisitos: ${(tema.prerequisitos || []).join(", ") || "ninguno declarado"}`];
+    `Prerequisitos: ${(tema.prerequisitos || []).join(", ") || "ninguno declarado"}`,
+    // F1, F2: el rango con su tool y sin enlace; la cita sale de la página leída, no del comienzo del rango.
+    tema.bibliografia?.length ? "Bibliografía del tema: antes de enseñar cada nodo, leé con leer_paginas la página que lo define y citá esa." : "Bibliografía del tema: ninguna; lo que no conste en el material va marcado «sin respaldo en el material»."];
   for (const ref of tema.bibliografia || []) {
-    try { const d = documento(datos, ref.doc); lineas.push(`${ref.doc} · ${d.titulo} · ${d.prioridad} · ${ref.seccion} · PDF ${ref.paginas.join("–")} · ${cita(datos, ref.doc, ref.paginas[0])}`); }
+    try { const d = documento(datos, ref.doc); lineas.push(`- leer_paginas ${ref.doc} PDF ${ref.paginas.join("–")} · ${ref.seccion} · ${d.titulo}${d.prioridad ? ` (${d.prioridad})` : ""}`); }
     catch { lineas.push("Referencia bibliográfica no disponible; no reconstruirla desde memoria."); }
   }
   const items: { linea: string; id: string; automatico: boolean }[] = [], vistos = reservados(raiz, datos);
