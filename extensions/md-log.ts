@@ -296,7 +296,8 @@ export default function mdLog(pi: ExtensionAPI) {
 		const status = details?.status;
 		if (!status) return callout("warning", "Quiz sin respuesta", ["La herramienta no registró una respuesta; no se califica."]);
 		if (status === "cancelled") {
-			return callout("warning", "Quiz — cancelado", ["(omitido por el usuario)"]);
+			// El motivo lo pone un corte de /fin, /estudiar o /simulacro (comun/corte.ts); sin él, fue el Esc del alumno.
+			return callout("warning", "Quiz — cancelado", [details.motivo ? `(cortado ${details.motivo})` : "(omitido por el usuario)"]);
 		}
 		if (status === "unavailable") {
 			return callout("warning", "Quiz — no disponible", [details?.message || ""]);
@@ -344,7 +345,7 @@ export default function mdLog(pi: ExtensionAPI) {
 	function answerCalloutAsk(details: any): string {
 		const status = details?.status;
 		if (status === "cancelled") {
-			return callout("warning", "Pregunta — cancelada", ["(omitida por el usuario)"]);
+			return callout("warning", "Pregunta — cancelada", [details.motivo ? `(cortada ${details.motivo})` : "(omitida por el usuario)"]);
 		}
 		if (status === "unavailable") {
 			return callout("warning", "Pregunta — no disponible", [details?.message || ""]);

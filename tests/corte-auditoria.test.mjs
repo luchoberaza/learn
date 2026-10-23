@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { agentDir, importPi, vaultDir } from "../scripts/lib/pi-sdk.mjs";
@@ -58,4 +59,19 @@ test("P2: la respuesta ya corregida se conserva al cortar, también sin otra lla
   assert.equal(resultado.details.status, "answered");
   assert.equal(resultado.details.answers.length, 1);
   assert.equal(mensajes.at(-1), resultado);
+});
+
+test("P5: la nota distingue la pregunta cortada por /fin, /estudiar o /simulacro del Esc del alumno", async t => {
+  const { default: mdLog } = await import("../extensions/md-log.ts");
+  const dir = mkdtempSync(join(tmpdir(), "pi-corte-nota-")), file = join(dir, "clase.md"), handlers = new Map(), bus = new Map();
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  writeFileSync(file, "");
+  mdLog({ on: (n, h) => handlers.set(n, h), events: { on: (n, h) => bus.set(n, h), emit() {} }, registerCommand() {}, appendEntry() {} });
+  const ctx = { cwd: dir, hasUI: false, isIdle: () => true, sessionManager: { getBranch: () => [] }, ui: { setStatus() {}, notify() {} } };
+  await handlers.get("session_start")({}, ctx);
+  await new Promise(r => bus.get("md-log:link")({ file, backfill: false, onComplete: r }));
+  for (const [toolName, motivo] of [["quiz", "al cerrar la clase"], ["quiz", undefined], ["ask_user_question", "al cambiar de tema"], ["ask_user_question", undefined]])
+    await handlers.get("tool_result")({ toolName, toolCallId: "x", details: { status: "cancelled", motivo } }, ctx);
+  const nota = readFileSync(file, "utf8");
+  for (const linea of ["(cortado al cerrar la clase)", "(omitido por el usuario)", "(cortada al cambiar de tema)", "(omitida por el usuario)"]) assert.ok(nota.includes(linea), linea);
 });
