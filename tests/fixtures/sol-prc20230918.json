@@ -1,0 +1,21 @@
+{
+ "nota": "Textos reales de sol-prc20230918 (pregunta 3 y su solución) segmentados en el e2e de la etapa H; se usan si el curso todavía no lo segmentó.",
+ "items": [
+  {
+   "id": "3",
+   "paginas": [
+    2
+   ],
+   "enunciado": "**Pregunta 3 (8 puntos)**\n\nSuponga que existe un enlace de microondas a 10 Mbps entre un satélite geoestacionario (situado a 36000 Km de altura sobre el Ecuador) y su estación base en la Tierra. El satélite toma una fotografía digital por minuto y la envía a la estación base. La velocidad de propagación es $2,4 \\times 10^8$ metros/segundo.\n\na) ¿Cuál es el retardo de propagación del enlace?  \nb) ¿Cuál es el producto ancho de banda-retardo, $R \\times d_{prop}$?  \nc) Sea **x** el tamaño de la fotografía. ¿Cuál es el valor mínimo de **x** para que el enlace de microondas esté transmitiendo continuamente?",
+   "puntos": 8
+  },
+  {
+   "id": "3-solucion",
+   "paginas": [
+    2
+   ],
+   "enunciado": "Solución Pregunta 3\n\na) $d_{prop}$ = largo del enlace / velocidad de propagación  \nlargo del enlace = 36.000 Km = $36 \\times 10^6$ m  \nvelocidad de propagación es $2,4 \\times 10^8$ m/s  \n$d_{prop} = 36 \\times 10^6$ m / $2,4 \\times 10^8$ m/s = 36 m / $2,4 \\times 10^2$ m/s = 36 m / 240 m/s = 3,6 m / 24 m/s =0,15 s\n\nb) $R \\times d_{prop} = 10 \\times 10^6$ bps * 0,15 s = 1.500.000 bits.\n\nc) Necesito conocer el tamaño de x para que el enlace esté siempre ocupado. Para eso necesito una foto que ocupe todo el ancho de banda durante los 60 segundos que le lleva al satélite tener la siguiente foto para transmitir. El enlace puede transmitir $10 \\times 10^6$ bps, entonces con fotos de hasta 600.000.000 bits podremos ocupar todo el enlace durante 60 segundos sin solaparse con la transmisión de la siguiente foto.",
+   "solucion_de": "3"
+  }
+ ]
+}

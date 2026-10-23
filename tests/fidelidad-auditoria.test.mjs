@@ -1,0 +1,88 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { buscarMaterial, dossier, leerItems, leerPaginas, reservados, reservas } from "../extensions/curso/material.ts";
+import { tokenizar } from "../scripts/ingesta/bm25.ts";
+import { piDir, vaultDir } from "../scripts/lib/pi-sdk.mjs";
+
+// Regresiones de la etapa I (fidelidad y evaluación): curso sintético y curso real, sin modelos.
+const COPIA_PARCIAL = "**Pregunta 2 (8 puntos)**\nSuponga un enlace de microondas a 10 Mbps entre un satélite geoestacionario (a 36000 Km) y su estación base. El satélite toma una fotografía por minuto. La velocidad de propagación es $2,4 \\times 10^8$ metros/segundo.\na) ¿Cuál es el retardo de propagación?\nb) ¿Cuál es el producto ancho de banda-retardo?";
+const COPIA_PRACTICO = "Suponga que existe un enlace de microondas a 10 Mbps entre un satélite geoestacionario y su estación base en la Tierra. El satélite toma una fotografía digital por minuto. La velocidad de propagación es $2,4 \\times 10^8$ metros/segundo. Recuerde que está a 36,000 km.\n(a) ¿Cuál es el retardo de propagación del enlace?\n(b) ¿Cuál es el producto ancho de banda-retardo?";
+const CONMUTACION = "a) Compare conmutación de circuitos y conmutación de paquetes. b) Para cada tipo de conmutación, mencione una aplicación que se beneficia de la misma. c) ¿Qué significa que un conmutador implementa almacenamiento y reenvío? d) ¿Qué retardos introduce este modo de funcionamiento?";
+function curso(t) {
+  const vault = mkdtempSync(join(tmpdir(), "pi-fidelidad-")), raiz = join(vault, "cursos/redes");
+  t.after(() => rmSync(vault, { recursive: true, force: true }));
+  const tema = { id: "retardos", nombre: "Retardos", alias: [], unidad: 1, prerequisitos: [], objetivos: ["O1.2"], bibliografia: [{ doc: "libro", seccion: "1.4", paginas: [1, 3] }],
+    ejercicios: [{ doc: "practico", items: ["1", "2"] }], evaluaciones: [{ doc: "parcial", items: ["2", "3"] }] };
+  const d = { curso: "redes", nombre: "Redes", contrato: "# Objetivos\n- O1.2: Calcular retardos.\n", temas: [tema],
+    documentos: [{ id: "libro", titulo: "Libro", tipo: "bibliografia", archivo: "fuentes/bibliografia/libro.pdf", paginas: 3, prioridad: "principal" },
+      { id: "practico", titulo: "Práctico", tipo: "ejercicios", archivo: "fuentes/ejercicios/practico.pdf", paginas: 1 },
+      { id: "parcial", titulo: "Parcial", tipo: "evaluaciones", archivo: "fuentes/evaluaciones/parcial.pdf", paginas: 1 }],
+    items: { practico: [{ id: "1", paginas: [1], enunciado: COPIA_PRACTICO }, { id: "2", paginas: [1], enunciado: "Suponga que N paquetes llegan simultáneamente a un enlace sin cola. ¿Cuál es el retardo de cola medio?" }],
+      parcial: [{ id: "2", paginas: [1], enunciado: COPIA_PARCIAL, puntos: 8 }, { id: "2-solucion", paginas: [1], enunciado: "SOLUCION DOS", solucion_de: "2" },
+        { id: "3", paginas: [1], enunciado: `**Pregunta 3 (10 puntos)**\n${CONMUTACION}`, puntos: 10 }, { id: "3-solucion", paginas: [1], enunciado: "SOLUCION TRES", solucion_de: "3" }] },
+    progreso: { temas: {}, historial: [] }, avisos: [], validacion: { errores: [], avisos: [], pendientes: [] } };
+  const escribir = (relativa, texto) => { mkdirSync(join(raiz, relativa, ".."), { recursive: true }); writeFileSync(join(raiz, relativa), texto); };
+  escribir("_procesado/practico/paginas/0001.md", `<!-- p. PDF 1 · [[cursos/redes/fuentes/ejercicios/practico.pdf#page=1]] -->\n**Ejercicio 1**\n${COPIA_PRACTICO}\n**Ejercicio 2**\nSuponga que N paquetes llegan simultáneamente a un enlace sin cola.`);
+  return { vault, raiz, d, tema, escribir };
+}
+
+test("E3: la reserva prefiere un ítem de evaluación sin casi copias visibles y, si todos tienen, oculta también la copia", t => {
+  const c = curso(t);
+  // parcial/2 tiene una casi copia en el práctico: se reserva parcial/3 aunque el 2 venga primero.
+  assert.deepEqual(reservas(c.raiz, c.d).retardos, { doc: "parcial", id: "3" });
+  assert.deepEqual([...reservados(c.raiz, c.d)].sort(), ["parcial/3", "parcial/3-solucion"]);
+  // Si todos tienen copia, se elige igual (solución, puntos y orden del índice) y su copia tampoco se ve; la del otro, sí.
+  c.d.items.practico.push({ id: "3", paginas: [1], enunciado: CONMUTACION.replace("Compare", "Explique y compare") });
+  assert.deepEqual(reservas(c.raiz, c.d).retardos, { doc: "parcial", id: "2" });
+  assert.deepEqual([...reservados(c.raiz, c.d)].sort(), ["parcial/2", "parcial/2-solucion", "practico/1"]);
+  c.d.items.practico.pop();
+  // Una reserva ya fijada no cambia aunque tenga copia: se ocultan sus copias, por todas las vías.
+  c.d.progreso.temas.retardos = { estado: "en_curso", reservado: [{ doc: "parcial", id: "2" }] };
+  const r = reservados(c.raiz, c.d);
+  assert.deepEqual([...r].sort(), ["parcial/2", "parcial/2-solucion", "practico/1"]);
+  assert.equal(leerItems(c.d, "practico", ["1"], false, r), "practico/1: Ese ítem está reservado para /simulacro; elegí otro.");
+  assert.match(leerItems(c.d, "practico", ["2"], false, r), /N paquetes llegan/);
+  for (const despues of [false, true]) {
+    const texto = leerPaginas(c.raiz, c.d, "practico", 1, 1, despues, r);
+    assert.ok(!/geoestacionario|#page=/.test(texto), texto);
+    assert.match(texto, /\[Pregunta reservada para \/simulacro\.\][\s\S]*N paquetes llegan/);
+  }
+  const d = dossier(c.raiz, c.d, c.tema, 3000, 1500);
+  assert.ok(!d.includes("practico/1") && !d.includes("geoestacionario"), d);
+  assert.match(d, /ejercicios: practico\/2 /);
+  const fragmentos = [{ doc: "practico", titulo: "Práctico", tipo: "ejercicios", pagina: 1, seccion: "Ejercicio 1", texto: COPIA_PRACTICO, cita: "", calidad: 1, pendiente: false }];
+  for (const f of fragmentos) { f.largo = tokenizar(f.texto).length; f.frecuencias = Object.fromEntries(tokenizar(f.texto).map(w => [w, 1])); }
+  c.escribir("_procesado/busqueda.json", JSON.stringify({ version: 1, normalizacion: "NFD-sin-tildes-v1", k1: 1.2, b: 0.75, cantidad: 1, largo_promedio: 40, df: { satelite: 1, geoestacionario: 1 }, fragmentos }));
+  const [hallado] = buscarMaterial(c.raiz, c.d, "satélite geoestacionario", undefined, r);
+  assert.ok(!/geoestacionario|#page=/.test(JSON.stringify(hallado)), JSON.stringify(hallado));
+  assert.match(hallado.fragmento, /leer_items \(ítems: 2\)/);
+  // Sin reserva, el práctico se lee entero y con su enlace.
+  assert.match(leerPaginas(c.raiz, c.d, "practico", 1, 1, false, new Set()), /geoestacionario[\s\S]*practico\.pdf#page=1/);
+});
+
+const redes = () => JSON.parse(execFileSync(join(piDir, ".venv/bin/python"), [join(piDir, "scripts/ingesta/sesion.py"), "cargar", "--vault", vaultDir, "--curso", "redes"], { env: { ...process.env, PYTHONDONTWRITEBYTECODE: "1" } }));
+
+test("E3 con el curso real: el Ej. 10 del Práctico 1, casi copia de la Pregunta 3 del parcial 2023, no se ve mientras esa pregunta esté reservada", t => {
+  if (!existsSync(join(vaultDir, "cursos/redes/_procesado/practico-1/items.yaml"))) return t.skip("sin el curso redes");
+  const d = redes(), raiz = join(vaultDir, "cursos/redes"), retardos = d.temas.find(x => x.id === "retardos");
+  // Sin el parcial 2023 segmentado todavía, sus textos reales del e2e de la etapa H.
+  d.items["sol-prc20230918"] ||= JSON.parse(readFileSync(join(piDir, "tests/fixtures/sol-prc20230918.json"), "utf8")).items;
+  d.progreso = { temas: { retardos: { estado: "en_curso", reservado: [{ doc: "sol-prc20230918", id: "3" }] } }, historial: [] };
+  const r = reservados(raiz, d);
+  assert.ok(r.has("practico-1/10"));
+  // Nada más que el reservado, sus soluciones y esa copia: los otros ejercicios del práctico siguen a la vista.
+  assert.deepEqual([...r].filter(x => !/^sol-prc20240926\//.test(x)).sort(), ["practico-1/10", "sol-prc20230918/3", "sol-prc20230918/3-solucion"]);
+  assert.equal(leerItems(d, "practico-1", ["10"], false, r), "practico-1/10: Ese ítem está reservado para /simulacro; elegí otro.");
+  const pagina = leerPaginas(raiz, d, "practico-1", 3, 3, false, r);
+  assert.ok(!/geoestacionario|#page=/.test(pagina), pagina);
+  assert.match(pagina, /Ejercicio 9[\s\S]*R = 1\$ Gbps/);
+  assert.match(leerPaginas(raiz, d, "practico-1", 1, 2, false, r), /practico1\.pdf#page=1/);
+  const texto = dossier(raiz, d, retardos, 3000, 2000);
+  assert.ok(!texto.includes("practico-1/10") && !texto.includes("geoestacionario"));
+  assert.match(texto, /practico-1\/9/);
+  for (const x of buscarMaterial(raiz, d, "satélite geoestacionario fotografía por minuto", "ejercicios", r)) assert.ok(!/geoestacionario|fotograf/i.test(JSON.stringify(x)), JSON.stringify(x));
+});

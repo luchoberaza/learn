@@ -85,30 +85,44 @@ function itemsDelTema(raiz: string, datos: DatosCurso, tema: Tema) {
   }
   return r;
 }
-// E3: por tema, un ítem real de evaluación sin practicar queda para /simulacro, con solución oficial y puntos si hay.
+// E3: números normalizados (36,000 → 36000; 2,4 → 2.4) y palabras de 5 letras o más, sin comandos LaTeX.
+const huella = (t: string) => new Set(normalizar(t).replace(/\\[a-z]+/g, " ").replace(/(\d)[.,](?=\d{3}(?!\d))/g, "$1").replace(/(\d),(?=\d)/g, "$1.").match(/\d+(?:\.\d+)?|[a-z]{5,}/g) ?? []);
+// Casi copias visibles de un ítem: enunciados de ejercicios y evaluaciones con Jaccard ≥ 0,5 y 10 términos en común, así dos enunciados cortos no se confunden
+// (en redes, el parcial copiado en el práctico da 0,73 con 30 en común; el par siguiente, 0,19).
+function casiCopias(datos: DatosCurso) {
+  const visibles = datos.documentos.filter(d => d.tipo === "ejercicios" || d.tipo === "evaluaciones").flatMap(d => (datos.items[d.id] || []).filter(i => !esSolucion(d, i)).map(i => ({ doc: d.id, id: i.id, h: huella(i.enunciado) })));
+  return (x: Ref) => {
+    const a = visibles.find(v => v.doc === x.doc && v.id === x.id);
+    return a ? visibles.filter(v => { const comun = [...a.h].filter(t => v.h.has(t)).length; return v !== a && comun >= 10 && comun / (a.h.size + v.h.size - comun) >= 0.5; }) : [];
+  };
+}
+// E3: por tema, un ítem real de evaluación sin practicar queda para /simulacro: sin casi copias visibles si hay, con solución oficial y puntos si hay.
 // El primero vigente que guardó progreso.yaml manda: los ítems nuevos no lo cambian; usado o desaparecido, se elige otro.
 export function reservas(raiz: string, datos: DatosCurso): Record<string, Ref> {
   const enunciado = (x: Ref) => datos.documentos.some(d => d.id === x?.doc && d.tipo === "evaluaciones") ? datos.items[x.doc]?.find(i => i.id === x.id && i.solucion_de === undefined) : undefined;
   const conSolucionOficial = (x: Ref) => !!enunciado(x)?.solucion || (datos.items[x.doc] || []).some(i => i.solucion_de === x.id);
-  const progresos = Object.values(datos.progreso.temas), r: Record<string, Ref> = {};
+  const progresos = Object.values(datos.progreso.temas), r: Record<string, Ref> = {}, copias = casiCopias(datos);
   const tocados = new Set([...progresos.flatMap(p => lista(p?.ejercicios).map(e => `${e?.doc}/${e?.item}`)), ...progresos.flatMap(p => lista(p?.reservado).map(x => `${x?.doc}/${x?.id}`))]);
   for (const tema of datos.temas) {
     const fijado = lista(datos.progreso.temas[tema.id]?.reservado).find(x => !x?.usado && enunciado(x));
-    const peso = (x: Ref) => 2 * Number(conSolucionOficial(x)) + Number(enunciado(x)!.puntos !== undefined);
+    const peso = (x: Ref) => 4 * Number(!copias(x).length) + 2 * Number(conSolucionOficial(x)) + Number(enunciado(x)!.puntos !== undefined);
     const elegido = fijado || itemsDelTema(raiz, datos, tema).filter(x => x.clase === "evaluaciones" && enunciado(x) && !tocados.has(`${x.doc}/${x.id}`)).sort((a, b) => peso(b) - peso(a))[0];
     if (elegido) { r[tema.id] = { doc: elegido.doc, id: elegido.id }; tocados.add(`${elegido.doc}/${elegido.id}`); }
   }
   return r;
 }
-// Lo que no se muestra fuera del simulacro: los reservados de todos los temas y sus soluciones, salvo el que se está rindiendo.
+// Lo que no se muestra fuera del simulacro: los reservados de todos los temas, sus casi copias y sus soluciones, salvo el que se está rindiendo.
 export function reservados(raiz: string, datos: DatosCurso, permitido?: Ref): Set<string> {
-  const s = new Set<string>();
-  for (const x of Object.values(reservas(raiz, datos))) {
-    if (x.doc === permitido?.doc && x.id === permitido.id) continue;
+  const s = new Set<string>(), copias = casiCopias(datos);
+  const ocultar = (x: Ref) => {
     s.add(`${x.doc}/${x.id}`);
     for (const i of datos.items[x.doc] || []) if (i.solucion_de === x.id) s.add(`${x.doc}/${i.id}`);
     const sol = datos.items[x.doc]?.find(i => i.id === x.id)?.solucion;
     if (sol) s.add(`${sol.doc}/${sol.id}`);
+  };
+  for (const x of Object.values(reservas(raiz, datos))) {
+    copias(x).forEach(ocultar);
+    if (x.doc !== permitido?.doc || x.id !== permitido.id) ocultar(x);
   }
   return s;
 }
@@ -118,7 +132,7 @@ export function buscarMaterial(raiz: string, datos: DatosCurso, consulta: string
   return buscar(indice, consulta, 5, tipo).flatMap(r => {
     const d = datos.documentos.find(d => d.id === r.doc);
     if (!d) return [];
-    if (!conSolucion(datos, d)) return [{ doc: r.doc, pagina: r.pagina, seccion: r.seccion, fragmento: r.fragmento, pendiente: r.pendiente, cita: cita(datos, r.doc, r.pagina) }];
+    if (!conSolucion(datos, d) && !paginasReservadas(datos, r.doc, reservados).has(r.pagina)) return [{ doc: r.doc, pagina: r.pagina, seccion: r.seccion, fragmento: r.fragmento, pendiente: r.pendiente, cita: cita(datos, r.doc, r.pagina) }];
     const items = (datos.items[r.doc] || []).filter(i => !esSolucion(d, i) && !reservados.has(`${r.doc}/${i.id}`) && i.paginas.includes(r.pagina)).map(i => i.id);
     const como = d.tipo === "soluciones" ? "son soluciones: pedilas con leer_items e incluir_solucion después del intento" : items.length ? `leé el enunciado con leer_items (ítems: ${items.join(", ")})` : "leé el enunciado con leer_paginas, que omite la parte resuelta";
     return [{ doc: r.doc, pagina: r.pagina, seccion: /^(pregunta|ejercicio|problema)\b/i.test(r.seccion || "") ? r.seccion : null, pendiente: r.pendiente, cita: sinEnlace([r.pagina]),
@@ -155,7 +169,7 @@ export function leerPaginas(raiz: string, datos: DatosCurso, doc: string, desde:
   // Un ítem reservado (E3) no se ve ni después de otro intento: se omite su pregunta entera o se rechaza el rango.
   const enRango = [...paginasReservadas(datos, doc, reservados)].some(p => desde <= p && p <= hasta);
   const omitir = new Set(enRango ? (datos.items[doc] || []).filter(i => i.solucion_de === undefined && reservados.has(`${doc}/${i.id}`)).map(i => i.id) : []);
-  const separadas = (!despuesDelIntento && conSolucion(datos, d)) || enRango ? sinSoluciones(raiz, d, new Error(enRango ? `Esas páginas de ${doc} traen un ítem reservado para /simulacro; elegí otro rango o leé los ítems con leer_items.` : `No se puede separar el enunciado de la solución en ${doc}: leé el enunciado con leer_items; el texto completo, sólo después del intento del estudiante (despues_del_intento:true).`), omitir, !despuesDelIntento) : undefined;
+  const separadas = (!despuesDelIntento && conSolucion(datos, d)) || enRango ? sinSoluciones(raiz, d, new Error(enRango ? `Esas páginas de ${doc} traen un ítem reservado para /simulacro; elegí otro rango o leé los ítems con leer_items.` : `No se puede separar el enunciado de la solución en ${doc}: leé el enunciado con leer_items; el texto completo, sólo después del intento del estudiante (despues_del_intento:true).`), omitir, !despuesDelIntento && conSolucion(datos, d)) : undefined;
   let salida = "";
   for (let p = desde; p <= hasta && Buffer.byteLength(salida) < 30000; p++) {
     try { salida += separadas ? `\n${separadas[p - 1]}\n${sinEnlace([p])}\n` : `\n${leer(raiz, `_procesado/${doc}/paginas/${String(p).padStart(4, "0")}.md`, 200_000)}\n${cita(datos, doc, p)}\n`; }
