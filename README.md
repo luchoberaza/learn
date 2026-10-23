@@ -54,9 +54,3 @@ Fork de [amosblomqvist/learn](https://github.com/amosblomqvist/learn), el sistem
 - [`informes/`](informes/): informes de cada fase de la implementación.
 
 Algunos documentos citados en SETUP (`AUDITORIA.md`, `PRUEBA-MANUAL.md`, `fricciones.md`) viven en la raíz del vault y no en este repo, porque mezclan datos del curso propio.
-
-## Límites conocidos
-
-- Lo probé con una sola materia (Redes de Computadoras) y un solo alumno. El tutor está escrito para estudiar en español rioplatense.
-- Algunos avisos de pi salen en inglés («Warning:», «Error:», «Operation aborted»): los dibuja pi y no la extensión.
-- Usa modelos de una cuenta ChatGPT/Codex (`openai-codex/…`), sin proveedor de respaldo. Para otro proveedor, cambiá `settings.json` y `curso.config.json`.
