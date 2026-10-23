@@ -261,12 +261,14 @@ test("E9: /simulacro corta el turno, presenta el reservado con su tiempo y termi
   assert.deepEqual([o.customType, o.display, o.triggerTurn], ["curso-orden", false, true]);
   assert.match(o.content, /tal cual[\s\S]*\(8 puntos\)[\s\S]*~24 min \(2 horas para 5 preguntas\)[\s\S]*no des pistas[\s\S]*registrar_progreso[\s\S]*plan de repaso ordenado por peso/);
   assert.match(o.content, /Ítem parcial\/2:\nENUNCIADO DOS: calcule el retardo\.$/);
+  assert.match(o.content, /registrar_progreso con el intento \(doc parcial, item 2, resultado y puntaje\) y los nodos fallados en borde\.falla/);
   // Durante el simulacro, leer_items devuelve el reservado; el prompt lleva las reglas aunque /compact resuma la orden.
   Object.assign(e.ctx, { isIdle: () => true });
   assert.match(e.sesion.leer_items({ doc: "parcial", ids: ["2"] }, enCurso(e.ctx, e.sesion.actual())), /ENUNCIADO DOS/);
   const evento = { systemPromptOptions: { sections: {} } };
   for (const h of e.eventos.get("before_agent_start")) h(evento, e.ctx);
   assert.match(evento.systemPromptOptions.sections.simulacro, /Simulacro en curso del ítem reservado parcial\/2/);
+  assert.match(evento.systemPromptOptions.sections.simulacro, /nodos fallados en borde\.falla/);
   // Tras un kill, /resume o /tree vuelve la barra del simulacro.
   e.estados.curso = undefined;
   for (const h of e.eventos.get("session_start")) await h({}, e.ctx);
@@ -344,6 +346,7 @@ test("modo-curso: prevalece sobre teach con sus conflictos explícitos y trae la
     "reservado (E3)": "Nunca lo uses ni lo parafrasees al enseñar",
     "rozado (E3)": "si algo lo rozó, declaralo",
     "simulacro (E9)": "sin pistas ni correcciones hasta la entrega",
+    "nodos fallados del simulacro (E9)": "registrás el intento y los nodos fallados (en `borde.falla`) con `registrar_progreso`",
     "práctica al final (6e)": "Al final del tema",
     "delta del progreso": "sólo lo nuevo desde el último guardado",
     "nunca soluciones antes": "Nunca muestres una solución antes del intento",
