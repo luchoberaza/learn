@@ -157,7 +157,7 @@ test("H62: /compact resume en español con curso, tema y log, y no califica el q
   const r = await session.compact();
   assert.equal(pedidos.length, 1, "una sola llamada, también con el turno partido");
   const pedido = JSON.stringify(pedidos[0].messages);
-  for (const parte of ["## Curso y tema", "## Borde", "## Práctica", "## Próximo paso", "pendiente, sin responder", "nunca lo califiques", "curso redes, tema retardos, log cursos/redes/sesiones/2026-10-22-retardos.md", "¿Qué cambia si se duplica R?"]) assert.ok(pedido.includes(parte), parte);
+  for (const parte of ["## Curso y tema", "## Borde", "## Práctica", "## Próximo paso", "se conservan tal cual y no ves", "pendiente, sin responder", "nunca lo califiques", "curso redes, tema retardos, log cursos/redes/sesiones/2026-10-22-retardos.md", "¿Qué cambia si se duplica R?"]) assert.ok(pedido.includes(parte), parte);
   assert.doesNotMatch(pedido, /## Goal|In Progress|Blocked|Turn Context/);
   assert.equal(r.summary, "## Curso y tema\nredes · retardos");
 });

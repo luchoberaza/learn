@@ -16,7 +16,7 @@ Qué domina y qué falla el estudiante, con la evidencia observada.
 Cada pregunta, quiz o ítem con su resultado real tal como lo registró la herramienta (correcta, incorrecta, «No sé», cancelada). Lo que el estudiante no respondió va como «pendiente, sin responder»: nunca lo califiques ni inventes su respuesta.
 
 ## Próximo paso
-La pregunta pendiente, si la hay, y lo que sigue.
+La pregunta pendiente, si la hay, y lo que sigue al final de esta parte. Después vienen los mensajes más recientes, que se conservan tal cual y no ves: no afirmes que no hay nada pendiente ni qué falta evaluar.
 
 ## Datos
 Citas [[…#page=N]], fórmulas y valores que hagan falta para seguir.`;
