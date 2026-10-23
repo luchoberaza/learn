@@ -1,6 +1,7 @@
 import { mock, test } from "node:test";
 import assert from "node:assert/strict";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { getEventListeners } from "node:events";
 import childProcess from "node:child_process";
@@ -9,8 +10,9 @@ import { join } from "node:path";
 import mdLog from "../extensions/md-log.ts";
 import { registrarSesion } from "../extensions/curso/sesion.ts";
 import { registrarProgreso } from "../extensions/curso/progreso.ts";
-import { loadProject } from "../scripts/lib/pi-sdk.mjs";
+import { loadProject, piDir } from "../scripts/lib/pi-sdk.mjs";
 import { python, transcribir } from "../extensions/curso/ingesta.ts";
+import { registrarPreparacion } from "../extensions/curso/preparacion.ts";
 import { guardarCurso } from "../extensions/curso/curacion.ts";
 
 // Remates de integración: md-log, sesión y progreso reales sobre un bus de eventos, backend Python real, sin modelos.
@@ -143,4 +145,70 @@ test("textos: la copia muestra el error limpio de Python y la nota se nombra en 
   await e.emitir("agent_settled", {});
   assert.deepEqual(e.avisos, [["warning", "No se pudo cerrar la nota de la clase en Obsidian; la clase sigue abierta: repetí /fin."]]);
   assert.ok(e.sesion.actual());
+});
+
+// Preparación por tema con la ingesta base real y un modelo simulado (como preparacion-auditoria): libro, parcial y práctico.
+const CURSO = `from pathlib import Path
+import sys, yaml, pymupdf
+from test_ingesta import crear_pdf
+from pipeline import ejecutar
+v = Path(sys.argv[1]); raiz = v / "cursos/ejemplo"
+for tipo in ["bibliografia", "evaluaciones", "ejercicios"]:
+    (raiz / f"fuentes/{tipo}").mkdir(parents=True)
+crear_pdf(raiz / "fuentes/bibliografia/libro.pdf")
+for tipo, doc, texto in [("evaluaciones", "parcial", "Pregunta 1 (8 puntos) Calcule la derivada."), ("ejercicios", "practico", "Ejercicio 1. Derive la composición de funciones.")]:
+    with pymupdf.open() as pdf:
+        pdf.new_page(width=500, height=700).insert_textbox(pymupdf.Rect(45, 100, 450, 400), texto, fontsize=12)
+        pdf.save(raiz / f"fuentes/{tipo}/{doc}.pdf")
+docs = [{"id": "libro", "titulo": "Libro", "tipo": "bibliografia", "archivo": "fuentes/bibliografia/libro.pdf", "paginas": 3, "prioridad": "principal"},
+        {"id": "parcial", "titulo": "Parcial", "tipo": "evaluaciones", "archivo": "fuentes/evaluaciones/parcial.pdf", "paginas": 1},
+        {"id": "practico", "titulo": "Práctico", "tipo": "ejercicios", "archivo": "fuentes/ejercicios/practico.pdf", "paginas": 1}]
+tema = {"id": "derivacion", "nombre": "Derivación", "unidad": 1, "alias": [], "prerequisitos": [], "objetivos": ["O1.1"], "bibliografia": [{"doc": "libro", "seccion": "Derivadas", "paginas": [1, 2]}], "ejercicios": [], "evaluaciones": []}
+(raiz / "indice.yaml").write_text(yaml.safe_dump({"version": 1, "documentos": docs, "temas": [tema]}, allow_unicode=True))
+(raiz / "curso.md").write_text("---\\nnombre: Ejemplo\\nslug: ejemplo\\n---\\n# Objetivos\\n- O1.1: Derivar.\\n")
+(raiz / "progreso.yaml").write_text("version: 1\\ntemas: {}\\nhistorial: []\\n")
+ejecutar({"version": 1, "motores": {c: "pymupdf" for c in ["digital", "escaneada", "mixta"]},
+          "documentos": [{**d, "archivo": f"cursos/ejemplo/{d['archivo']}", "paginas": list(range(1, d["paginas"] + 1))} for d in docs]}, v, raiz / "_procesado")`;
+const USO = { input: 1, output: 1, cacheRead: 0, cacheWrite: 0, totalTokens: 2, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } };
+const respuesta = (texto, extra = {}) => ({ stopReason: "stop", content: texto ? [{ type: "text", text: texto }] : [], usage: structuredClone(USO), ...extra });
+function preparacion(t) {
+  const vault = mkdtempSync(join(tmpdir(), "pi-remates-prep-")), recursos = join(vault, ".pi"), raiz = join(vault, "cursos/ejemplo");
+  t.after(() => rmSync(vault, { recursive: true, force: true }));
+  const r = spawnSync(join(piDir, ".venv/bin/python"), ["-c", CURSO, vault], { encoding: "utf8", env: { ...process.env, PYTHONPATH: join(piDir, "tests/ingesta"), PYTHONDONTWRITEBYTECODE: "1" }, timeout: 30000 });
+  assert.equal(r.status, 0, r.stderr);
+  mkdirSync(recursos);
+  writeFileSync(join(recursos, "curso.config.json"), JSON.stringify({ modelo_vision: "openai/gpt-6-luna", max_paginas_vision_sin_confirmar: 1, umbral_calidad_pagina: 0.6 }));
+  const d = JSON.parse(spawnSync(join(piDir, ".venv/bin/python"), [join(piDir, "scripts/ingesta/sesion.py"), "cargar", "--vault", vault, "--curso", "ejemplo"], { encoding: "utf8" }).stdout);
+  const e = { activo: { a: { curso: "ejemplo", tema: "derivacion", log: "cursos/ejemplo/sesiones/1.md" }, d, r: raiz }, avisos: [], llamadas: [], eventos: new Map(), guion: {}, raiz };
+  const pi = { on: (n, h) => e.eventos.set(n, h), sendMessage: () => {} };
+  const ctx = { hasUI: true, ui: { setStatus: () => {}, notify: (m, tipo) => e.avisos.push([tipo, m]) },
+    modelRegistry: { find: (provider, id) => ({ provider, id, input: ["text", "image"] }), hasConfiguredAuth: () => true, getProviderAuth: async () => undefined,
+      streamSimple: (_modelo, contexto) => ({ result: async () => {
+        const pedido = contexto.messages[0].content, texto = pedido.map(b => b.text || "").join("");
+        const tipo = pedido.some(b => b.type === "image") ? "vision" : contexto.systemPrompt.startsWith("Segmentás") ? "segmentar" : "clasificar";
+        e.llamadas.push(tipo);
+        const guionada = e.guion[tipo]?.(texto);
+        if (guionada) return guionada;
+        if (tipo === "vision") return respuesta("El ejercicio pide derivar una función compuesta y justificar cada paso del procedimiento. ".repeat(3));
+        if (tipo === "segmentar") return respuesta(JSON.stringify({ items: [{ id: "1", paginas: [1], enunciado: texto.includes("Documento parcial") ? "Calcule la derivada." : "Derive la composición." }] }));
+        const { items } = JSON.parse(texto.slice(0, texto.lastIndexOf("}") + 1));
+        return respuesta(JSON.stringify({ asignaciones: items.map(i => ({ doc: i.doc, id: i.id, tema: "derivacion" })) }));
+      } }) } };
+  const prep = registrarPreparacion(pi, { actual: () => e.activo, refrescar: () => "" }, vault, recursos);
+  let n = 0;
+  e.turno = async () => { e.activo.a.log = `cursos/ejemplo/sesiones/${++n}.md`; await e.eventos.get("before_agent_start")({}, ctx); await prep.ultima(); };
+  e.json = f => JSON.parse(readFileSync(join(raiz, "_procesado", f), "utf8"));
+  return e;
+}
+
+test("preparación (e, f): sólo se borra el lock propio y un pid reutilizado tras reiniciar no lo retiene", async t => {
+  const e = preparacion(t), lock = join(e.raiz, "_procesado/.preparacion.lock");
+  // El pid vive (este proceso) pero el lock es de otro arranque.
+  writeFileSync(lock, JSON.stringify({ pid: process.pid, inicio: Date.now(), proceso: "otro-arranque:123" }));
+  const ajeno = JSON.stringify({ pid: process.pid, inicio: Date.now(), proceso: "otra-instancia" });
+  // A mitad de la tanda, otra instancia (tras /reload) toma el lock: el finally viejo no lo borra.
+  e.guion.vision = () => { if (e.llamadas.length === 1) writeFileSync(lock, ajeno); };
+  await e.turno();
+  assert.equal(e.llamadas.filter(x => x === "vision").length, 4);
+  assert.equal(readFileSync(lock, "utf8"), ajeno);
 });

@@ -33,24 +33,30 @@ const CLASIFICAR = `Asignás ítems de práctica de un curso al tema que evalúa
 
 const mensaje = (e: unknown) => e instanceof Error ? e.message : String(e);
 const vivo = (pid: number) => { try { process.kill(pid, 0); return true; } catch (e) { return (e as NodeJS.ErrnoException).code === "EPERM"; } };
+// Identidad que un pid reutilizado (también tras reiniciar) no repite: arranque del sistema y del proceso; en Linux.
+function proceso(pid: number) {
+  try { return `${readFileSync("/proc/sys/kernel/random/boot_id", "utf8").trim()}:${readFileSync(`/proc/${pid}/stat`, "utf8").split(") ").at(-1)!.split(" ")[19]}`; }
+  catch { return undefined; }
+}
 function ingestando(salida: string) {
   try { const e = JSON.parse(readFileSync(join(salida, "estado-ingesta.json"), "utf8")); return ["iniciando", "en_curso"].includes(e.estado) && vivo(e.pid); }
   catch { return false; }
 }
-// Una preparación por curso entre procesos; el lock de un pi muerto (kill) o muy viejo se reemplaza.
-function tomar(file: string): boolean {
+// Una preparación por curso entre procesos; el lock de un pi muerto (kill), de otro proceso con su pid o muy viejo se reemplaza.
+// Devuelve el contenido escrito: sólo quien lo escribió lo borra.
+function tomar(file: string): string | undefined {
+  const propio = JSON.stringify({ pid: process.pid, inicio: Date.now(), proceso: proceso(process.pid) });
   for (let intento = 0; intento < 2; intento++) {
     try {
       const fd = openSync(file, "wx", 0o600);
-      try { writeFileSync(fd, JSON.stringify({ pid: process.pid, inicio: Date.now() })); } finally { closeSync(fd); }
-      return true;
+      try { writeFileSync(fd, propio); } finally { closeSync(fd); }
+      return propio;
     } catch (e) { if ((e as NodeJS.ErrnoException).code !== "EEXIST") throw e; }
     let raw = "";
-    try { raw = readFileSync(file, "utf8"); const l = JSON.parse(raw); if (vivo(l.pid) && Date.now() - l.inicio < VIEJO) return false; }
+    try { raw = readFileSync(file, "utf8"); const l = JSON.parse(raw); if (vivo(l.pid) && Date.now() - l.inicio < VIEJO && (!l.proceso || l.proceso === proceso(l.pid))) return; }
     catch { /* Ilegible: lo cortó un kill mientras se escribía. */ }
     try { if (readFileSync(file, "utf8") === raw) unlinkSync(file); } catch { /* Ya lo soltó o tomó otro proceso. */ }
   }
-  return false;
 }
 export function necesitaPreparacion(raiz: string, tema: string) {
   try {
@@ -104,7 +110,8 @@ export function registrarPreparacion(pi: ExtensionAPI, sesion: Pick<ReturnType<t
   async function preparar(curso: string, tema: Tema, d: DatosCurso, raiz: string, ctx: ExtensionContext, clave: string) {
     const salida = join(raiz, "_procesado"), lock = join(salida, ".preparacion.lock"), control = new AbortController(), signal = control.signal;
     // La ingesta base u otro pi preparando, o un curso sin ingesta base: sin aviso, se reintenta en el próximo turno.
-    try { if (corriendo.has(curso) || ingestando(salida) || !tomar(lock)) return; } catch { return; }
+    let propio: string | undefined;
+    try { if (corriendo.has(curso) || ingestando(salida) || !(propio = tomar(lock))) return; } catch { return; }
     corriendo.set(curso, control); intentados.add(clave);
     const estado = (texto?: string) => { try { ctx.ui.setStatus("preparacion", texto); } catch { /* ctx viejo tras /reload. */ } };
     const avisar = (texto: string, tipo: "info" | "warning") => { try { ctx.ui.notify(texto, tipo); } catch { /* ctx viejo tras /reload. */ } };
@@ -195,7 +202,8 @@ export function registrarPreparacion(pi: ExtensionAPI, sesion: Pick<ReturnType<t
     } finally {
       estado(undefined);
       corriendo.delete(curso);
-      try { unlinkSync(lock); } catch { /* Ya no estaba. */ }
+      // Tras /reload el lock puede ser de otra instancia: sólo se borra el propio.
+      try { if (readFileSync(lock, "utf8") === propio) unlinkSync(lock); } catch { /* Ya no estaba. */ }
     }
   }
   pi.on("before_agent_start", (_event, ctx) => {
