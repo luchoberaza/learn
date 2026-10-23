@@ -24,7 +24,7 @@ async function clase(t, anterior = false) {
   if (anterior) writeFileSync(join(raiz, "sesiones/2026-01-01-derivacion.md"), "> [!quote] VOS\n\nCreo que es la regla de la cadena.\n");
   const d = { curso: "ejemplo", nombre: "Ejemplo", contrato: "Contrato", documentos: [], temas: [{ id: "derivacion", nombre: "Derivación", unidad: 1, alias: [], objetivos: [], prerequisitos: [] }], items: {}, progreso: { temas: {}, historial: [] }, avisos: [] };
   const handlers = new Map(), bus = new Map(), comandos = new Map(), entradas = [], avisos = [], ordenes = [], selects = [];
-  const pi = { on: (n, h) => handlers.set(n, [...(handlers.get(n) || []), h]), registerCommand: (n, c) => comandos.set(n, c), registerTool: () => {},
+  const pi = { d, on: (n, h) => handlers.set(n, [...(handlers.get(n) || []), h]), registerCommand: (n, c) => comandos.set(n, c), registerTool: () => {},
     appendEntry: (customType, data) => entradas.push({ type: "custom", customType, data }), setSessionName: () => {}, sendMessage: m => ordenes.push(m.content),
     getAllTools: () => [], getActiveTools: () => [], setActiveTools: () => {}, exec: async () => ({ code: 0, stdout: JSON.stringify(d), stderr: "", killed: false }),
     events: { on: (n, h) => bus.set(n, [...(bus.get(n) || []), h]), emit: (n, p) => { for (const h of bus.get(n) || []) h(p); } } };
@@ -38,7 +38,7 @@ async function clase(t, anterior = false) {
   await comandos.get("estudiar").handler("ejemplo derivacion", ctx);
   const final = async texto => { const message = { role: "assistant", stopReason: "stop", content: [{ type: "text", text: texto }] }; await emitir("message_end", { message }); entradas.push({ type: "message", message }); };
   const guardar = extra => progreso.registrar("prueba", { resumen: "Probe", borde: { domina: ["Derivar un polinomio"] }, ...extra }, undefined, undefined, ctx);
-  return { vault, raiz, ctx, comandos, entradas, avisos, ordenes, selects, sesion, progreso, emitir, final, guardar };
+  return { vault, raiz, pi, ctx, comandos, entradas, avisos, ordenes, selects, sesion, progreso, emitir, final, guardar };
 }
 const historial = e => readFileSync(join(e.raiz, "progreso.yaml"), "utf8").match(/log: .*/g);
 
@@ -124,4 +124,23 @@ test("H45: sin el venv, las operaciones locales fallan en español y remiten al 
   mock.method(childProcess, "spawn", (_programa, args, opciones) => real("/no/existe/python", args, opciones)); syncBuiltinESMExports();
   t.after(() => { mock.restoreAll(); syncBuiltinESMExports(); });
   await assert.rejects(() => python("trabajo", {}, undefined, "preparacion.py"), { message: "Falta el entorno de ingesta (Python): corré .pi/scripts/doctor." });
+});
+
+test("textos: la copia muestra el error limpio de Python y la nota se nombra en palabras del alumno", async t => {
+  const e = await clase(t);
+  e.pi.exec = async () => ({ code: 1, killed: false, stdout: "", stderr: "Disco lleno: no se pudo preparar el material; liberá espacio y reintentá.\n" });
+  e.avisos.length = 0;
+  await e.comandos.get("estudiar").handler("ejemplo derivacion", e.ctx);
+  assert.deepEqual(e.avisos.filter(([, m]) => /Material/.test(m)), [["warning", "Material desde la última carga. Disco lleno: no se pudo preparar el material; liberá espacio y reintentá."]]);
+  assert.equal(e.sesion.actual().pendiente, undefined);
+  // Otra nota vinculada a mano durante la clase: el cierre no se confirma y se dice sin nombrar componentes.
+  const otra = join(e.raiz, "sesiones/otra.md"); writeFileSync(otra, "");
+  await e.comandos.get("md-log").handler(otra, e.ctx);
+  await e.comandos.get("fin").handler("", e.ctx);
+  await e.guardar({ cierre: true });
+  await e.final("Resumen final.");
+  e.avisos.length = 0;
+  await e.emitir("agent_settled", {});
+  assert.deepEqual(e.avisos, [["warning", "No se pudo cerrar la nota de la clase en Obsidian; la clase sigue abierta: repetí /fin."]]);
+  assert.ok(e.sesion.actual());
 });

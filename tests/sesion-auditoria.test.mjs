@@ -233,7 +233,7 @@ test("H16: si md-log no confirma o sesiones/ no se puede escribir, la clase sigu
   assert.deepEqual(readdirSync(join(e.raiz, "sesiones")), []);
   assert.equal(e.entradas.at(-1).data.sinLog, true);
   assert.equal(e.ordenes.length, 1);
-  assert.deepEqual(e.avisos.at(-1), ["warning", "md-log no confirmó la nota: seguimos sin nota de Obsidian."]);
+  assert.deepEqual(e.avisos.at(-1), ["warning", "No se pudo crear la nota de la clase en Obsidian; seguimos sin nota."]);
   assert.ok(eventos.some(([n, p]) => n === "md-log:unlink" && !p.file));
   await e.sesion.cerrar(e.ctx);
   assert.equal(e.sesion.actual(), undefined);
@@ -242,7 +242,7 @@ test("H16: si md-log no confirma o sesiones/ no se puede escribir, la clase sigu
   await f.estudiar("calculo derivacion");
   chmodSync(join(f.raiz, "sesiones"), 0o755);
   assert.equal(f.sesion.actual().a.tema, "derivacion");
-  assert.deepEqual(f.avisos.at(-1), ["warning", "Sin permiso para escribir en sesiones/: seguimos sin nota de Obsidian."]);
+  assert.deepEqual(f.avisos.at(-1), ["warning", "No se pudo crear la nota de la clase en Obsidian (sin permiso para escribir en sesiones/); seguimos sin nota."]);
 });
 test("H02: sin modelo o sin credenciales no se crea nada y se dice qué hacer en una línea", async t => {
   const e = entorno(t);

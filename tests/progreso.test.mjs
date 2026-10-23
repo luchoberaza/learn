@@ -74,7 +74,7 @@ test('guardar cierre no desvincula sin mensaje final o si se abortó el turno',a
 test('fallo del acuse de md-log conserva el curso y permite reintentar cierre',async t=>{
   const e=await entorno(t);await e.guardar({cierre:true});e.final();const emitir=e.pi.events.emit;
   e.pi.events.emit=(n,p)=>{if(n==='md-log:unlink')p.onComplete('Vínculo cambiado; se preservó');else emitir(n,p);};
-  await e.eventos.get('agent_settled')({aborted:false},e.ctx);assert.ok(e.sesion.actual());assert.match(e.avisos.at(-1),/Vínculo cambiado/);
+  await e.eventos.get('agent_settled')({aborted:false},e.ctx);assert.ok(e.sesion.actual());assert.match(e.avisos.at(-1),/No se pudo cerrar la nota de la clase en Obsidian; la clase sigue abierta/);
   e.pi.events.emit=emitir;await e.eventos.get('agent_settled')({aborted:false},e.ctx);assert.equal(e.sesion.actual(),undefined);
 });
 test('/progreso informa estados; sugerencia respeta prerequisitos y omite dominados',async t=>{

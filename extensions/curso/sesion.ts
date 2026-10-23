@@ -12,7 +12,7 @@ import { verificacionPrevia } from "./researcher.ts";
 type Config = { max_tokens_dossier: number; max_tokens_curso_md: number };
 // Tools del estudio; read queda para las fotos del alumno, que pi 1.4.0 pega como ruta de texto (interactive-mode.js:2477-2483).
 const ESTUDIO = ["quiz", "ask_user_question", "buscar_material", "leer_paginas", "leer_items", "ver_pagina", "registrar_progreso", "leer_sesion_anterior", "investigar_tema", "read"];
-const COPIA = "Material desde la última carga; el entorno de ingesta no respondió: corré .pi/scripts/doctor.";
+const COPIA = "Material desde la última carga";
 // pi.exec devuelve code 0 cuando mata al proceso por tiempo (exec.js:63): manda killed. Un traceback no es un mensaje para el alumno.
 export function fallaPython(r: { stderr: string; killed: boolean }) {
   const causa = r.stderr.trim().split("\n").at(-1) || "";
@@ -65,11 +65,13 @@ export function registrarSesion(pi: ExtensionAPI, vault = vaultDir, recursos = p
     } catch { /* Salida cortada: como un fallo del entorno. */ }
     let d: DatosCurso;
     try { d = JSON.parse(readFileSync(copia, "utf8")); } catch { throw new Error(fallaPython(r)); }
-    return { ...d, avisos: [...d.avisos, COPIA] };
+    // fallaPython remite al doctor sólo si Python no dio un error propio (p. ej. «Disco lleno…»), que ya dice qué hacer.
+    const causa = fallaPython(r);
+    return { ...d, avisos: [...d.avisos, causa.includes(".pi/scripts/doctor") ? `${COPIA}; el entorno de ingesta no respondió: corré .pi/scripts/doctor.` : `${COPIA}. ${causa}`] };
   }
   // Se ofrece una sola vez (queda en .no-reconstruir.json) la última sesión real del tema sin cierre; no con el progreso dudoso, en ad hoc ni la viva de otro pi.
   function sinCierre(a: Activo, d: DatosCurso, tema: Tema) {
-    if (a.adHoc || d.avisos.some(x => /^Progreso (no disponible|inválido)/.test(x) || x === COPIA)) return;
+    if (a.adHoc || d.avisos.some(x => /^Progreso (no disponible|inválido)/.test(x) || x.startsWith(COPIA))) return;
     const r = raiz(a.curso), carpeta = rutaSegura(r, "sesiones");
     let viva = "";
     try { const o = JSON.parse(readFileSync(rutaSegura(r, ".sesion-activa.json"), "utf8")); if (o.pid !== process.pid && vivo(o.pid)) viva = o.log; } catch { /* sin otra sesión registrada */ }
@@ -124,7 +126,7 @@ export function registrarSesion(pi: ExtensionAPI, vault = vaultDir, recursos = p
       if (!esSlug(a.curso) || !esSlug(a.tema) || typeof a.log !== "string" || !a.log.startsWith(`cursos/${a.curso}/sesiones/`) || !a.log.endsWith(".md")) throw new Error("Estado de curso inválido.");
       rutaSegura(vault, a.log);
       const d = await cargar(a.curso, false, undefined, 30000);
-      for (const aviso of d.avisos.filter(a => a.startsWith("Progreso") || a === COPIA)) ctx.ui.notify(aviso, "warning");
+      for (const aviso of d.avisos.filter(a => a.startsWith("Progreso") || a.startsWith(COPIA))) ctx.ui.notify(aviso, "warning");
       const tema = preparar(a, d);
       sinLog = !!(a as { sinLog?: boolean }).sinLog;
       herramientas = (a as { herramientas?: string[] }).herramientas ?? pi.getActiveTools();
@@ -224,7 +226,7 @@ export function registrarSesion(pi: ExtensionAPI, vault = vaultDir, recursos = p
         if (libres < 2e8) { ctx.ui.notify(`Disco casi lleno (${Math.floor(libres / 1e6)} MB libres): liberá espacio y repetí /estudiar.`, "error"); return; }
         if (libres < 1e9) ctx.ui.notify(`Queda poco disco (${Math.floor(libres / 1e6)} MB libres): liberá espacio pronto para no perder la sesión.`, "warning");
         let d = await cargar(curso, true);
-        for (const aviso of d.avisos.filter(a => a.startsWith("Progreso") || a === COPIA)) ctx.ui.notify(aviso, "warning");
+        for (const aviso of d.avisos.filter(a => a.startsWith("Progreso") || a.startsWith(COPIA))) ctx.ui.notify(aviso, "warning");
         let candidatos = consulta ? resolverTemas(d.temas, consulta) : ordenarTemas(d), resultados: ReturnType<typeof buscarMaterial> = [];
         if (consulta && !candidatos.length) {
           try { resultados = buscarMaterial(raiz(curso), d, consulta, "bibliografia"); } catch { /* La falta de BM25 no impide un probe ad hoc. */ }
@@ -293,7 +295,7 @@ export function registrarSesion(pi: ExtensionAPI, vault = vaultDir, recursos = p
           });
         } catch (e) {
           const codigo = (e as NodeJS.ErrnoException).code;
-          sinNota = codigo === "ENOSPC" ? "Disco lleno" : ["EACCES", "EPERM", "EROFS"].includes(codigo || "") ? "Sin permiso para escribir en sesiones/" : codigo || !(e instanceof Error) ? "No se pudo crear la nota" : e.message;
+          sinNota = `No se pudo crear la nota de la clase en Obsidian${codigo === "ENOSPC" ? " (disco lleno)" : ["EACCES", "EPERM", "EROFS"].includes(codigo || "") ? " (sin permiso para escribir en sesiones/)" : ""}; seguimos sin nota.`;
           // Que la nota anterior no reciba este tema.
           pi.events.emit("md-log:unlink", {});
           try { const file = rutaSegura(vault, a.log); if (statSync(file).size === 0) rmSync(file); } catch { /* no quedó archivo */ }
@@ -308,7 +310,7 @@ export function registrarSesion(pi: ExtensionAPI, vault = vaultDir, recursos = p
         pi.setSessionName(`${d.nombre || curso} · ${tema.nombre}`);
         // Los avisos del curso van al dossier; la preparación por tema informa al alumno lo que le toca.
         ctx.ui.setStatus("curso", `📚 ${curso} › ${tema.nombre}`);
-        if (sinNota) ctx.ui.notify(`${sinNota.replace(/[.;]\s*$/, "")}: seguimos sin nota de Obsidian.`, "warning");
+        if (sinNota) ctx.ui.notify(sinNota, "warning");
         const estudiado = d.progreso.temas[tema.id]?.estado;
         ordenar(pi, `Empecemos con «${tema.nombre}» (${curso}). ${estudiado && estudiado !== "sin_empezar" ? "Abrí con una línea de dónde quedamos (borde y próximo paso del dossier) y enseguida la primera pregunta" : "Iniciá el probe con la primera pregunta, sin preámbulo"}, sin esperar una nueva orden del estudiante.`);
       } catch (e) { ctx.ui.notify(mensaje(e, "No se pudo activar el curso"), "error"); }
@@ -332,8 +334,9 @@ export function registrarSesion(pi: ExtensionAPI, vault = vaultDir, recursos = p
     async cerrar(ctx: ExtensionContext) {
       const { a } = actual();
       if (!sinLog) await new Promise<void>((resolve, reject) => {
-        const timer = setTimeout(() => reject(new Error("md-log no confirmó el cierre; el curso sigue activo.")), 2000);
-        pi.events.emit("md-log:unlink", { file: rutaSegura(vault, a.log), onComplete(error?: string) { clearTimeout(timer); error ? reject(new Error(error)) : resolve(); } });
+        const sinCerrar = new Error("No se pudo cerrar la nota de la clase en Obsidian; la clase sigue abierta: repetí /fin.");
+        const timer = setTimeout(() => reject(sinCerrar), 2000);
+        pi.events.emit("md-log:unlink", { file: rutaSegura(vault, a.log), onComplete(error?: string) { clearTimeout(timer); error ? reject(sinCerrar) : resolve(); } });
       });
       pi.appendEntry("curso", null);
       olvidarActivo(ctx, a.curso);
