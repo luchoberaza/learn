@@ -163,7 +163,7 @@ El modelo se toma de `curso.config.json`, sin fallback ni reintentos automático
 
 `revision_humana: pendiente` se conserva incluso con puntaje alto. La calidad automática no certifica la semántica ni la fidelidad de las tablas. Se reconstruyen índice e informe por página para mantener la consistencia; agrupar esas escrituras queda diferido hasta medir un problema en cursos grandes.
 
-*Superada en parte por DA2 y DA24: la preparación por tema transcribe sin pedir confirmación (tope de 150 páginas por corrida), y un error ya no degrada una página que era buena: la marca `error_vision` para reintentar.*
+*Superada en parte por DA2, DA24 y DA28: la preparación por tema transcribe sin pedir confirmación (tope de 150 páginas por corrida); un error ya no degrada una página que era buena: la marca `error_vision` para reintentar; y la confirmación de una tanda grande es «Sí, transcribir»/«No», no `ctx.ui.confirm`.*
 
 ## D2.2 — Ítems elegidos por el agente, no por otro pipeline LLM
 
@@ -201,7 +201,7 @@ Para un curso ya existente se muestra el diff y se requiere `ctx.ui.confirm`; si
 
 El informe visible verifica su hash antes de regenerarlo y publica un registro recuperable antes del Markdown, siguiendo el patrón de Fase 2. Una edición manual queda preservada.
 
-*Superada en parte por DA23: un `aplicar` cortado ya no deja copias con el nombre final; el curso nuevo se arma en `cursos/.<slug>.nuevo/` y cada PDF se publica con un hard link tras verificar su SHA-256.*
+*Superada en parte por DA23 y DA28: un `aplicar` cortado ya no deja copias con el nombre final; el curso nuevo se arma en `cursos/.<slug>.nuevo/` y cada PDF se publica con un hard link tras verificar su SHA-256. La confirmación es «Sí, guardar los cambios»/«No», no `ctx.ui.confirm`.*
 
 ## D3.3 — Validez estructural no es preparación ni fidelidad
 
