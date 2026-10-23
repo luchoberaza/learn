@@ -201,6 +201,26 @@ function preparacion(t) {
   return e;
 }
 
+test("preparación (b, c): red, cuota o credenciales cortan la tanda en la primera falla; un plazo vencido se dice en español", async t => {
+  const e = preparacion(t);
+  e.guion.vision = () => respuesta("", { stopReason: "error", errorMessage: "429 Too Many Requests: You have hit your usage limit" });
+  await e.turno();
+  assert.deepEqual(e.llamadas, ["vision"]);
+  assert.deepEqual(e.avisos, [["warning", "Preparación del material no disponible: el proveedor rechazó el pedido por cuota o límite de uso; esperá o cambiá de modelo con /model; seguimos con lo que hay."]]);
+  const f = preparacion(t);
+  f.guion.segmentar = () => respuesta("", { stopReason: "error", errorMessage: "fetch failed" });
+  await f.turno();
+  assert.deepEqual(f.llamadas.filter(x => x !== "vision"), ["segmentar"]);
+  assert.deepEqual(f.avisos, [["warning", "Preparación del material no disponible: sin conexión con el proveedor del modelo; revisá la red; seguimos con lo que hay."]]);
+  assert.ok(!existsSync(join(f.raiz, "_procesado/preparacion.json")) || !f.json("preparacion.json").fallos, "una falla de red no deja el documento en espera");
+  const g = preparacion(t);
+  g.guion.segmentar = texto => texto.includes("Documento parcial") && respuesta("", { stopReason: "aborted", errorMessage: "Request was aborted" });
+  await g.turno();
+  assert.equal(g.avisos.length, 1);
+  assert.match(g.avisos[0][1], /no se pudieron separar los ítems de parcial \(el modelo no respondió en 5 minutos\)/);
+  assert.doesNotMatch(g.avisos[0][1], /Request was aborted/);
+});
+
 test("preparación (e, f): sólo se borra el lock propio y un pid reutilizado tras reiniciar no lo retiene", async t => {
   const e = preparacion(t), lock = join(e.raiz, "_procesado/.preparacion.lock");
   // El pid vive (este proceso) pero el lock es de otro arranque.

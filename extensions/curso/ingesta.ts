@@ -24,6 +24,13 @@ export function python(accion: string, datos: object, signal?: AbortSignal, scri
   });
 }
 
+// Fallas del proveedor que se repetirían en cada llamada siguiente: la tanda se corta en la primera (las mismas causas que sesion.ts).
+export function corteModelo(error = "") {
+  return /usage limit|quota|rate.?limit|\b429\b|too many requests/i.test(error) ? "el proveedor rechazó el pedido por cuota o límite de uso; esperá o cambiá de modelo con /model"
+    : /api key|unauthori[sz]ed|\b40[13]\b|authenticat|credential|expired|\/login/i.test(error) ? "faltan o vencieron las credenciales del modelo; ejecutá /login"
+    : /fetch failed|network|connection|ENOTFOUND|EAI_AGAIN|ECONN|ETIMEDOUT|socket/i.test(error) ? "sin conexión con el proveedor del modelo; revisá la red" : undefined;
+}
+
 type Solicitud = { vault: string; salida: string; doc: string; paginas: number[] };
 type Config = { modelo_vision: string; max_paginas_vision_sin_confirmar: number; umbral_calidad_pagina: number };
 
@@ -48,7 +55,7 @@ export async function transcribir(ctx: Pick<ExtensionContext, "modelRegistry" | 
   }
   if (typeof config.modelo_vision !== "string" || config.modelo_vision.indexOf("/") < 1) throw new Error("Modelo de visión inválido en curso.config.json.");
   const paginas = [...new Set(solicitud.paginas)].sort((a, b) => a - b);
-  const resumen = { solicitadas: paginas.length, transcritas: 0, cache: 0, fallidas: [] as number[], pendientes: [] as number[], avisos: [] as string[], cancelada: false };
+  const resumen = { solicitadas: paginas.length, transcritas: 0, cache: 0, fallidas: [] as number[], pendientes: [] as number[], avisos: [] as string[], cancelada: false, corte: undefined as string | undefined };
   const vision = await modeloVision(ctx, config.modelo_vision);
   if ("motivo" in vision) {
     resumen.fallidas.push(...paginas);
@@ -87,7 +94,8 @@ export async function transcribir(ctx: Pick<ExtensionContext, "modelRegistry" | 
         for (const k of ["input", "output", "cacheRead", "cacheWrite", "total"] as const) usage.cost[k] += respuesta.usage.cost[k];
       }
       const texto = respuesta.content.filter(b => b.type === "text").map(b => b.text).join("\n");
-      if (respuesta.stopReason !== "stop" || !texto.trim()) throw new Error(respuesta.errorMessage || "respuesta vacía o cortada.");
+      // «aborted» sin un corte del usuario es el plazo de 3 minutos (pi-ai lo informa como «Request was aborted»).
+      if (respuesta.stopReason !== "stop" || !texto.trim()) throw new Error(respuesta.stopReason === "aborted" ? "el modelo no respondió en 3 minutos" : respuesta.errorMessage || "respuesta vacía o cortada.");
       etapa = "guardar";
       const guardada = await python("guardar", { ...datos, ...preparada, texto, completa: true, uso: respuesta.usage,
         umbral: config.umbral_calidad_pagina }, signal);
@@ -97,13 +105,15 @@ export async function transcribir(ctx: Pick<ExtensionContext, "modelRegistry" | 
       // Una cancelación del usuario no es un fallo: la página queda como estaba.
       if (signal?.aborted) { resumen.cancelada = true; break; }
       const mensaje = error instanceof Error ? error.message : String(error);
+      resumen.corte = etapa === "modelo" ? corteModelo(mensaje) : undefined;
       resumen.fallidas.push(pagina);
-      resumen.avisos.push(`PDF ${pagina}: ${etapa === "modelo" ? `Visión no disponible: ${mensaje.slice(0, 200)}` : mensaje.slice(0, 350)}`);
+      resumen.avisos.push(`PDF ${pagina}: ${etapa === "modelo" ? `Visión no disponible: ${mensaje.slice(0, 200)}${resumen.corte ? ` (${resumen.corte}); no se enviaron las páginas siguientes` : ""}` : mensaje.slice(0, 350)}`);
       if (preparada && !preparada.cache) {
         // Nunca reemplaza texto ajeno; una página base buena sólo queda marcada para reintentar.
         try { await python("fallar", { ...datos, ...preparada }, AbortSignal.timeout(10000)); }
         catch { resumen.avisos.push(`PDF ${pagina}: no se pudo actualizar el estado; se preservaron los archivos existentes.`); }
       }
+      if (resumen.corte) break;
     }
   }
   return { resumen, usage };

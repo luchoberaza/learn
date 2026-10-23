@@ -85,5 +85,5 @@ test("H39: un snapshot de credenciales viejo no bloquea la visión si pi resuelv
   ctx.modelRegistry.getProviderAuth = async () => ({ auth: { apiKey: "x" } });
   const { resumen } = await transcribir(ctx, solicitud, config);
   assert.equal(llamadas.length, 1);
-  assert.doesNotMatch(resumen.avisos.join(" "), /credenciales/);
+  assert.doesNotMatch(resumen.avisos.join(" "), /no hay credenciales/);
 });

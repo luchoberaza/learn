@@ -4,7 +4,7 @@ import { createHash } from "node:crypto";
 import { closeSync, openSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { piDir, vaultDir } from "../../scripts/lib/pi-sdk.mjs";
-import { modeloVision, python, transcribir } from "./ingesta.ts";
+import { corteModelo, modeloVision, python, transcribir } from "./ingesta.ts";
 import { leer, type DatosCurso, type Tema } from "./material.ts";
 import type { registrarSesion } from "./sesion.ts";
 
@@ -69,14 +69,15 @@ async function pedirJSON(ctx: Pick<ExtensionContext, "modelRegistry">, modelo: M
   const r = await ctx.modelRegistry.streamSimple(modelo, { systemPrompt: sistema, messages: [{ role: "user", timestamp: Date.now(), content: [{ type: "text", text: texto }] }] },
     { maxTokens, reasoning: "low", maxRetries: 0, signal: AbortSignal.any([signal, AbortSignal.timeout(300_000)]) }).result();
   const salida = r.content.filter(b => b.type === "text").map(b => b.text).join("\n").trim();
-  if (r.stopReason !== "stop" || !salida) throw new Error(r.errorMessage || "respuesta vacía o cortada");
+  // «aborted» sin un corte del usuario es el plazo de 5 minutos (pi-ai lo informa como «Request was aborted»).
+  if (r.stopReason !== "stop" || !salida) throw new Error(r.stopReason === "aborted" ? "el modelo no respondió en 5 minutos" : r.errorMessage || "respuesta vacía o cortada");
   try { return JSON.parse(salida.replace(/^```(?:json)?\s*|\s*```$/g, "")); } catch { throw new Error("la respuesta no es JSON válido"); }
 }
 // Una respuesta inválida se reintenta una vez con el motivo; si vuelve a fallar, queda para la próxima corrida.
 async function conReintento<T>(pedido: (error: string) => Promise<T>, signal: AbortSignal): Promise<T> {
   for (let intento = 0, error = ""; ; intento++) {
     try { return await pedido(error ? `\nTu respuesta anterior se rechazó: ${error}. Corregila.` : ""); }
-    catch (e) { if (intento || signal.aborted || OCUPADA.test(mensaje(e))) throw e; error = mensaje(e).slice(0, 300); }
+    catch (e) { if (intento || signal.aborted || OCUPADA.test(mensaje(e)) || corteModelo(mensaje(e))) throw e; error = mensaje(e).slice(0, 300); }
   }
 }
 function validarItems(r: any, s: Segmento) {
@@ -117,6 +118,8 @@ export function registrarPreparacion(pi: ExtensionAPI, sesion: Pick<ReturnType<t
     const avisar = (texto: string, tipo: "info" | "warning") => { try { ctx.ui.notify(texto, tipo); } catch { /* ctx viejo tras /reload. */ } };
     let ocupada = false, transcriptas = 0, nuevos = 0, asignadas = 0;
     const avisos: string[] = [], segmentados: string[] = [];
+    // Red, cuota o credenciales: cada llamada siguiente fallaría igual, así que se corta la tanda con la causa.
+    const cortar = (e: unknown) => { const corte = corteModelo(mensaje(e)); if (signal.aborted || OCUPADA.test(mensaje(e)) || corte) throw corte ? new Error(corte) : e; };
     try {
       const config = JSON.parse(readFileSync(join(recursos, "curso.config.json"), "utf8"));
       const pedir = (): Promise<Trabajo> => python("trabajo", { vault, curso, tema: tema.id, maximo: TOPE }, signal, "preparacion.py");
@@ -137,6 +140,7 @@ export function registrarPreparacion(pi: ExtensionAPI, sesion: Pick<ReturnType<t
           transcriptas += resumen.transcritas;
           ocupada ||= resumen.avisos.some(a => OCUPADA.test(a));
           if (ocupada || resumen.cancelada) throw new Error("cancelada");
+          if (resumen.corte) throw new Error(resumen.corte);
           avisos.push(...resumen.avisos);
           // Las páginas del tema ya sirven: el dossier deja de mandarlas a ver_pagina sin esperar a parciales y prácticos.
           if (resumen.transcritas && tema.bibliografia?.some(b => b.doc === doc)) {
@@ -159,7 +163,7 @@ export function registrarPreparacion(pi: ExtensionAPI, sesion: Pick<ReturnType<t
             nuevos += items.filter((i: any) => i.solucion_de === undefined && !antes.has(i.id)).length;
             segmentados.push(s.doc);
           } catch (e) {
-            if (signal.aborted || OCUPADA.test(mensaje(e))) throw e;
+            cortar(e);
             avisos.push(`no se pudieron separar los ítems de ${s.doc} (${mensaje(e).slice(0, 150)})`);
           }
         }
@@ -177,7 +181,7 @@ export function registrarPreparacion(pi: ExtensionAPI, sesion: Pick<ReturnType<t
             }, signal);
             asignadas += asignaciones.filter((a: any) => a.tema === tema.id).length;
           } catch (e) {
-            if (signal.aborted || OCUPADA.test(mensaje(e))) throw e;
+            cortar(e);
             avisos.push(`no se pudieron clasificar ${lote.length} ítems (${mensaje(e).slice(0, 150)})`);
           }
         }
