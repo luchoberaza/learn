@@ -2,10 +2,12 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
+import { getEventListeners } from "node:events";
 import { join } from "node:path";
 import mdLog from "../extensions/md-log.ts";
 import { registrarSesion } from "../extensions/curso/sesion.ts";
 import { registrarProgreso } from "../extensions/curso/progreso.ts";
+import { loadProject } from "../scripts/lib/pi-sdk.mjs";
 
 // Remates de integración: md-log, sesión y progreso reales sobre un bus de eventos, backend Python real, sin modelos.
 async function clase(t) {
@@ -61,4 +63,28 @@ test("H04: si el renombre se nota recién con el mensaje final, igual cierra", a
   await e.emitir("agent_settled", {});
   assert.equal(e.sesion.actual(), undefined);
   assert.match(readFileSync(join(e.vault, nueva), "utf8"), /Resumen final\./);
+});
+
+test("H26/H25: cortar el turno (/fin, /estudiar) cierra un quiz o una pregunta abiertos sin Esc", async () => {
+  const p = await loadProject();
+  const theme = { fg: (_c, s) => s, bg: (_c, s) => s, bold: s => s, italic: s => s, underline: s => s, strikethrough: s => s };
+  const tui = { requestRender() {}, terminal: { rows: 40, columns: 100 } };
+  const quiz = { question: "¿Qué retardo depende de la distancia?", options: [{ label: "Propagación", value: "prop" }, { label: "Transmisión", value: "trans" }, { label: "Cola", value: "cola" }], correctAnswer: "prop", explanation: "d/s" };
+  const ask = { question: "¿Seguimos?", options: [{ label: "Sí" }, { label: "Más tarde" }] };
+  try {
+    for (const [nombre, args] of [["quiz", quiz], ["quiz", { ...quiz, multiSelect: true, correctAnswer: ["prop"] }], ["ask_user_question", ask], ["ask_user_question", { ...ask, multiSelect: true }]]) {
+      for (const antes of [false, true]) {
+        // antes: el corte llegó mientras esperaba el turno de otro popup.
+        const corte = new AbortController(), tool = p.session.extensionRunner.getToolDefinition(nombre);
+        const ctx = { hasUI: true, ui: { custom: factory => new Promise(res => { if (antes) corte.abort(); factory(tui, theme, {}, res); setTimeout(() => corte.abort(), 10); }) } };
+        const r = await Promise.race([tool.execute("x", args, corte.signal, () => {}, ctx), new Promise(res => setTimeout(() => res({ details: { status: "abierto" } }), 1500))]);
+        assert.equal(r.details.status, "cancelled", `${nombre} ${JSON.stringify(args.multiSelect ?? false)} ${antes}`);
+      }
+    }
+    // El signal dura toda la corrida: los popups respondidos no le dejan listeners (Node avisa desde 11, y el aviso ensucia la terminal).
+    const corrida = new AbortController(), quizTool = p.session.extensionRunner.getToolDefinition("quiz");
+    const responder = { hasUI: true, ui: { custom: factory => new Promise(res => { const c = factory(tui, theme, {}, r => { c.dispose?.(); res(r); }); c.handleInput("\r"); c.handleInput("\r"); }) } };
+    for (let i = 0; i < 12; i++) assert.notEqual((await quizTool.execute("q", quiz, corrida.signal, () => {}, responder)).details.status, "cancelled");
+    assert.equal(getEventListeners(corrida.signal, "abort").length, 0);
+  } finally { await p.close(); }
 });

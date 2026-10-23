@@ -473,6 +473,7 @@ async function askSingleChoice(
 	options: QuizOption[],
 	correctIndices: number[],
 	explanation: string | undefined,
+	signal?: AbortSignal,
 ): Promise<QuizResponse | null> {
 	const allOptions: DisplayOption[] = options.map((option, index) => ({
 		...option,
@@ -483,6 +484,10 @@ async function askSingleChoice(
 
 	return ctx.ui.custom<QuizResponse | null>(
 		(tui: any, theme: any, _kb: any, done: (result: QuizResponse | null) => void) => {
+			// /fin y /estudiar cortan el turno con ctx.abort(): el popup se cierra solo, como con Esc.
+			const cortar = () => done(null);
+			if (signal?.aborted) cortar();
+			else signal?.addEventListener("abort", cortar, { once: true });
 			let optionIndex = 0;
 			let phase: "select" | "feedback" = "select";
 			let focus: "options" | "note" = "options";
@@ -641,6 +646,8 @@ async function askSingleChoice(
 					editor.invalidate();
 				},
 				handleInput,
+				// El signal dura toda la corrida: cada popup cerrado suelta su listener.
+				dispose: () => signal?.removeEventListener("abort", cortar),
 			};
 		},
 	);
@@ -653,6 +660,7 @@ async function askMultiChoice(
 	options: QuizOption[],
 	correctIndices: number[],
 	explanation: string | undefined,
+	signal?: AbortSignal,
 ): Promise<QuizResponse | null> {
 	const DONT_KNOW_ID = "dont-know";
 	const choiceItems: DisplayOption[] = options.map((option, index) => ({
@@ -671,6 +679,10 @@ async function askMultiChoice(
 
 	return ctx.ui.custom<QuizResponse | null>(
 		(tui: any, theme: any, _kb: any, done: (result: QuizResponse | null) => void) => {
+			// /fin y /estudiar cortan el turno con ctx.abort(): el popup se cierra solo, como con Esc.
+			const cortar = () => done(null);
+			if (signal?.aborted) cortar();
+			else signal?.addEventListener("abort", cortar, { once: true });
 			let optionIndex = 0;
 			let phase: "select" | "feedback" = "select";
 			let focus: "options" | "note" = "options";
@@ -885,6 +897,8 @@ async function askMultiChoice(
 					editor.invalidate();
 				},
 				handleInput,
+				// El signal dura toda la corrida: cada popup cerrado suelta su listener.
+				dispose: () => signal?.removeEventListener("abort", cortar),
 			};
 		},
 	);
@@ -1022,8 +1036,8 @@ export default function quiz(pi: ExtensionAPI) {
 			return withUILock(async () => {
 				const response =
 					mode === "single-select"
-						? await askSingleChoice(ctx, question, context, options, correctIndices, explanation)
-						: await askMultiChoice(ctx, question, context, options, correctIndices, explanation);
+						? await askSingleChoice(ctx, question, context, options, correctIndices, explanation, signal)
+						: await askMultiChoice(ctx, question, context, options, correctIndices, explanation, signal);
 				if (!response) {
 					return cancelledResult(question, mode, correctIndices, context);
 				}

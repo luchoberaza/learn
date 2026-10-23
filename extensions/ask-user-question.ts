@@ -205,6 +205,7 @@ async function askSingleChoice(
 	question: string,
 	context: string | undefined,
 	options: AskOption[],
+	signal?: AbortSignal,
 ): Promise<AskAnswer | null> {
 	const otherLabel = getOtherLabel(options);
 	const allOptions: DisplayOption[] = [
@@ -213,6 +214,10 @@ async function askSingleChoice(
 	];
 
 	return ctx.ui.custom<AskAnswer | null>((tui: any, theme: any, _kb: any, done: (result: AskAnswer | null) => void) => {
+		// /fin y /estudiar cortan el turno con ctx.abort(): el popup se cierra solo, como con Esc.
+		const cortar = () => done(null);
+		if (signal?.aborted) cortar();
+		else signal?.addEventListener("abort", cortar, { once: true });
 		let optionIndex = 0;
 		let editMode = false;
 		let cachedLines: string[] | undefined;
@@ -329,6 +334,8 @@ async function askSingleChoice(
 				cachedLines = undefined;
 			},
 			handleInput,
+			// El signal dura toda la corrida: cada popup cerrado suelta su listener.
+			dispose: () => signal?.removeEventListener("abort", cortar),
 		};
 	});
 }
@@ -338,6 +345,7 @@ async function askMultiChoice(
 	question: string,
 	context: string | undefined,
 	options: AskOption[],
+	signal?: AbortSignal,
 ): Promise<AskAnswer[] | null> {
 	const otherLabel = getOtherLabel(options);
 	const choiceItems: DisplayOption[] = options.map((option, index) => ({
@@ -353,6 +361,10 @@ async function askMultiChoice(
 	];
 
 	return ctx.ui.custom<AskAnswer[] | null>((tui: any, theme: any, _kb: any, done: (result: AskAnswer[] | null) => void) => {
+		// /fin y /estudiar cortan el turno con ctx.abort(): el popup se cierra solo, como con Esc.
+		const cortar = () => done(null);
+		if (signal?.aborted) cortar();
+		else signal?.addEventListener("abort", cortar, { once: true });
 		let optionIndex = 0;
 		let editMode = false;
 		let cachedLines: string[] | undefined;
@@ -534,6 +546,8 @@ async function askMultiChoice(
 				cachedLines = undefined;
 			},
 			handleInput,
+			// El signal dura toda la corrida: cada popup cerrado suelta su listener.
+			dispose: () => signal?.removeEventListener("abort", cortar),
 		};
 	});
 }
@@ -610,14 +624,14 @@ export default function askUserQuestion(pi: ExtensionAPI) {
 				}
 
 				if (mode === "single-select") {
-					const answer = await askSingleChoice(ctx, params.question, context, options);
+					const answer = await askSingleChoice(ctx, params.question, context, options, signal);
 					if (!answer) {
 						return cancelledResult(params.question, mode, context);
 					}
 					return buildResult(params.question, context, mode, [answer]);
 				}
 
-				const answers = await askMultiChoice(ctx, params.question, context, options);
+				const answers = await askMultiChoice(ctx, params.question, context, options, signal);
 				if (!answers) {
 					return cancelledResult(params.question, mode, context);
 				}
