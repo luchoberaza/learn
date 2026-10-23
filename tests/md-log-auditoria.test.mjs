@@ -197,6 +197,21 @@ test("H48, C5: la página mostrada queda embebida en la nota si su render vive e
   assert.equal(readFileSync(e.file, "utf8"), `${bloques.join("\n\n")}\n`);
 });
 
+test("H48, C5: si la nota se borró, la página que se vuelve a mostrar queda en la nota recreada; renombrada, no se repite", async t => {
+  const e = entorno(t); await e.handlers.get("session_start")({}, e.ctx); await e.vincular();
+  mkdirSync(join(e.dir, "cursos/redes/_procesado/kurose-7/render"), { recursive: true });
+  const render = join(e.dir, "cursos/redes/_procesado/kurose-7/render/0056.png"); writeFileSync(render, png);
+  const resultado = { toolName: "ver_pagina", isError: false, content: [{ type: "text", text: "[[cursos/redes/fuentes/kurose-7.pdf#page=56]]" }], details: { render } };
+  const bloque = "> [!info] Página mostrada\n> [[cursos/redes/fuentes/kurose-7.pdf#page=56]]\n> ![[cursos/redes/_procesado/kurose-7/render/0056.png]]\n";
+  await e.handlers.get("tool_result")(resultado, e.ctx);
+  rmSync(e.file);
+  await e.handlers.get("tool_result")(resultado, e.ctx);
+  assert.equal(readFileSync(e.file, "utf8"), bloque);
+  const nueva = join(e.sesiones, "Retardos (renombrada).md"); renameSync(e.file, nueva);
+  await e.handlers.get("tool_result")(resultado, e.ctx);
+  assert.equal(readFileSync(nueva, "utf8"), bloque);
+});
+
 test("H49: la limpieza de enlaces de md-log es la misma que la de quiz (D5)", () => {
   const funcion = archivo => readFileSync(new URL(`../extensions/${archivo}`, import.meta.url), "utf8").match(/function sinEnlaces[\s\S]*?\n\t?}\n/)[0].replace(/^\t+/gm, "");
   assert.equal(funcion("md-log.ts"), funcion("quiz.ts"));

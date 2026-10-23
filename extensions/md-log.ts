@@ -55,8 +55,6 @@ export default function mdLog(pi: ExtensionAPI) {
 	let origen: string | null = null;
 	let nota: Nota | undefined;
 	let contexto: ExtensionContext | undefined;
-	// Último bloque escrito: la misma página mostrada dos veces seguidas no se repite.
-	let ultimo: string | null = null;
 
 	// --- State restoration on session restart ---
 
@@ -135,7 +133,6 @@ export default function mdLog(pi: ExtensionAPI) {
 			if (!fs.lstatSync(logFile).isFile()) throw new Error("El log dejó de ser un archivo regular.");
 			const prefix = fs.statSync(logFile).size > 0 ? "\n\n" : "";
 			fs.appendFileSync(logFile, prefix + text + "\n", "utf-8");
-			ultimo = text;
 		} catch {
 			contexto?.ui.notify("No se pudo escribir el log; el chat continúa y no se reemplazó la nota.", "warning");
 		}
@@ -430,7 +427,11 @@ export default function mdLog(pi: ExtensionAPI) {
 		const toolName = (event as any).toolName;
 		if (toolName === "ver_pagina") {
 			const bloque = (event as any).isError ? null : paginaMostrada((event as any).content, (event as any).details, ctx.cwd);
-			if (bloque) await withLock(() => { if (bloque !== ultimo) appendToFile(bloque); });
+			// La misma página dos veces seguidas se anota una vez: se mira el final de la nota, que pudo moverse o recrearse.
+			if (bloque) await withLock(() => {
+				try { relocalizar(); if (fs.readFileSync(logFile!, "utf-8").endsWith(`${bloque}\n`)) return; } catch { /* appendToFile avisa. */ }
+				appendToFile(bloque);
+			});
 			return;
 		}
 		if (!QA_TOOLS.has(toolName)) return;
@@ -449,7 +450,6 @@ export default function mdLog(pi: ExtensionAPI) {
 		logFile = file;
 		origen = file;
 		nota = identidad(file);
-		ultimo = null;
 		pi.appendEntry("md-log", { file, origen, ...nota });
 		const written = rellenar ? backfill(ctx) : 0;
 		ctx.ui.setStatus("md-log", `🗒 ${path.basename(file)}`);
@@ -610,7 +610,6 @@ export default function mdLog(pi: ExtensionAPI) {
 			}
 		}
 
-		ultimo = blocks.at(-1) ?? null;
 		if (blocks.length > 0) {
 			try {
 				fs.writeFileSync(logFile, blocks.join("\n\n") + "\n", "utf-8");
