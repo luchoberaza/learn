@@ -415,7 +415,7 @@ node --test .pi/tests/*.test.mjs
 .pi/.venv/bin/python -m unittest discover -s .pi/tests/ingesta
 ```
 
-El 2026-10-23, sobre la rama `cursos` en `64cb42d`, la suite Python dio 151 tests OK en unos 25 s y la Node, 267 en verde en 60 a 100 s según la carga de la máquina. La suite Node incluye la Python: `tests/ingesta.test.mjs` corre el mismo `unittest discover` con un plazo de 90 s, que en una corrida con la máquina cargada venció y dejó ese test en rojo. Si ves `actual: null` en «ingesta Python», es ese plazo: repetí `node --test .pi/tests/ingesta.test.mjs` solo (esa vez dio 7/7). Los tests de OCR real (`test_ocr_real_local_sin_llm`, `test_formula_escaneada_queda_pendiente_y_la_prosa_no`) necesitan un Tesseract con `spa` en el `PATH`; algunos tests se saltean si faltan los PDFs reales de `cursos/redes`.
+El 2026-10-23, sobre la rama `cursos` en `e79708d`, la suite Python dio 151 tests OK en unos 25 s y la Node, 268 en verde en 60 a 100 s según la carga de la máquina. La suite Node incluye la Python: `tests/ingesta.test.mjs` corre el mismo `unittest discover` con un plazo de 90 s, que en una corrida con la máquina cargada venció y dejó ese test en rojo. Si ves `actual: null` en «ingesta Python», es ese plazo: repetí `node --test .pi/tests/ingesta.test.mjs` solo (esa vez dio 7/7). Los tests de OCR real (`test_ocr_real_local_sin_llm`, `test_formula_escaneada_queda_pendiente_y_la_prosa_no`) necesitan un Tesseract con `spa` en el `PATH`; algunos tests se saltean si faltan los PDFs reales de `cursos/redes`.
 
 ### Prueba del researcher con subagentes (opcional, con LLM y red)
 
