@@ -87,16 +87,6 @@ class PedagogiaAuditoriaTest(unittest.TestCase):
             self.assertTrue(texto.startswith('Progreso no guardado: '), texto)
             self.assertNotRegex(texto, r"'doc'|unhashable|recursion")
 
-    def test_errores_internos_de_python_no_llegan_en_ingles(self):
-        # Una fecha imposible que mande el modelo («2026-02-30») daba «day is out of range for month».
-        for fecha in ['2026-02-30', '2026-13-01']:
-            with self.assertRaisesRegex(ValueError, '^Fecha de evidencia inválida o futura.$'):
-                self.guardar({'resumen': 'x', 'ejercicios': [{'doc': 'practico', 'item': '1', 'resultado': 'correcto', 'fecha': fecha}]})
-        for e in [KeyError('doc'), TypeError("unhashable type: 'list'"), RecursionError('maximum recursion depth exceeded')]:
-            texto = falla(e)
-            self.assertTrue(texto.startswith('Progreso no guardado: '), texto)
-            self.assertNotRegex(texto, r"'doc'|unhashable|recursion")
-
 
 class ReservaTest(unittest.TestCase):
     """E3: el ítem reservado para /simulacro se fija en progreso.yaml y se marca usado al rendirlo."""
@@ -141,17 +131,6 @@ class ReservaTest(unittest.TestCase):
     def test_rendido_en_el_mismo_registro_en_que_se_fija_queda_usado(self):
         self.guardar(simulacro={'doc': 'parcial', 'id': '1'}, reservas={'derivacion': {'doc': 'parcial', 'id': '1'}})
         self.assertEqual(self.temas()['derivacion']['reservado'], [{'doc': 'parcial', 'id': '1', 'usado': True}])
-
-    def test_presentado_en_el_simulacro_queda_usado_sin_esperar_el_intento(self):
-        # Visto es usado: si pi se corta antes de la entrega, no vuelve a reservarse ni a ocultarse.
-        r = usar(self.vault, 'ejemplo', 'derivacion', 'parcial', '1')
-        self.assertEqual(self.temas()['derivacion'], {'estado': 'sin_empezar', 'reservado': [{'doc': 'parcial', 'id': '1', 'usado': True}]})
-        self.assertEqual(r['progreso']['historial'], [])
-        self.guardar(reservas={'derivacion': {'doc': 'parcial', 'id': '2'}})
-        usar(self.vault, 'ejemplo', 'derivacion', 'parcial', '2')
-        self.assertEqual(self.temas()['derivacion']['reservado'], [{'doc': 'parcial', 'id': '1', 'usado': True}, {'doc': 'parcial', 'id': '2', 'usado': True}])
-        # Una solución no se reserva ni se anota.
-        self.assertTrue(usar(self.vault, 'ejemplo', 'limites', 'parcial', '1-solucion')['sin_cambios'])
 
     def test_presentado_en_el_simulacro_queda_usado_sin_esperar_el_intento(self):
         # Visto es usado: si pi se corta antes de la entrega, no vuelve a reservarse ni a ocultarse.
