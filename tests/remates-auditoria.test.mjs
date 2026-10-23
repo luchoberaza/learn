@@ -374,6 +374,21 @@ test("preparación (b, c): red, cuota o credenciales cortan la tanda en la prime
   assert.doesNotMatch(g.avisos[0][1], /Request was aborted/);
 });
 
+test("H19: los fallos de la corrida quedan registrados aunque después la corte la red, y la próxima clase no los repite", async t => {
+  const e = preparacion(t);
+  // El parcial responde algo inválido dos veces (queda en espera); con el práctico se cae la red.
+  e.guion.segmentar = texto => texto.includes("Documento parcial") ? respuesta("No encontré ítems.") : respuesta("", { stopReason: "error", errorMessage: "fetch failed" });
+  await e.turno();
+  assert.deepEqual(e.llamadas.filter(x => x !== "vision"), ["segmentar", "segmentar", "segmentar"]);
+  assert.deepEqual(e.avisos, [["warning", "Preparación del material no disponible: sin conexión con el proveedor del modelo; revisá la red; seguimos con lo que hay."]]);
+  assert.deepEqual(Object.keys(e.json("preparacion.json").fallos), ["segmentar/parcial"]);
+  assert.equal(e.json("preparacion.json").temas, undefined, "el tema sigue sin preparar");
+  e.llamadas.length = 0; delete e.guion.segmentar;
+  await e.turno();
+  assert.deepEqual(e.llamadas.filter(x => x === "segmentar"), ["segmentar"], "sólo el práctico");
+  assert.equal(e.json("preparacion.json").temas.derivacion.estado, "incompleta");
+});
+
 test("preparación (b): un ítem inválido que habla de sockets o conexiones no corta la tanda como una falla de red", async t => {
   const e = preparacion(t);
   // El motivo del rechazo cita el ítem: en un curso de redes trae «socket», «connection» o «401» sin que falle el proveedor.

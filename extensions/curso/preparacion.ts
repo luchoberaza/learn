@@ -210,6 +210,8 @@ export function registrarPreparacion(pi: ExtensionAPI, sesion: Pick<ReturnType<t
       if (e?.a.curso === curso && e.a.tema === tema.id) pi.sendMessage({ customType: "curso-preparacion", display: false,
         content: `Preparación automática del material de «${tema.nombre}»: ${resultado}${segmentados.length ? ` (ítems de ${segmentados.join(", ")})` : ""}${asignadas ? `; ${cuenta(asignadas, "ítem asignado a este tema, marcado", "ítems asignados a este tema, marcados")} «asignado automáticamente» en el dossier` : ""}${pendientes ? `; ${quedan} sin transcribir` : ""}. El dossier ya está actualizado: usá leer_paginas y leer_items con ese material.` }, { deliverAs: "nextTurn" });
     } catch (e) {
+      // Un corte de red, cuota o credenciales no borra los fallos ya vistos: no se repiten en la próxima clase.
+      if (Object.keys(fallos).length && !signal.aborted) await python("registrar", { vault, curso, fallos }, signal, "preparacion.py").catch(() => {});
       // Cancelada al cerrar pi, o la ingesta base tomó la salida: sin aviso; se reintenta después.
       if (ocupada) intentados.delete(clave);
       else if (!signal.aborted) avisar(`Preparación del material no disponible: ${mensaje(e).replace(/^No se completó la (operación|preparación): /, "").replace(/\.$/, "").slice(0, 200)}; seguimos con lo que hay.`, "warning");
