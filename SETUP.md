@@ -87,17 +87,16 @@ Paquete oficial observado: `https://conda.anaconda.org/conda-forge/linux-64/tess
 
 ## Base Git
 
-Comandos originales, **solo para un directorio nuevo**; no sobreescribir `.pi/`:
+**Solo para un directorio nuevo**; no sobreescribir `.pi/`:
 
 ```bash
 cd ~/Projects/pi-learning
-git clone https://github.com/santi-esquerre/learn .pi
-git -C .pi switch -c cursos
+git clone -b cursos https://github.com/santi-esquerre/learn .pi
 git -C .pi remote add upstream https://github.com/amosblomqvist/learn
 git -C .pi remote -v
 ```
 
-`origin` es el fork del usuario; `upstream`, la herramienta original. La base inspeccionada de ambos fue `7cfd8942f82ab9476e63572387e1fe9bcea5082c`. `skills/teach/SKILL.md` permanece intacto.
+`origin` es el fork del usuario y su rama `cursos` tiene el modo curso; `upstream`, la herramienta original. La base inspeccionada de ambos fue `7cfd8942f82ab9476e63572387e1fe9bcea5082c`, que sigue siendo `main` del fork. `skills/teach/SKILL.md` permanece intacto.
 
 ## Paquetes pi, solo en este proyecto
 

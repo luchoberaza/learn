@@ -1,49 +1,59 @@
-# learn
+# learn — modo curso
+
+Tutor con IA para estudiar una materia universitaria **con su propia bibliografía** y practicar **como en los parciales**, dentro de un vault de Obsidian. Es una configuración de [pi](https://github.com/earendil-works/pi) (un directorio `.pi/`).
+
+Fork de [amosblomqvist/learn](https://github.com/amosblomqvist/learn), el sistema del video [How I Use AI to Learn Things](https://www.youtube.com/watch?v=kzcI5F4tGiU). La filosofía de enseñanza original (`skills/teach/`) queda intacta; este fork le suma el modo curso.
 
 [![video](assets/thumbnail.png)](https://www.youtube.com/watch?v=kzcI5F4tGiU)
 
-My AI learning system from this video: [How I Use AI to Learn Things](https://www.youtube.com/watch?v=kzcI5F4tGiU).
+## Qué hace
 
-This is a personal system I built for myself, shared as-is. Built as a pi configuration: the teaching philosophy encoded in a skill, a few small extensions, and agent definitions.
+- **Crear un curso.** `/curso-nuevo <slug>` arma el contrato y el índice de temas desde los PDFs que pongas en `_entrada/` (bibliografía, prácticos, parciales con solución) e indexa todas las páginas en local, sin modelo. `/curso-agregar <slug>` suma material; todo cambio a un curso guardado muestra un diff y pide confirmación.
+- **Estudiar.** `/estudiar <curso> <tema>` abre una clase en español. La primera pregunta llega en segundos, sin escribir nada más. El tutor enseña a partir del material del curso, cita la página exacta del PDF (`[[libro.pdf#page=N]]`, clicable en Obsidian), marca lo que no sale del material y puede mostrar la página con `ver_pagina`. Cada clase deja su nota en `cursos/<curso>/sesiones/`.
+- **Preparación por tema.** La primera vez que se estudia un tema, su material se prepara solo en segundo plano con un modelo de visión: transcribe páginas escaneadas o con fórmulas, separa los ítems de parciales y prácticos y los asigna a temas. La clase no espera a que termine.
+- **Practicar como en el examen.** Los ejercicios son ítems reales del curso, corregidos con sus criterios, y la solución nunca se muestra antes del intento. Un ítem de parcial por tema queda reservado: `/simulacro` lo toma como en el examen, y ni ese ítem ni sus casi copias aparecen antes.
+- **No perder nada.** `/fin` guarda el progreso en `cursos/<curso>/progreso.yaml` y `/progreso` sugiere el próximo tema. Un `/compact`, un `/resume` o cerrar la ventana no pierden la clase: `pi-learn -c` la retoma donde quedó.
+- **Si falla algo externo** (red, cuota, Python, visión), la clase sigue con un aviso de una línea.
 
-## Modo curso (este fork)
+## Cómo está armado
 
-Este fork suma un modo curso para estudiar una materia con su propio material, dentro de un vault de Obsidian (`~/Projects/pi-learning`). `teach` queda intacto; mientras hay un curso activo, `modo-curso.md` prevalece sobre él en lo que regula y declara cada conflicto (probe con tope, objetivo propuesto por el curso, plan aprobado con botones, popups sin LaTeX).
+| Parte | Qué es |
+|---|---|
+| `extensions/curso/` | comandos y tools del curso: sesión, material, progreso, preparación, researcher anclado, simulacro, presentación |
+| `extensions/comun/` | selector en español y corte de turno, compartidos por las extensiones (pi no lo carga como extensión) |
+| `extensions/quiz.ts`, `ask-user-question.ts`, `md-log.ts` | quizzes con nota, preguntas en popup y nota de la clase en Obsidian |
+| `scripts/ingesta/` | ingesta, visión, segmentación de ítems y progreso, en Python (`uv`) |
+| `skills/` | `teach` (original), `visualize`, `curso-nuevo`, `curso-agregar` |
+| `modo-curso.md` | reglas del tutor con un curso activo; prevalece sobre `teach` en lo que regula y declara cada conflicto |
+| `scripts/doctor` | chequeo de la instalación, sin red ni gasto de modelo |
+| `config/` | lanzador fish `pi-learn` y configuración de tmux |
+| `tests/` | suites Node (`node --test`) y Python (`unittest`) |
 
-- **Crear o ampliar un curso:** `/curso-nuevo <slug>` y `/curso-agregar <slug>` arman contrato e índice desde los PDFs de `_entrada/` (todo cambio a un curso ya guardado, con diff y confirmación) e ingieren todas las páginas en local, sin modelo.
-- **Estudiar:** `/estudiar <curso> <tema>` abre la clase con su nota en Obsidian, citas a la página del PDF y quizzes en español. La primera vez que se estudia un tema, su material se prepara solo en segundo plano con el modelo de visión (transcripción, ítems de parciales y prácticos, asignación por tema). `/simulacro` rinde, como en el examen, una pregunta de parcial del tema que se reservó para eso (ni ella ni sus casi copias se muestran antes); con el tema sin terminar, pregunta antes de gastarla. `/fin` guarda el progreso; `/progreso` sugiere el próximo tema.
-- **Componentes:** `extensions/curso/` (comandos y tools), `extensions/comun/` (selector en español y corte de turno, compartidos con quiz, ask-user-question y md-log; pi no lo carga como extensión), `scripts/ingesta/` (ingesta y backend en Python), `skills/curso-nuevo/`, `skills/curso-agregar/`, `scripts/doctor` y `config/` (lanzador `pi-learn` y tmux).
+## Instalación
 
-Se abre con `pi-learn`, no con `pi` a secas: así el tutor sólo ve las skills del proyecto. El researcher del curso corre como un `pi -p` propio y no necesita subagentes. Instalación, dependencias (también las globales), uso, doctor y pruebas: [`SETUP.md`](SETUP.md). Por qué cada cosa es como es: [`DECISIONES.md`](DECISIONES.md). Para este fork no uses el `git clone` de «Install»: seguí `SETUP.md`.
+**Seguí [`SETUP.md`](SETUP.md); no alcanza con clonar.** En resumen:
 
-## What's in it
+1. Requisitos: pi `1.4.0`, Node.js, fish, tmux, uv, Tesseract con `spa` y `eng`. La lista completa, con versiones y qué pasa si falta cada una, está en SETUP.
+2. El vault tiene que estar en `~/Projects/pi-learning`: el lanzador y la configuración lo suponen.
+3. Clonar este repo como `.pi/` del vault, en la rama `cursos`:
+   ```bash
+   cd ~/Projects/pi-learning
+   git clone -b cursos https://github.com/santi-esquerre/learn .pi
+   ```
+4. Instalar los paquetes de pi del proyecto, el venv de Python y el lanzador (comandos en SETUP), y apuntar `ruta_tesseract` de `curso.config.json` a tu Tesseract.
+5. Comprobar con `node .pi/scripts/doctor`.
+6. Abrir con `pi-learn`, no con `pi` a secas: así el tutor ve sólo las skills del proyecto.
 
-- `skills/teach/` — the philosophy and the process
-- `skills/visualize/` — adds a correct, minimal diagram to a lesson when an idea is clearer as a picture
-- `extensions/ask-user-question.ts` — the agent asks you questions through a UI popup
-- `extensions/quiz.ts` — graded questions with instant feedback (✓/✗, correct answer, explanation)
-- `extensions/md-log.ts` — link a markdown file to the session
-- `extensions/visual-tools/` — tools for visualization subagents
-- `agents/` — `researcher`, `svg-maker`, `mermaid-maker`: the subagents the system delegates to
+## Documentación
 
-## Install
+- [`SETUP.md`](SETUP.md): instalación, dependencias, uso de cada comando, doctor y pruebas.
+- [`DECISIONES.md`](DECISIONES.md): por qué cada cosa es como es.
+- [`informes/`](informes/): informes de cada fase de la implementación.
 
-This repo **is** a `.pi` directory. From your learning project's root:
+Algunos documentos citados en SETUP (`AUDITORIA.md`, `PRUEBA-MANUAL.md`, `fricciones.md`) viven en la raíz del vault y no en este repo, porque mezclan datos del curso propio.
 
-```bash
-git clone https://github.com/amosblomqvist/learn .pi
-```
+## Límites conocidos
 
-Then open pi in that directory. (Or copy the pieces you want into your existing project config.)
-
-## Requirements
-
-- [pi](https://github.com/earendil-works/pi)
-- A subagent implementation, so the system can spawn the researcher and the visual makers. Recommended: [pi-interactive-subagents](https://github.com/amosblomqvist/pi-interactive-subagents) (tmux only). With it, everything works out of the box. Any other implementation works too, but expect to adapt the agent definitions in `agents/`.
-- `ask-user-question` — use the copy bundled here. If your setup already has an `ask-user-question` extension, use **this** one in its place. Popups from different extensions serialize through a shared UI lock, which only works when it's the same implementation.
-
-## Notes
-
-You can run the system without subagents. The main session does the teaching. You just lose the researcher (truth verification) and the generated visuals.
-
-The teaching skill is written for one learner (me). Edit the skill to fit how you learn best.
+- Lo probé con una sola materia (Redes de Computadoras) y un solo alumno. El tutor está escrito para estudiar en español rioplatense.
+- Algunos avisos de pi salen en inglés («Warning:», «Error:», «Operation aborted»): los dibuja pi y no la extensión.
+- Usa modelos de una cuenta ChatGPT/Codex (`openai-codex/…`), sin proveedor de respaldo. Para otro proveedor, cambiá `settings.json` y `curso.config.json`.
