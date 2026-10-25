@@ -10,6 +10,7 @@ import {
 } from "@mariozechner/pi-tui";
 import { Type } from "@sinclair/typebox";
 import { cortable } from "./comun/corte.ts";
+import { preguntarConApp } from "./comun/preguntar.ts";
 
 // ────────────────────────────────────────────────────────────────────────────
 // quiz — a GRADED sibling of ask_user_question.
@@ -911,6 +912,31 @@ function sortAnswers(answers: OptionAnswer[]): OptionAnswer[] {
 	return [...answers].sort((a, b) => a.index - b.index);
 }
 
+// La app recibe las opciones en el orden ya barajado y la correcta para corregir en pantalla, como el popup; devuelve
+// índices de ese mismo orden. Una respuesta sin opciones válidas (ni «No sé») vale como cancelada.
+async function preguntarQuiz(
+	app: NonNullable<ReturnType<typeof preguntarConApp>>,
+	question: string,
+	context: string | undefined,
+	mode: QuizMode,
+	options: QuizOption[],
+	correctIndices: number[],
+	explanation: string | undefined,
+	signal?: AbortSignal,
+): Promise<QuizResponse | null> {
+	const r = await app({
+		tipo: "quiz", pregunta: question, contexto: context, modo: mode, correctas: correctIndices, explicacion: explanation,
+		opciones: options.map((o, i) => ({ indice: i + 1, label: o.label, ...(o.description ? { description: o.description } : {}) })),
+	}, signal);
+	if (!r) return null;
+	const answers = r.noSe ? [] : sortAnswers([...new Set(r.elegidas)].filter((i) => Number.isInteger(i) && i >= 1 && i <= options.length)
+		.slice(0, mode === "single-select" ? 1 : undefined)
+		.map((i) => ({ label: options[i - 1].label, value: options[i - 1].value, index: i })));
+	if (!r.noSe && answers.length === 0) return null;
+	const note = r.nota?.trim();
+	return { dontKnow: r.noSe, ...(note ? { note } : {}), answers };
+}
+
 // Shared UI mutex. ctx.ui.custom()/editor can only handle one active call at
 // a time, so ALL pop-up-style tools (quiz, ask_user_question, ...) must
 // serialize against each other, not just against themselves. We stash one
@@ -1037,8 +1063,11 @@ export default function quiz(pi: ExtensionAPI) {
 			}
 
 			return withUILock(async () => {
-				const response =
-					mode === "single-select"
+				// Con la app de escritorio la pregunta se dibuja allá; en la terminal, el popup de siempre.
+				const app = preguntarConApp(ctx);
+				const response = app
+					? await preguntarQuiz(app, question, context, mode, options, correctIndices, explanation, signal)
+					: mode === "single-select"
 						? await askSingleChoice(ctx, question, context, options, correctIndices, explanation, signal)
 						: await askMultiChoice(ctx, question, context, options, correctIndices, explanation, signal);
 				if (!response) {
