@@ -7,7 +7,7 @@
   --deco: #565f89; --accent: #bb9af7; --wash: rgba(187, 154, 247, .11); --wash-fuerte: rgba(187, 154, 247, .2); --cite: #7dcfff; --ok: #9ece6a;
   --bad: #f7768e; --warn: #e0af68; --focus: #7aa2f7; --onaccent: #1a1b26; --velo: rgba(10, 11, 18, .62); --codigo: #16161e;
   --leer: "Literata Variable", "Literata", Georgia, serif;
-  --ui: "Atkinson Hyperlegible Next Variable", "Atkinson Hyperlegible Next", system-ui, sans-serif;
+  --ui: "Poppins", system-ui, sans-serif;
   --mono: ui-monospace, "Cascadia Code", "JetBrains Mono", Consolas, monospace;
 }
 @media (prefers-color-scheme: light) {

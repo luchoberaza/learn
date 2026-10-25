@@ -9,7 +9,7 @@ Electron, React y TypeScript. Corre la misma pi 1.4.0 y el mismo `.pi/` del vaul
 | `host/` | el proceso que corre pi, con el Node del sistema. `inicio.mjs` arma la sesión como `pi-learn` y atiende las acciones de la ventana. `filtro.mjs` decide qué sale hacia la ventana (nunca args ni resultados de las tools del curso, la correcta antes de responder, mensajes ocultos ni razonamiento). `interfaz.mjs` es la uiContext de pi (diálogos, quiz y preguntas). `paginas.mjs` aplica las reglas de `ver_pagina` al panel de página. `curso.mjs` y `sesiones.mjs` leen el curso y las sesiones. `superficie.mjs` abre los paneles de subagentes |
 | `src/main/` | el proceso principal de Electron: ventana, ajustes de la app, diálogos de archivos, «Preparar la computadora» (doctor e instalación) |
 | `src/preload/` | la API `window.learn` de la ventana, sin acceso a Node |
-| `src/renderer/` | la interfaz: tienda de estado, pantallas, estilos (tokens Noche de Tokio y Día, Literata y Atkinson Hyperlegible Next empaquetadas) |
+| `src/renderer/` | la interfaz: tienda de estado, pantallas, estilos (tokens Noche de Tokio y Día, Literata y Poppins empaquetadas) |
 | `src/lib/` | lógica pura con tests: temporizador de foco y textos (citas, plan, fechas) |
 | `subagentes/` | la superficie de paneles para pi-interactive-subagents y el script que la aplica al paquete instalado |
 | `e2e/` | proveedor falso de pi-ai con guion, curso de demostración y pruebas de punta a punta con Playwright |
