@@ -1,5 +1,5 @@
 import { lstatSync, readFileSync, statSync } from "node:fs";
-import { isAbsolute, join, resolve } from "node:path";
+import { isAbsolute, join, resolve, sep } from "node:path";
 import { buscar, normalizar, type IndiceBM25 } from "../../scripts/ingesta/bm25.ts";
 
 export interface Documento { id: string; titulo: string; tipo: string; archivo: string; paginas: number; prioridad?: string }
@@ -12,6 +12,8 @@ export interface DatosCurso { curso: string; nombre?: string; contrato: string; 
   avisos: string[]; validacion?: { errores: string[]; avisos: string[]; pendientes: unknown[] } }
 export interface Activo { curso: string; tema: string; log: string; adHoc?: Tema }
 export type Ref = { doc: string; id: string };
+// Rutas relativas del vault siempre con /: así se guardan en el progreso y en las entradas de la sesión, y así las comparan las extensiones.
+export const aBarra = (ruta: string) => ruta.split(sep).join("/");
 export const esSlug = (s: string) => typeof s === "string" && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(s);
 
 export function rutaSegura(base: string, relativa: string): string {

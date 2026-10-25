@@ -4,12 +4,12 @@ import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { piDir } from "../../scripts/lib/pi-sdk.mjs";
+import { piDir, pythonDelVenv } from "../../scripts/lib/pi-sdk.mjs";
 import { elegir } from "../comun/elegir.ts";
 
 export function python(accion: string, datos: object, signal?: AbortSignal, script: "vision.py" | "progreso.py" | "preparacion.py" = "vision.py"): Promise<any> {
   return new Promise((resolve, reject) => {
-    const hijo = spawn(join(piDir, ".venv/bin/python"), [join(piDir, "scripts/ingesta", script), accion],
+    const hijo = spawn(pythonDelVenv(piDir), [join(piDir, "scripts/ingesta", script), accion],
       { stdio: ["pipe", "pipe", "pipe"], signal, timeout: 30000 });
     let salida = "", error = "";
     hijo.stdout.on("data", bloque => { salida += bloque; });

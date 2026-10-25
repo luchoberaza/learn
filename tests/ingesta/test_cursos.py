@@ -35,14 +35,14 @@ class CursosTest(unittest.TestCase):
     def escribir(self, indice=None, contrato=None):
         paquete = {"indice_yaml": yaml.safe_dump(indice or self.indice, allow_unicode=True, sort_keys=False), "curso_md": contrato or self.contrato,
                    "origenes": {"libro": {"archivo": "_entrada/libro.pdf", "sha256": sha256(self.fuente)}}}
-        self.propuesta.write_text(json.dumps(paquete, ensure_ascii=False))
+        self.propuesta.write_text(json.dumps(paquete, ensure_ascii=False), encoding="utf-8", newline="\n")
 
     def crear(self):
         r, _ = revisar(self.vault, "ejemplo", self.propuesta)
         return aplicar(self.vault, "ejemplo", self.propuesta, r["base"], r["huella"])
 
     def guardar_indice(self, i):
-        (self.raiz / "indice.yaml").write_text(yaml.safe_dump(i, allow_unicode=True))
+        (self.raiz / "indice.yaml").write_text(yaml.safe_dump(i, allow_unicode=True), encoding="utf-8", newline="\n")
         return validar(self.raiz, "ejemplo")
 
     def test_crea_copia_identica_y_progreso_vacio_sin_mover_fuente(self):
@@ -53,7 +53,7 @@ class CursosTest(unittest.TestCase):
         self.assertFalse(r["validacion"]["listo_estudio"])
         self.assertEqual(sha256(self.raiz / "fuentes/bibliografia/libro.pdf"), antes)
         self.assertEqual(sha256(self.fuente), antes)
-        self.assertEqual(cargar_yaml((self.raiz / "progreso.yaml").read_text()), {"version": 1, "temas": {}, "historial": []})
+        self.assertEqual(cargar_yaml((self.raiz / "progreso.yaml").read_text(encoding="utf-8")), {"version": 1, "temas": {}, "historial": []})
         self.assertTrue((self.raiz / "sesiones/adjuntos").is_dir())
 
     def test_repeticion_no_recopia_fuente_ni_cambia_progreso(self):
@@ -65,16 +65,16 @@ class CursosTest(unittest.TestCase):
 
     def test_ampliacion_conserva_texto_y_comentarios_y_rechaza_edicion_concurrente(self):
         self.crear()
-        paquete = json.loads(self.propuesta.read_text())
+        paquete = json.loads(self.propuesta.read_text(encoding="utf-8"))
         paquete["indice_yaml"] += "# Nota manual que se conserva.\n"
-        self.propuesta.write_text(json.dumps(paquete))
+        self.propuesta.write_text(json.dumps(paquete), encoding="utf-8", newline="\n")
         self.crear()
-        self.assertIn("# Nota manual", (self.raiz / "indice.yaml").read_text())
+        self.assertIn("# Nota manual", (self.raiz / "indice.yaml").read_text(encoding="utf-8"))
         r, _ = revisar(self.vault, "ejemplo", self.propuesta)
-        (self.raiz / "curso.md").write_text(self.contrato + "\nNota del usuario\n")
+        (self.raiz / "curso.md").write_text(self.contrato + "\nNota del usuario\n", encoding="utf-8", newline="\n")
         with self.assertRaises(Conflicto):
             aplicar(self.vault, "ejemplo", self.propuesta, r["base"], r["huella"])
-        self.assertIn("Nota del usuario", (self.raiz / "curso.md").read_text())
+        self.assertIn("Nota del usuario", (self.raiz / "curso.md").read_text(encoding="utf-8"))
 
     def test_propuesta_cambiada_o_fuente_alterada_no_se_publican(self):
         r, _ = revisar(self.vault, "ejemplo", self.propuesta)
@@ -89,10 +89,10 @@ class CursosTest(unittest.TestCase):
     def test_no_sobrescribe_destino_existente_ni_acepta_carpeta_incompleta(self):
         self.raiz.mkdir(parents=True)
         nota = self.raiz / "nota.md"
-        nota.write_text("Material del usuario")
+        nota.write_text("Material del usuario", encoding="utf-8", newline="\n")
         with self.assertRaises(OSError):
             self.crear()
-        self.assertEqual(nota.read_text(), "Material del usuario")
+        self.assertEqual(nota.read_text(encoding="utf-8"), "Material del usuario")
 
     def test_rutas_y_symlinks_rechazados(self):
         for ruta in ["../libro.pdf", "fuentes/bibliografia/../../fuera.pdf", "/tmp/libro.pdf", "fuentes/bibliografia/a#b.pdf"]:
@@ -155,11 +155,11 @@ class CursosTest(unittest.TestCase):
         banco = self.raiz / "_procesado/libro"
         (banco / "paginas").mkdir(parents=True)
         q = {"paginas": {str(n): {"ruta": "digital", "pendiente": n == 2} for n in [1, 2]}}
-        for n in [1, 2]: (banco / f"paginas/{n:04}.md").write_text("Texto")
-        (banco / "calidad.json").write_text(json.dumps(q))
+        for n in [1, 2]: (banco / f"paginas/{n:04}.md").write_text("Texto", encoding="utf-8", newline="\n")
+        (banco / "calidad.json").write_text(json.dumps(q), encoding="utf-8", newline="\n")
         self.assertEqual(validar(self.raiz, "ejemplo")["pendientes"], [{"doc": "libro", "pagina": 2}])
         q["paginas"]["2"]["pendiente"] = False
-        (banco / "calidad.json").write_text(json.dumps(q))
+        (banco / "calidad.json").write_text(json.dumps(q), encoding="utf-8", newline="\n")
         self.assertTrue(validar(self.raiz, "ejemplo")["listo_estudio"])
 
     def test_progreso_invalido_no_se_restaura_ni_modifica(self):
@@ -171,7 +171,7 @@ class CursosTest(unittest.TestCase):
                  {"version": 1, "temas": {"derivacion": {"estado": "en_curso", "borde": {"falla": "texto"}}}, "historial": []},
                  {"version": 1, "temas": {}, "historial": [{"tema": "derivacion", "resumen": "hola", "fecha": "2026-10-20", "log": "../secreto.md"}]}]
         for p in casos:
-            archivo.write_text(yaml.safe_dump(p))
+            archivo.write_text(yaml.safe_dump(p), encoding="utf-8", newline="\n")
             antes = sha256(archivo)
             self.assertFalse(validar(self.raiz, "ejemplo")["ok"])
             self.assertEqual(sha256(archivo), antes)
@@ -189,13 +189,13 @@ class CursosTest(unittest.TestCase):
         self.assertFalse(self.guardar_indice(i)["ok"])
         carpeta = self.raiz / "_procesado/libro"; carpeta.mkdir(parents=True)
         item = {"id": "1", "paginas": [1], "enunciado": "Calcule la derivada."}
-        (carpeta / "items.yaml").write_text(yaml.safe_dump({"doc": "libro", "items": [item]}))
+        (carpeta / "items.yaml").write_text(yaml.safe_dump({"doc": "libro", "items": [item]}), encoding="utf-8", newline="\n")
         self.assertTrue(self.guardar_indice(i)["ok"])
         item["solucion"] = {"doc": "libro", "id": "1"}
-        (carpeta / "items.yaml").write_text(yaml.safe_dump({"doc": "libro", "items": [item]}))
+        (carpeta / "items.yaml").write_text(yaml.safe_dump({"doc": "libro", "items": [item]}), encoding="utf-8", newline="\n")
         self.assertFalse(self.guardar_indice(i)["ok"])
         del item["solucion"]
-        (carpeta / "items.yaml").write_text(yaml.safe_dump({"doc": "libro", "items": [item, item]}))
+        (carpeta / "items.yaml").write_text(yaml.safe_dump({"doc": "libro", "items": [item, item]}), encoding="utf-8", newline="\n")
         self.assertFalse(self.guardar_indice(i)["ok"])
 
     def test_ampliacion_no_elimina_ni_renombra_material(self):
@@ -214,9 +214,9 @@ class CursosTest(unittest.TestCase):
         i = copy.deepcopy(self.indice)
         i["documentos"].append({**i["documentos"][0], "id": "otro", "archivo": "fuentes/bibliografia/otro.pdf"})
         self.escribir(i, contrato=self.contrato + "\nNota manual preservada\n")
-        paquete = json.loads(self.propuesta.read_text())
+        paquete = json.loads(self.propuesta.read_text(encoding="utf-8"))
         paquete["origenes"] = {"otro": {"archivo": "_entrada/otro.pdf", "sha256": sha256(nuevo)}}
-        self.propuesta.write_text(json.dumps(paquete))
+        self.propuesta.write_text(json.dumps(paquete), encoding="utf-8", newline="\n")
         progreso = self.raiz / "progreso.yaml"
         antes = progreso.stat().st_mtime_ns
         fuente_previa = sha256(self.raiz / self.indice["documentos"][0]["archivo"])
@@ -225,7 +225,7 @@ class CursosTest(unittest.TestCase):
         self.assertEqual(progreso.stat().st_mtime_ns, antes)
         self.assertEqual(sha256(self.raiz / self.indice["documentos"][0]["archivo"]), fuente_previa)
         self.assertEqual(sha256(self.raiz / "fuentes/bibliografia/otro.pdf"), sha256(nuevo))
-        self.assertIn("Nota manual preservada", (self.raiz / "curso.md").read_text())
+        self.assertIn("Nota manual preservada", (self.raiz / "curso.md").read_text(encoding="utf-8"))
 
     def test_amplia_con_pdf_nuevo_y_rechaza_edicion_durante_la_copia(self):
         self.crear()
@@ -234,31 +234,31 @@ class CursosTest(unittest.TestCase):
         i = copy.deepcopy(self.indice)
         i["documentos"].append({**i["documentos"][0], "id": "otro", "archivo": "fuentes/bibliografia/otro.pdf"})
         self.escribir(i)
-        paquete = json.loads(self.propuesta.read_text())
+        paquete = json.loads(self.propuesta.read_text(encoding="utf-8"))
         paquete["origenes"] = {"otro": {"archivo": "_entrada/otro.pdf", "sha256": sha256(nuevo)}}
-        self.propuesta.write_text(json.dumps(paquete))
+        self.propuesta.write_text(json.dumps(paquete), encoding="utf-8", newline="\n")
         progreso = sha256(self.raiz / "progreso.yaml")
         r, _ = revisar(self.vault, "ejemplo", self.propuesta)
         import shutil
         copiar = shutil.copyfileobj
         def interferir(entrada, salida):
             copiar(entrada, salida)
-            (self.raiz / "curso.md").write_text(self.contrato + "\nEdición durante copia\n")
+            (self.raiz / "curso.md").write_text(self.contrato + "\nEdición durante copia\n", encoding="utf-8", newline="\n")
         with patch("cursos.shutil.copyfileobj", side_effect=interferir):
             with self.assertRaises(Conflicto):
                 aplicar(self.vault, "ejemplo", self.propuesta, r["base"], r["huella"])
-        self.assertIn("Edición durante copia", (self.raiz / "curso.md").read_text())
+        self.assertIn("Edición durante copia", (self.raiz / "curso.md").read_text(encoding="utf-8"))
         self.assertEqual(sha256(self.raiz / "progreso.yaml"), progreso)
-        self.assertEqual(len(cargar_yaml((self.raiz / "indice.yaml").read_text())["documentos"]), 1)
+        self.assertEqual(len(cargar_yaml((self.raiz / "indice.yaml").read_text(encoding="utf-8"))["documentos"]), 1)
 
     def test_registro_corrupto_o_fuente_cambiada_se_detecta(self):
         self.crear()
         carpeta = self.raiz / "_procesado/libro"
         carpeta.mkdir(parents=True)
-        (carpeta / "calidad.json").write_text("[]")
+        (carpeta / "calidad.json").write_text("[]", encoding="utf-8", newline="\n")
         self.assertFalse(validar(self.raiz, "ejemplo")["ok"])
-        (carpeta / "calidad.json").write_text('{"paginas": {}}')
-        (carpeta / "meta.json").write_text(json.dumps({"id": "libro", "sha256": "huella incorrecta"}))
+        (carpeta / "calidad.json").write_text('{"paginas": {}}', encoding="utf-8", newline="\n")
+        (carpeta / "meta.json").write_text(json.dumps({"id": "libro", "sha256": "huella incorrecta"}), encoding="utf-8", newline="\n")
         self.assertFalse(validar(self.raiz, "ejemplo")["ok"])
 
     def test_informe_recupera_corte_entre_registro_y_markdown(self):
@@ -276,15 +276,15 @@ class CursosTest(unittest.TestCase):
             with self.assertRaises(OSError):
                 publicar_informe(self.vault, "ejemplo")
         publicar_informe(self.vault, "ejemplo")
-        self.assertIn("nombre revisado", (self.raiz / "informe-ingesta.md").read_text())
+        self.assertIn("nombre revisado", (self.raiz / "informe-ingesta.md").read_text(encoding="utf-8"))
 
     def test_informe_visible_cita_y_preserva_edicion_manual(self):
         self.crear()
         publicar_informe(self.vault, "ejemplo")
         archivo = self.raiz / "informe-ingesta.md"
-        self.assertIn("Tema → material", archivo.read_text())
-        self.assertIn("[[cursos/ejemplo/fuentes/bibliografia/libro.pdf#page=1]]", archivo.read_text())
-        self.assertIn("sin preparar", archivo.read_text())
-        archivo.write_text("Mis observaciones")
+        self.assertIn("Tema → material", archivo.read_text(encoding="utf-8"))
+        self.assertIn("[[cursos/ejemplo/fuentes/bibliografia/libro.pdf#page=1]]", archivo.read_text(encoding="utf-8"))
+        self.assertIn("sin preparar", archivo.read_text(encoding="utf-8"))
+        archivo.write_text("Mis observaciones", encoding="utf-8", newline="\n")
         with self.assertRaises(Conflicto): publicar_informe(self.vault, "ejemplo")
-        self.assertEqual(archivo.read_text(), "Mis observaciones")
+        self.assertEqual(archivo.read_text(encoding="utf-8"), "Mis observaciones")

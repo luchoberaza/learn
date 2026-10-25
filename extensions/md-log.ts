@@ -152,6 +152,8 @@ export default function mdLog(pi: ExtensionAPI) {
 		if (!logFile) throw new Error("No hay nota vinculada.");
 		let bytes: Buffer;
 		if (typeof image === "string") {
+			// Windows no tiene O_NOFOLLOW: ahí el enlace simbólico se rechaza antes de abrir.
+			if (!fs.constants.O_NOFOLLOW && fs.lstatSync(image).isSymbolicLink()) throw new Error("La imagen debe ser un archivo regular.");
 			const fd = fs.openSync(image, fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW | fs.constants.O_NONBLOCK);
 			try {
 				if (!fs.fstatSync(fd).isFile()) throw new Error("La imagen debe ser un archivo regular.");
@@ -217,11 +219,12 @@ export default function mdLog(pi: ExtensionAPI) {
 				const adjuntoExplicito = linea.trim().startsWith("@");
 				let ruta = linea.trim().replace(/^@/, "");
 				if ((ruta.startsWith('"') && ruta.endsWith('"')) || (ruta.startsWith("'") && ruta.endsWith("'"))) ruta = ruta.slice(1, -1);
-				if ((adjuntoExplicito || /^(?:\/|~\/|\.{1,2}\/)/.test(ruta)) && /\.(?:png|jpe?g|webp|gif|heic|heif|bmp)$/i.test(ruta)) {
-					return insertarImagen(path.resolve(contexto?.cwd || ".", ruta.startsWith("~/") ? path.join(homedir(), ruta.slice(2)) : ruta));
+				// En Windows la ruta también puede ser C:\… o venir con \ (así la pega pi con Ctrl+V).
+				if ((adjuntoExplicito || /^(?:\/|~[\\/]|\.{1,2}[\\/]|[A-Za-z]:[\\/])/.test(ruta)) && /\.(?:png|jpe?g|webp|gif|heic|heif|bmp)$/i.test(ruta)) {
+					return insertarImagen(path.resolve(contexto?.cwd || ".", /^~[\\/]/.test(ruta) ? path.join(homedir(), ruta.slice(2)) : ruta));
 				}
 				// Pi 1.3 pega una ruta en el editor, también en medio de una respuesta.
-				return linea.replace(/\/[^\s"'`<>]*\bpi-clipboard-[a-f0-9-]{36}\.(?:png|jpe?g|webp|gif)(?=$|[\s"'`<>),;:])/gi, ruta => insertarImagen(ruta));
+				return linea.replace(/(?:[A-Za-z]:)?[\\/][^\s"'`<>]*\bpi-clipboard-[a-f0-9-]{36}\.(?:png|jpe?g|webp|gif)(?=$|[\s"'`<>),;:])/gi, ruta => insertarImagen(ruta));
 			}).join("\n");
 		}).filter(Boolean);
 		return partes.length ? `> [!quote] VOS\n\n${partes.join("\n\n")}` : null;

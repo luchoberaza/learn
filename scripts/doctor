@@ -3,7 +3,7 @@ import { existsSync, readFileSync, readdirSync, mkdtempSync, writeFileSync, rmSy
 import { homedir, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
-import { agentDir, loadProject, piDir, vaultDir, webConfigPath } from "./lib/pi-sdk.mjs";
+import { agentDir, leerConfig, loadProject, piDir, vaultDir, webConfigPath, pythonDelVenv, PYTHON_TEXTO, WINDOWS } from "./lib/pi-sdk.mjs";
 
 const sinRed = process.argv.includes("--sin-red");
 if (process.argv.some(arg => arg === "--help" || arg === "--ayuda")) {
@@ -15,35 +15,49 @@ function check(ok, label, detail) {
   if (!ok) fallos++;
   console.log(`${ok ? "✓" : "✗"} ${label}: ${detail}`);
 }
+// En Windows pi y npm son .cmd: spawnSync sólo los encuentra a través de la shell (sus argumentos acá son fijos y sin espacios).
 function run(program, args = []) {
-  const result = spawnSync(program, args, { encoding: "utf8", timeout: 15000, cwd: vaultDir });
+  const shell = WINDOWS && ["pi", "npm"].includes(program);
+  const result = shell ? spawnSync([program, ...args].join(" "), { encoding: "utf8", timeout: 15000, cwd: vaultDir, shell: true, windowsHide: true })
+    : spawnSync(program, args, { encoding: "utf8", timeout: 15000, cwd: vaultDir, windowsHide: true });
   return { ok: result.status === 0, text: (result.stdout || "").trim() };
 }
 function json(file) { return JSON.parse(readFileSync(file, "utf8")); }
-const config = json(join(piDir, "curso.config.json"));
+const base = json(join(piDir, "curso.config.json")), config = leerConfig(piDir);
 const version = run("pi", ["--version"]);
 if (version.ok && version.text !== "1.4.0") console.log(`! pi: ${version.text}, distinta de la fijada 1.4.0; verificá APIs antes de usar (SETUP.md).`);
 else check(version.ok, "pi", `${version.text || "no encontrado"}; se requiere 1.4.0 (ver SETUP.md)`);
-check(process.version === "v26.1.0", "Node.js", `${process.version}; versión verificada: v26.1.0`);
-const fish = run("fish", ["--version"]);
-check(fish.ok && fish.text === "fish, version 4.9.3", "fish", `${fish.text || "ausente"}; versión verificada: 4.9.3`);
-const tmux = run("tmux", ["-V"]);
-check(tmux.ok && tmux.text === "tmux 3.8", "tmux instalado", tmux.ok ? tmux.text : "instalá tmux 3.8");
-check(Boolean(process.env.TMUX) && run("tmux", ["display-message", "-p", "#{pane_id}"]).ok,
-  "Dentro de tmux", process.env.TMUX ? "sesión detectada" : "abrí pi con pi-learn desde fish");
-const fishFile = join(homedir(), ".config/fish/functions/pi-learn.fish");
-check(existsSync(fishFile) && readFileSync(fishFile, "utf8") === readFileSync(join(piDir, "config/fish/pi-learn.fish"), "utf8"),
-  "Lanzador fish", "~/.config/fish/functions/pi-learn.fish; reinstalación en SETUP.md");
-const wayland = process.env.XDG_SESSION_TYPE === "wayland" || Boolean(process.env.WAYLAND_DISPLAY);
-const clipboard = wayland ? "wl-paste" : "xclip";
-check(run(clipboard, [wayland ? "--version" : "-version"]).ok,
-  "Portapapeles", `${wayland ? "Wayland" : "X11"}: se necesita ${clipboard}; prueba Ctrl+V manual en SETUP.md`);
-const vault = config.vault.replace(/^~(?=\/|$)/, homedir());
+// Como con pi: otra versión que cumple el piso de pi 1.4.0 (>=22.19.0) es un aviso, no una falla.
+const [mayor, menor] = process.versions.node.split(".").map(Number);
+if (process.version !== "v26.1.0" && (mayor > 22 || (mayor === 22 && menor >= 19))) console.log(`! Node.js: ${process.version}, distinta de la verificada v26.1.0; pi 1.4.0 pide >=22.19.0.`);
+else check(process.version === "v26.1.0", "Node.js", `${process.version}; versión verificada: v26.1.0`);
+if (WINDOWS) {
+  // pi-learn (fish + tmux) es el lanzador de Linux; en Windows se abre con la app o con pi -ns --skill .pi/skills.
+  console.log("· fish, tmux y el lanzador pi-learn: no aplican en Windows (se abre con la app).");
+  const bash = [process.env.ProgramFiles, process.env["ProgramFiles(x86)"]].filter(Boolean).map(d => join(d, "Git/bin/bash.exe")).find(existsSync);
+  check(Boolean(bash) || run("bash", ["--version"]).ok, "Git Bash", bash ? `${bash}; pi lo usa para la herramienta bash y los comandos de las skills` : "instalá Git for Windows: pi lo necesita para la herramienta bash");
+} else {
+  const fish = run("fish", ["--version"]);
+  check(fish.ok && fish.text === "fish, version 4.9.3", "fish", `${fish.text || "ausente"}; versión verificada: 4.9.3`);
+  const tmux = run("tmux", ["-V"]);
+  check(tmux.ok && tmux.text === "tmux 3.8", "tmux instalado", tmux.ok ? tmux.text : "instalá tmux 3.8");
+  check(Boolean(process.env.TMUX) && run("tmux", ["display-message", "-p", "#{pane_id}"]).ok,
+    "Dentro de tmux", process.env.TMUX ? "sesión detectada" : "abrí pi con pi-learn desde fish");
+  const fishFile = join(homedir(), ".config/fish/functions/pi-learn.fish");
+  check(existsSync(fishFile) && readFileSync(fishFile, "utf8") === readFileSync(join(piDir, "config/fish/pi-learn.fish"), "utf8"),
+    "Lanzador fish", "~/.config/fish/functions/pi-learn.fish; reinstalación en SETUP.md");
+  const wayland = process.env.XDG_SESSION_TYPE === "wayland" || Boolean(process.env.WAYLAND_DISPLAY);
+  const clipboard = wayland ? "wl-paste" : "xclip";
+  check(run(clipboard, [wayland ? "--version" : "-version"]).ok,
+    "Portapapeles", `${wayland ? "Wayland" : "X11"}: se necesita ${clipboard}; prueba Ctrl+V manual en SETUP.md`);
+}
+const vault = config.vault.replace(/^~(?=[\\/]|$)/, homedir());
 check(resolve(vault) === vaultDir && ["_entrada", "cursos"].every(name => existsSync(join(vault, name))),
   "Rutas del vault", `${vault}; creá _entrada/ y cursos/ si faltan`);
 // Un ENOSPC en clase corta el turno y deja el JSONL de la sesión con una línea partida.
 const libre = Math.min(...[vaultDir, agentDir].filter(existsSync).map(dir => { const s = statfsSync(dir); return s.bavail * s.bsize; }));
-check(libre >= 2 ** 31, "Espacio libre", `${(libre / 2 ** 30).toFixed(1).replace(".", ",")} GB en el disco del vault y de pi${libre < 2 ** 31 ? "; liberá al menos 2 GB (para ver qué ocupa: du -xh -d 2 ~ | sort -h | tail)" : ""}`);
+const queOcupa = WINDOWS ? "Configuración > Sistema > Almacenamiento" : "du -xh -d 2 ~ | sort -h | tail";
+check(libre >= 2 ** 31, "Espacio libre", `${(libre / 2 ** 30).toFixed(1).replace(".", ",")} GB en el disco del vault y de pi${libre < 2 ** 31 ? `; liberá al menos 2 GB (para ver qué ocupa: ${queOcupa})` : ""}`);
 let obsidian = false;
 try { obsidian = json(join(vault, ".obsidian/app.json")).userIgnoreFilters?.includes("_procesado") === true; } catch {}
 check(obsidian, "Obsidian", obsidian ? "_procesado excluido" : "con Obsidian cerrado, agregá _procesado a userIgnoreFilters");
@@ -55,8 +69,8 @@ check(webVersion === "0.42.0", "Extensión web fijada", `${webVersion || "ausent
 const webConfig = webConfigPath();
 check(existsSync(webConfig) && readFileSync(webConfig, "utf8") === readFileSync(join(piDir, "config/web-search.json"), "utf8"),
   "Configuración web", `${webConfig}; instalación reproducible en SETUP.md (sin cookies; uso actual sin claves de búsqueda)`);
-// El researcher es un pi -p propio: timeout lo corta, pi-web-access le da la web y el renombre deja pasar web_fetch por --tools.
-check(run("timeout", ["--version"]).ok, "timeout (coreutils)", "el researcher lo usa para cortar al hijo; si falta, instalá coreutils");
+// El researcher es un pi -p propio: el vigilante lo corta (en Node, igual en Linux y Windows), pi-web-access le da la web y el renombre deja pasar web_fetch por --tools.
+check(existsSync(join(piDir, "scripts/vigilante.mjs")), "Vigilante del researcher", "scripts/vigilante.mjs corta al hijo al vencer el plazo; si falta, el researcher no corre");
 check(existsSync(join(piDir, "npm/node_modules/pi-web-access/dist/index.js")), "Web del researcher",
   ".pi/npm/node_modules/pi-web-access/dist/index.js; si falta, el researcher investiga sin web: ejecutá npm ci --ignore-scripts --prefix .pi/npm");
 let fetchContent;
@@ -64,9 +78,18 @@ try { fetchContent = json(webConfig).toolNames?.fetchContent; } catch {}
 check(fetchContent === "web_fetch", "web_fetch del researcher",
   `${webConfig}: toolNames.fetchContent = ${JSON.stringify(fetchContent ?? null)}; debe ser "web_fetch" o el researcher queda sin leer páginas (copiá .pi/config/web-search.json, SETUP.md)`);
 const researcher = readFileSync(join(piDir, "agents/researcher.md"), "utf8");
-check(researcher.match(/^model: (.+)$/m)?.[1] === config.modelo_researcher, "Modelo del researcher", "agents/researcher.md debe coincidir con curso.config.json");
+check(researcher.match(/^model: (.+?)\r?$/m)?.[1] === base.modelo_researcher, "Modelo del researcher", "agents/researcher.md debe coincidir con curso.config.json"
+  + (config.modelo_researcher !== base.modelo_researcher ? `; en esta máquina se usa ${config.modelo_researcher} (curso.config.local.json)` : ""));
 check(run("git", ["-C", piDir, "diff", "--exit-code", "7cfd8942f82ab9476e63572387e1fe9bcea5082c", "--", "skills/teach/SKILL.md"]).ok,
   "teach original", "skills/teach/SKILL.md sin cambios");
+// visualize dibuja con mermaid-cli (dependencia de visual-tools) y un Chrome, Chromium o Edge del sistema; sin eso los
+// diagramas no se dibujan, pero el resto anda: es un aviso.
+{
+  const { findChrome } = await import(new URL("../extensions/visual-tools/tools/_common.ts", import.meta.url).href);
+  const mmdc = existsSync(join(piDir, "extensions/visual-tools/node_modules/@mermaid-js/mermaid-cli/src/cli.js")), navegador = findChrome();
+  if (mmdc && navegador) check(true, "Diagramas (visualize)", `mermaid-cli y ${navegador}`);
+  else console.log(`! Diagramas (visualize): ${!mmdc ? "faltan las dependencias de visual-tools: PUPPETEER_SKIP_DOWNLOAD=1 npm ci --omit=dev --ignore-scripts --prefix .pi/extensions/visual-tools" : "no se encontró Chrome, Chromium ni Edge (o fijá PI_VISUAL_CHROME)"}`);
+}
 let project;
 try {
   project = await loadProject();
@@ -140,7 +163,7 @@ try {
 } catch {
   check(false, "Carga de pi", "falló el SDK o una extensión; ejecutá pi --verbose (SETUP.md)");
 } finally { if (project) await project.close(); }
-const pythonIngesta = join(piDir, ".venv/bin/python");
+const pythonIngesta = pythonDelVenv(piDir);
 const recetaVenv = "recrealo desde el vault: UV_PROJECT_ENVIRONMENT=$PWD/.pi/.venv uv sync --project .pi/scripts/ingesta --python 3.13.13 --python-preference only-managed --locked";
 if (!existsSync(pythonIngesta)) {
   check(false, "Entorno de ingesta", `falta .pi/.venv; ${recetaVenv}`);
@@ -149,7 +172,7 @@ if (!existsSync(pythonIngesta)) {
   try {
     if (!ingesta.ok) throw new Error("diagnóstico fallido");
     for (const entrada of JSON.parse(ingesta.text).chequeos) check(entrada.ok, entrada.nombre, entrada.detalle);
-  } catch { check(false, "Entorno de ingesta", `no se pudo verificar (.pi/.venv/bin/python .pi/scripts/ingesta/comprobar.py); si el venv está roto, ${recetaVenv}`); }
+  } catch { check(false, "Entorno de ingesta", `no se pudo verificar (${PYTHON_TEXTO} .pi/scripts/ingesta/comprobar.py); si el venv está roto, ${recetaVenv}`); }
 }
 const cursos = readdirSync(join(vaultDir, "cursos"), { withFileTypes: true }).filter(entry => entry.isDirectory());
 if (!cursos.length) check(true, "Validación de cursos", "sin cursos todavía; /curso-nuevo prepara uno desde _entrada/");

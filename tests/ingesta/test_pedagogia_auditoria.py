@@ -28,7 +28,7 @@ class PedagogiaAuditoriaTest(unittest.TestCase):
         return registrar(self.vault, 'ejemplo', 'derivacion', self.log, datos or self.datos, **kw)
 
     def tema(self):
-        return yaml.safe_load((self.raiz / 'progreso.yaml').read_text())['temas']['derivacion']
+        return yaml.safe_load((self.raiz / 'progreso.yaml').read_text(encoding="utf-8"))['temas']['derivacion']
 
     def test_h56_objetivo_y_plan_se_guardan_por_tema_como_delta(self):
         self.guardar({**self.datos, 'objetivo': 'Derivar composiciones como en el parcial', 'plan': '1. Regla de la cadena (libro PDF 3) → 2. Composición (PDF 4)'})
@@ -46,7 +46,7 @@ class PedagogiaAuditoriaTest(unittest.TestCase):
 
     def test_h56_una_reconstruccion_vieja_no_pisa_objetivo_ni_plan(self):
         viejo = 'sesiones/2000-01-01-derivacion.md'
-        (self.raiz / viejo).write_text('log viejo')
+        (self.raiz / viejo).write_text('log viejo', encoding="utf-8", newline="\n")
         self.guardar({**self.datos, 'objetivo': 'Actual', 'plan': 'Plan actual'})
         huella = hashlib.sha256((self.raiz / viejo).read_bytes()).hexdigest()
         registrar(self.vault, 'ejemplo', 'derivacion', viejo, {'resumen': 'viejo', 'objetivo': 'Viejo', 'plan': 'Plan viejo'}, reconstruido=True, huella_log=huella)
@@ -54,17 +54,18 @@ class PedagogiaAuditoriaTest(unittest.TestCase):
 
     def test_h56_un_plan_que_no_es_texto_invalida_el_progreso(self):
         self.guardar()
-        p = yaml.safe_load((self.raiz / 'progreso.yaml').read_text())
+        p = yaml.safe_load((self.raiz / 'progreso.yaml').read_text(encoding="utf-8"))
         p['temas']['derivacion']['plan'] = ['no', 'texto']
-        (self.raiz / 'progreso.yaml').write_text(yaml.safe_dump(p))
+        (self.raiz / 'progreso.yaml').write_text(yaml.safe_dump(p), encoding="utf-8", newline="\n")
         r = leer(self.vault, 'ejemplo')
         self.assertNotIn('plan', r['progreso']['temas'].get('derivacion', {}))
 
+    @unittest.skipIf(os.name == 'nt', 'Windows ignora chmod de carpetas: el texto de EACCES lo cubre test_otro_error_de_archivo')
     def test_permiso_denegado_es_una_linea_en_espanol(self):
         os.chmod(self.raiz, 0o555)
         self.addCleanup(os.chmod, self.raiz, 0o755)
         entrada = json.dumps({'vault': str(self.vault), 'curso': 'ejemplo', 'tema': 'derivacion', 'log': self.log, 'datos': self.datos})
-        r = subprocess.run([sys.executable, str(SCRIPT), 'registrar'], input=entrada, capture_output=True, text=True)
+        r = subprocess.run([sys.executable, str(SCRIPT), 'registrar'], input=entrada, capture_output=True, text=True, encoding="utf-8")
         self.assertEqual(r.returncode, 1)
         self.assertEqual(r.stderr.strip(), 'Progreso no guardado: no hay permiso para escribir el progreso; revisá los permisos de cursos/ejemplo/.')
 
@@ -83,7 +84,7 @@ class PedagogiaAuditoriaTest(unittest.TestCase):
         self.guardar()
         (self.raiz / 'progreso.yaml.bak').write_bytes(b'\xff\xfe basura')
         entrada = json.dumps({'vault': str(self.vault), 'curso': 'ejemplo', 'tema': 'derivacion', 'log': self.log, 'datos': {'resumen': 'otro registro'}})
-        r = subprocess.run([sys.executable, str(SCRIPT), 'registrar'], input=entrada, capture_output=True, text=True)
+        r = subprocess.run([sys.executable, str(SCRIPT), 'registrar'], input=entrada, capture_output=True, text=True, encoding="utf-8")
         self.assertEqual(r.returncode, 1)
         self.assertTrue(r.stderr.startswith('Progreso no guardado: '), r.stderr)
         self.assertNotRegex(r.stderr, r'codec|decode|byte|Traceback')
@@ -106,21 +107,21 @@ class ReservaTest(unittest.TestCase):
         self.b.setUp()
         self.addCleanup(self.b.doCleanups)
         self.vault, self.raiz, self.log = self.b.vault, self.b.raiz, self.b.log
-        indice = yaml.safe_load((self.raiz / 'indice.yaml').read_text())
+        indice = yaml.safe_load((self.raiz / 'indice.yaml').read_text(encoding="utf-8"))
         indice['documentos'].append({'id': 'parcial', 'tipo': 'evaluaciones'})
-        (self.raiz / 'indice.yaml').write_text(yaml.safe_dump(indice))
+        (self.raiz / 'indice.yaml').write_text(yaml.safe_dump(indice), encoding="utf-8", newline="\n")
         (self.raiz / '_procesado/parcial').mkdir()
         self.banco('1', '2')
 
     def banco(self, *ids):
         items = [{'id': i, 'enunciado': f'Pregunta {i}', 'puntos': 10} for i in ids] + [{'id': f'{i}-solucion', 'enunciado': 'Solución', 'solucion_de': i} for i in ids]
-        (self.raiz / '_procesado/parcial/items.yaml').write_text(yaml.safe_dump({'items': items}))
+        (self.raiz / '_procesado/parcial/items.yaml').write_text(yaml.safe_dump({'items': items}), encoding="utf-8", newline="\n")
 
     def guardar(self, datos=None, **kw):
         return registrar(self.vault, 'ejemplo', 'derivacion', self.log, datos or {'resumen': 'probe'}, **kw)
 
     def temas(self):
-        return yaml.safe_load((self.raiz / 'progreso.yaml').read_text())['temas']
+        return yaml.safe_load((self.raiz / 'progreso.yaml').read_text(encoding="utf-8"))['temas']
 
     def test_la_primera_reserva_queda_fija(self):
         self.guardar(reservas={'derivacion': {'doc': 'parcial', 'id': '1'}, 'limites': {'doc': 'parcial', 'id': '2'}})
@@ -133,7 +134,7 @@ class ReservaTest(unittest.TestCase):
         self.assertNotIn('limites', self.temas())
         temas, documentos, items = contexto(self.raiz)
         del temas['limites']
-        validar_progreso(yaml.safe_load((self.raiz / 'progreso.yaml').read_text()), temas, documentos, items)
+        validar_progreso(yaml.safe_load((self.raiz / 'progreso.yaml').read_text(encoding="utf-8")), temas, documentos, items)
 
     def test_un_intento_o_un_simulacro_lo_marcan_usado_y_despues_se_fija_otro(self):
         self.guardar(reservas={'derivacion': {'doc': 'parcial', 'id': '1'}})
@@ -174,9 +175,9 @@ class ReservaTest(unittest.TestCase):
 
     def test_una_reserva_fuera_del_esquema_invalida_el_progreso(self):
         self.guardar(reservas={'derivacion': {'doc': 'parcial', 'id': '1'}})
-        p = yaml.safe_load((self.raiz / 'progreso.yaml').read_text())
+        p = yaml.safe_load((self.raiz / 'progreso.yaml').read_text(encoding="utf-8"))
         p['temas']['derivacion']['reservado'] = [{'doc': 'parcial', 'id': 1}]
-        (self.raiz / 'progreso.yaml').write_text(yaml.safe_dump(p))
+        (self.raiz / 'progreso.yaml').write_text(yaml.safe_dump(p), encoding="utf-8", newline="\n")
         self.assertNotIn('derivacion', leer(self.vault, 'ejemplo')['progreso']['temas'])
 
 

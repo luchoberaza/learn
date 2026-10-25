@@ -3,7 +3,7 @@ import type { Api, Model } from "@earendil-works/pi-ai";
 import { createHash } from "node:crypto";
 import { closeSync, openSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { piDir, vaultDir } from "../../scripts/lib/pi-sdk.mjs";
+import { piDir, vaultDir, leerConfig } from "../../scripts/lib/pi-sdk.mjs";
 import { corteModelo, modeloVision, python, transcribir } from "./ingesta.ts";
 import { leer, type DatosCurso, type Tema } from "./material.ts";
 import type { registrarSesion } from "./sesion.ts";
@@ -130,7 +130,7 @@ export function registrarPreparacion(pi: ExtensionAPI, sesion: Pick<ReturnType<t
     // Red, cuota o credenciales: cada llamada siguiente fallaría igual, así que se corta la tanda con la causa.
     const cortar = (e: unknown) => { if (signal.aborted || OCUPADA.test(mensaje(e)) || corte(e)) throw corte(e) ? new Error(corte(e)) : e; };
     try {
-      const config = JSON.parse(readFileSync(join(recursos, "curso.config.json"), "utf8"));
+      const config = leerConfig(recursos);
       const pedir = (): Promise<Trabajo> => python("trabajo", { vault, curso, tema: tema.id, maximo: TOPE }, signal, "preparacion.py");
       let t = await pedir();
       // Un documento que espera la ingesta base no es trabajo: el tema queda incompleto sin aviso.

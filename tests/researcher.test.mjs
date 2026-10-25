@@ -2,12 +2,20 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, mkdtempSync, mkdirSync, writeFileSync, readFileSync, readdirSync, rmSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { spawnSync } from 'node:child_process';
+import { join, sep } from 'node:path';
 import { prepararInvestigacion, registrarResearcher, verificacionPrevia } from '../extensions/curso/researcher.ts';
 
+function limpiar(vault) {
+  if (process.platform === 'win32') {
+    const buscar = dir => { try { return readdirSync(dir, { withFileTypes: true }).flatMap(e => e.isDirectory() ? buscar(join(dir, e.name)) : e.name === 'trabajo.json' ? [join(dir, e.name)] : []); } catch { return []; } };
+    for (const f of buscar(vault)) try { spawnSync('taskkill', ['/PID', String(JSON.parse(readFileSync(f, 'utf8')).pid), '/T', '/F'], { stdio: 'ignore' }); } catch { /* ya terminó */ }
+  }
+  rmSync(vault, { recursive: true, force: true, maxRetries: 20, retryDelay: 100 });
+}
 function entorno(t) {
   const vault=mkdtempSync(join(tmpdir(),'pi-researcher-')), recursos=join(vault,'.pi'), raiz=join(vault,'cursos/calculo');
-  t.after(()=>rmSync(vault,{recursive:true,force:true}));
+  t.after(()=>limpiar(vault));
   for (const p of [join(recursos,'agents'),join(raiz,'_procesado/libro/paginas')]) mkdirSync(p,{recursive:true});
   writeFileSync(join(recursos,'curso.config.json'),JSON.stringify({modelo_researcher:'openai/gpt-6-luna'}));
   writeFileSync(join(recursos,'agents/researcher.md'),'PROMPT ESPAÑOL');
@@ -34,7 +42,7 @@ function entorno(t) {
 const args={modo:'alcance',afirmaciones:['La derivada de x² es x.']};
 test('tarea anclada: rutas reales, PDF base 1, límites y modelo configurado',t=>{
   const e=entorno(t),p=prepararInvestigacion(e.vault,e.recursos,e.d,e.tema,'verificar',args.afirmaciones);
-  assert.ok(p.tarea.includes(e.pagina));assert.ok(p.tarea.includes(e.d.contrato));assert.match(p.tarea,/#page=1/);assert.match(p.tarea,/1–3 afirmaciones/);assert.match(p.tarea,/Respondé en español/);assert.match(p.tarea,/libro\/2/);
+  assert.ok(p.tarea.includes(e.pagina.split(sep).join('/')));assert.ok(p.tarea.includes(e.d.contrato));assert.match(p.tarea,/#page=1/);assert.match(p.tarea,/1–3 afirmaciones/);assert.match(p.tarea,/Respondé en español/);assert.match(p.tarea,/libro\/2/);
   writeFileSync(e.pagina,'Otra transcripción');assert.notEqual(prepararInvestigacion(e.vault,e.recursos,e.d,e.tema,'verificar').huella,p.huella);
   e.tema.bibliografia[0].paginas=[0,1000000000];assert.throws(()=>prepararInvestigacion(e.vault,e.recursos,e.d,e.tema,'verificar'),/fuera de rango/);
 });

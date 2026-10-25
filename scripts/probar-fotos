@@ -5,7 +5,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync, append
 import { join, relative, dirname } from "node:path";
 import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
-import { agentDir, importPi, piDir, vaultDir } from "./lib/pi-sdk.mjs";
+import { agentDir, importPi, piDir, vaultDir, pythonDelVenv } from "./lib/pi-sdk.mjs";
 import { rutaSegura } from "../extensions/curso/material.ts";
 
 if (process.argv.length > 2) throw new Error("Uso: node .pi/scripts/probar-fotos (consume dos turnos del modelo principal)");
@@ -23,7 +23,7 @@ const id = `prueba-${Date.now()}`, salida = rutaSegura(vaultDir, `_procesado/fas
 const notas = rutaSegura(vaultDir, "informes/fase5"); mkdirSync(salida, { recursive: true }); mkdirSync(notas, { recursive: true });
 const log = join(notas, `${id}.md`), parcial = join(salida, "foto-parcial.png");
 writeFileSync(log, "", { flag: "wx" });
-const recorte = spawnSync(join(piDir, ".venv/bin/python"), ["-c", "from PIL import Image,ImageDraw; import sys; im=Image.open(sys.argv[1]).crop((90,675,1000,1080)); ImageDraw.Draw(im).rectangle((80,145,240,210),fill='white'); im.save(sys.argv[2])", foto, parcial], { timeout: 15000, encoding: "utf8" });
+const recorte = spawnSync(pythonDelVenv(piDir), ["-c", "from PIL import Image,ImageDraw; import sys; im=Image.open(sys.argv[1]).crop((90,675,1000,1080)); ImageDraw.Draw(im).rectangle((80,145,240,210),fill='white'); im.save(sys.argv[2])", foto, parcial], { timeout: 15000, encoding: "utf8" });
 assert.equal(recorte.status, 0, recorte.stderr);
 const protegidos = ["cursos/redes/progreso.yaml", "cursos/redes/indice.yaml", "cursos/redes/curso.md", ".pi/skills/teach/SKILL.md"];
 const antes = protegidos.map(p => hash(readFileSync(join(vaultDir, p))));

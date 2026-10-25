@@ -25,14 +25,14 @@ class FallosEnEsperaTest(base.CursoPreparacion):
         self.assertEqual(([s["listo"] for s in t["segmentar"]], [c["id"] for c in t["clasificar"]], t["en_espera"]), ([False], ["1"], 2))
         # Cambia una página del parcial: su segmentación vuelve a la cola; la clasificación sigue en espera.
         pagina = self.raiz / "_procesado/parcial/paginas/0002.md"
-        pagina.write_text(pagina.read_text() + "\nPregunta 2. Integre.\n")
+        pagina.write_text(pagina.read_text(encoding="utf-8") + "\nPregunta 2. Integre.\n", encoding="utf-8", newline="\n")
         t = self.trabajo()
         self.assertEqual(([s["listo"] for s in t["segmentar"]], t["en_espera"]), ([True], 1))
         # Pasa un día: la clasificación también vuelve.
         archivo = self.raiz / "_procesado/preparacion.json"
-        estado = json.loads(archivo.read_text())
+        estado = json.loads(archivo.read_text(encoding="utf-8"))
         estado["fallos"]["clasificar/practico/2"]["fecha"] = "2000-01-01T00:00:00+00:00"
-        archivo.write_text(json.dumps(estado))
+        archivo.write_text(json.dumps(estado), encoding="utf-8", newline="\n")
         self.assertEqual(([c["id"] for c in self.trabajo()["clasificar"]], self.trabajo()["en_espera"]), (["1", "2"], 0))
 
 

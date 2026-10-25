@@ -10,7 +10,7 @@ import { join } from "node:path";
 import mdLog from "../extensions/md-log.ts";
 import { registrarSesion } from "../extensions/curso/sesion.ts";
 import { registrarProgreso } from "../extensions/curso/progreso.ts";
-import { loadProject, piDir } from "../scripts/lib/pi-sdk.mjs";
+import { loadProject, piDir, pythonDelVenv, vaultDir } from "../scripts/lib/pi-sdk.mjs";
 import { python, transcribir } from "../extensions/curso/ingesta.ts";
 import { registrarPreparacion } from "../extensions/curso/preparacion.ts";
 import { guardarCurso, registrarCuracion } from "../extensions/curso/curacion.ts";
@@ -93,7 +93,7 @@ test("H04: registrar_progreso recibe la ruta actual de la nota y sólo avisa mie
   assert.doesNotMatch((await e.guardar()).content[0].text, /no está/);
 });
 
-test("H16: una clase sin nota no repite en cada guardado que falta el log", async t => {
+test("H16: una clase sin nota no repite en cada guardado que falta el log", { skip: process.platform === "win32" && "Windows ignora chmod de carpetas: no se puede simular sesiones/ sin permiso" }, async t => {
   const e = await clase(t), elegir = { ...e.ctx, ui: { ...e.ctx.ui, select: async (_t, opciones) => opciones.find(o => o === "Cambiar sin guardar") ?? opciones[0] } };
   chmodSync(join(e.raiz, "sesiones"), 0o555);
   try { await e.comandos.get("estudiar").handler("ejemplo derivacion", elegir); } finally { chmodSync(join(e.raiz, "sesiones"), 0o755); }
@@ -305,11 +305,11 @@ const respuesta = (texto, extra = {}) => ({ stopReason: "stop", content: texto ?
 function preparacion(t) {
   const vault = mkdtempSync(join(tmpdir(), "pi-remates-prep-")), recursos = join(vault, ".pi"), raiz = join(vault, "cursos/ejemplo");
   t.after(() => rmSync(vault, { recursive: true, force: true }));
-  const r = spawnSync(join(piDir, ".venv/bin/python"), ["-c", CURSO, vault], { encoding: "utf8", env: { ...process.env, PYTHONPATH: join(piDir, "tests/ingesta"), PYTHONDONTWRITEBYTECODE: "1" }, timeout: 30000 });
+  const r = spawnSync(pythonDelVenv(piDir), ["-c", CURSO, vault], { encoding: "utf8", env: { ...process.env, PYTHONPATH: join(piDir, "tests/ingesta"), PYTHONDONTWRITEBYTECODE: "1" }, timeout: 30000 });
   assert.equal(r.status, 0, r.stderr);
   mkdirSync(recursos);
   writeFileSync(join(recursos, "curso.config.json"), JSON.stringify({ modelo_vision: "openai/gpt-6-luna", max_paginas_vision_sin_confirmar: 1, umbral_calidad_pagina: 0.6 }));
-  const d = JSON.parse(spawnSync(join(piDir, ".venv/bin/python"), [join(piDir, "scripts/ingesta/sesion.py"), "cargar", "--vault", vault, "--curso", "ejemplo"], { encoding: "utf8" }).stdout);
+  const d = JSON.parse(spawnSync(pythonDelVenv(piDir), [join(piDir, "scripts/ingesta/sesion.py"), "cargar", "--vault", vault, "--curso", "ejemplo"], { encoding: "utf8" }).stdout);
   const e = { activo: { a: { curso: "ejemplo", tema: "derivacion", log: "cursos/ejemplo/sesiones/1.md" }, d, r: raiz }, avisos: [], llamadas: [], eventos: new Map(), guion: {}, raiz };
   const pi = { on: (n, h) => e.eventos.set(n, h), sendMessage: () => {} };
   const ctx = { hasUI: true, ui: { setStatus: () => {}, notify: (m, tipo) => e.avisos.push([tipo, m]) },
@@ -411,7 +411,7 @@ test("preparación (e, f): sólo se borra el lock propio y un pid reutilizado tr
   assert.equal(readFileSync(lock, "utf8"), ajeno);
 });
 
-test("/curso-check suma una línea por tema con la preparación automática, y sin ella igual valida", async () => {
+test("/curso-check suma una línea por tema con la preparación automática, y sin ella igual valida", { skip: !existsSync(join(vaultDir, "cursos/redes/indice.yaml")) && "necesita el curso real de Redes en el vault" }, async () => {
   const comandos = new Map(), mensajes = [];
   registrarCuracion({ registerCommand: (n, d) => comandos.set(n, d), sendMessage: m => mensajes.push(m.content),
     exec: async (_py, args) => ({ code: 0, killed: false, stderr: "", stdout: JSON.stringify({ ok: true, errores: [], avisos: ["Aviso de validar."], pendientes: args.includes("redes") ? [] : [{ doc: "libro", pagina: 3 }] }) }) });

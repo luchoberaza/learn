@@ -82,13 +82,13 @@ test("md-log registra texto y no filtra resultados de herramientas al log", asyn
   await project.session.prompt("/md-unlog");
 });
 
-test("pi-learn: sintaxis fish correcta", () => {
+test("pi-learn: sintaxis fish correcta", { skip: process.platform === "win32" && "pi-learn es el lanzador de Linux (fish + tmux); en Windows se abre con la app" }, () => {
   const result = spawnSync("fish", ["--no-execute", join(piDir, "config/fish/pi-learn.fish")]);
   assert.equal(result.status, 0, result.stderr?.toString());
 });
 
 for (const inside of [false, true]) {
-  test(`pi-learn ${inside ? "dentro" : "fuera"} de tmux conserva carpeta y argumentos sin evaluarlos`, () => {
+  test(`pi-learn ${inside ? "dentro" : "fuera"} de tmux conserva carpeta y argumentos sin evaluarlos`, { skip: process.platform === "win32" && "pi-learn es el lanzador de Linux (fish + tmux); en Windows se abre con la app" }, () => {
     const dir = join(temp, inside ? "dentro" : "fuera");
     const bin = join(dir, "bin");
     const cwd = join(dir, "carpeta con espacios");

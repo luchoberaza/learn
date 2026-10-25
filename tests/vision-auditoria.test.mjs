@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 import { registrarCuracion } from "../extensions/curso/curacion.ts";
 import { transcribir } from "../extensions/curso/ingesta.ts";
-import { piDir } from "../scripts/lib/pi-sdk.mjs";
+import { piDir, pythonDelVenv } from "../scripts/lib/pi-sdk.mjs";
 
 const temporal = mkdtempSync(join(tmpdir(), "pi-vision-auditoria-"));
 const config = { modelo_vision: "openai/gpt-6-luna", max_paginas_vision_sin_confirmar: 1, umbral_calidad_pagina: 0.6 };
@@ -14,7 +14,7 @@ const uso = { input: 1, output: 1, cacheRead: 0, cacheWrite: 0, totalTokens: 2, 
 let numero = 0, solicitud, llamadas, confirmaciones, ctx;
 beforeEach(() => {
   const vault = join(temporal, String(++numero));
-  const r = spawnSync(join(piDir, ".venv/bin/python"), ["-c", `from pathlib import Path
+  const r = spawnSync(pythonDelVenv(piDir), ["-c", `from pathlib import Path
 import sys
 from test_ingesta import crear_pdf
 from pipeline import ejecutar

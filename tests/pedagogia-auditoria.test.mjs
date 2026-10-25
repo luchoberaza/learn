@@ -9,7 +9,7 @@ import { registrarSesion } from "../extensions/curso/sesion.ts";
 import { registrarProgreso } from "../extensions/curso/progreso.ts";
 import { enCurso, registrarSimulacro, tiempo } from "../extensions/curso/simulacro.ts";
 import { tokenizar } from "../scripts/ingesta/bm25.ts";
-import { loadProject, piDir, vaultDir } from "../scripts/lib/pi-sdk.mjs";
+import { loadProject, piDir, vaultDir, pythonDelVenv } from "../scripts/lib/pi-sdk.mjs";
 
 // Regresiones de la auditoría pedagógica: curso sintético, sin modelos.
 function curso(t) {
@@ -87,7 +87,7 @@ test("H72: leer_items muestra el puntaje oficial también cuando es texto", t =>
 });
 
 // Con el curso real: lo que el tutor recibe al estudiar retardos.
-const redes = () => JSON.parse(execFileSync(join(piDir, ".venv/bin/python"), [join(piDir, "scripts/ingesta/sesion.py"), "cargar", "--vault", vaultDir, "--curso", "redes"], { env: { ...process.env, PYTHONDONTWRITEBYTECODE: "1" } }));
+const redes = () => JSON.parse(execFileSync(pythonDelVenv(piDir), [join(piDir, "scripts/ingesta/sesion.py"), "cargar", "--vault", vaultDir, "--curso", "redes"], { env: { ...process.env, PYTHONDONTWRITEBYTECODE: "1" } }));
 
 test("H51, X12: el dossier de retardos trae la notación de la cátedra desde curso.md", t => {
   if (!existsSync(join(vaultDir, "cursos/redes/curso.md"))) return t.skip("sin el curso redes");

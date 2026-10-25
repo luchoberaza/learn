@@ -1,0 +1,4 @@
+# Fin de línea LF en todas las plataformas: el código compara frontmatter, hashes y textos con saltos LF.
+* text=auto eol=lf
+*.png binary
+*.pdf binary

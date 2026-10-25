@@ -4,14 +4,14 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
-import { agentDir, importPi, vaultDir } from "../scripts/lib/pi-sdk.mjs";
+import { agentDir, importPi, vaultDir, importDependenciaPi } from "../scripts/lib/pi-sdk.mjs";
 import { cortarTurno } from "../extensions/comun/corte.ts";
 
 // pi 1.4.0 real con faux: como con un proveedor real, la llamada que arranca con la señal abortada falla al resolver
 // credenciales (pi-ai auth/resolve.js:15) y lazyStream la da por error (api/lazy.js:57-63): «Error: This operation was aborted».
 async function sesion(t) {
-  const sdk = await importPi(), raiz = process.env.PI_MANAGED_INSTALL_ROOT || join(agentDir, "install");
-  const ai = await import(pathToFileURL(join(raiz, "releases", readFileSync(join(raiz, "current-version"), "utf8").trim(), "node_modules/@earendil-works/pi-ai/dist/index.js")).href);
+  const sdk = await importPi();
+  const ai = await importDependenciaPi("@earendil-works/pi-ai");
   const faux = ai.fauxProvider({ provider: "faux", models: [{ id: "faux-1", contextWindow: 200000, maxTokens: 8000 }] });
   let pi;
   const settingsManager = sdk.SettingsManager.create(vaultDir, agentDir, { projectTrusted: true });

@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { spawnSync } from "node:child_process";
-import { agentDir, loadProject, piDir, vaultDir } from "../scripts/lib/pi-sdk.mjs";
+import { agentDir, loadProject, piDir, vaultDir, importDependenciaPi } from "../scripts/lib/pi-sdk.mjs";
 
 let p;
 before(async () => { p = await loadProject(); p.sdk.initTheme("dark"); });
@@ -118,8 +118,8 @@ test("H09/X04: «Working» y «Thinking...» quedan en español desde el arranqu
 
 // Sesión con un proveedor falso (sin red ni modelo) y el curso activo restaurado de la rama.
 async function conFaux(t, entradas, activo = true, avisos) {
-  const raiz = process.env.PI_MANAGED_INSTALL_ROOT || join(agentDir, "install"), { sdk } = p;
-  const ai = await import(pathToFileURL(join(raiz, "releases", readFileSync(join(raiz, "current-version"), "utf8").trim(), "node_modules/@earendil-works/pi-ai/dist/index.js")).href);
+  const { sdk } = p;
+  const ai = await importDependenciaPi("@earendil-works/pi-ai");
   const faux = ai.fauxProvider({ provider: "faux", models: [{ id: "faux-1", contextWindow: 200000, maxTokens: 8000 }] });
   const settingsManager = sdk.SettingsManager.create(vaultDir, agentDir, { projectTrusted: true });
   const loader = new sdk.DefaultResourceLoader({ cwd: vaultDir, agentDir, settingsManager, extensionFactories: [pi => pi.registerProvider(faux.provider)] });
@@ -151,7 +151,7 @@ const charla = [
   { role: "assistant", content: [{ type: "text", text: "Dale." }] },
 ];
 
-test("H62: /compact resume en español con curso, tema y log, y no califica el quiz sin responder", async t => {
+test("H62: /compact resume en español con curso, tema y log, y no califica el quiz sin responder", { skip: !existsSync(join(vaultDir, "cursos/redes/indice.yaml")) && "necesita el curso real de Redes en el vault" }, async t => {
   const { ai, faux, session } = await conFaux(t, charla), pedidos = [];
   faux.setResponses([c => { pedidos.push(c); return ai.fauxAssistantMessage("## Curso y tema\nredes · retardos"); }]);
   const r = await session.compact();
@@ -162,7 +162,7 @@ test("H62: /compact resume en español con curso, tema y log, y no califica el q
   assert.equal(r.summary, "## Curso y tema\nredes · retardos");
 });
 
-test("H62: si el resumen en español falla, pi sigue con el suyo y la sesión no se corta", async t => {
+test("H62: si el resumen en español falla, pi sigue con el suyo y la sesión no se corta", { skip: !existsSync(join(vaultDir, "cursos/redes/indice.yaml")) && "necesita el curso real de Redes en el vault" }, async t => {
   const { ai, faux, session } = await conFaux(t, charla);
   faux.setResponses([ai.fauxAssistantMessage("", { stopReason: "error", errorMessage: "sin red" }), ai.fauxAssistantMessage("resumen de pi"), ai.fauxAssistantMessage("resumen de pi")]);
   assert.match((await session.compact()).summary, /resumen de pi/);
@@ -177,7 +177,7 @@ test("H62: sin clase activa (preparando un curso o tras /fin) /compact usa la pl
   assert.doesNotMatch(pedido, /## Borde|pendiente, sin responder/);
 });
 
-test("P3: /compact en una clase corta suma una línea en español a la de pi, que queda en inglés", async t => {
+test("P3: /compact en una clase corta suma una línea en español a la de pi, que queda en inglés", { skip: !existsSync(join(vaultDir, "cursos/redes/indice.yaml")) && "necesita el curso real de Redes en el vault" }, async t => {
   const avisos = [], { session } = await conFaux(t, [], true, avisos);
   await assert.rejects(() => session.compact(), /Nothing to compact/);
   assert.deepEqual(avisos, [["info", "Todavía no hay nada para resumir; la clase sigue igual."]]);
@@ -189,7 +189,7 @@ test("P3: sin clase activa, /compact no suma la línea de la clase", async t => 
   assert.deepEqual(avisos, []);
 });
 
-test("H80: el doctor revisa timeout, la web del researcher y el renombre a web_fetch en vez de safe_bash", t => {
+test("H80: el doctor revisa el vigilante, la web del researcher y el renombre a web_fetch en vez de safe_bash", t => {
   const agente = mkdtempSync(join(tmpdir(), "pi-doctor-web-")), vacio = mkdtempSync(join(tmpdir(), "pi-doctor-path-"));
   t.after(() => { rmSync(agente, { recursive: true, force: true }); rmSync(vacio, { recursive: true, force: true }); });
   const { toolNames, ...sinRenombre } = JSON.parse(readFileSync(join(piDir, "config/web-search.json"), "utf8"));
@@ -197,11 +197,12 @@ test("H80: el doctor revisa timeout, la web del researcher y el renombre a web_f
   const doctor = env => spawnSync(process.execPath, [join(piDir, "scripts/doctor"), "--sin-red"], { cwd: vaultDir, encoding: "utf8", timeout: 120000,
     env: { ...process.env, PI_CODING_AGENT_DIR: agente, PI_MANAGED_INSTALL_ROOT: process.env.PI_MANAGED_INSTALL_ROOT || join(agentDir, "install"), ...env } }).stdout;
   const salida = doctor({});
-  assert.match(salida, new RegExp(`^✗ web_fetch del researcher: ${join(agente, "web-search.json")}: toolNames\\.fetchContent = null; debe ser "web_fetch"`, "m"));
-  assert.match(salida, /^✓ timeout \(coreutils\)/m);
+  const literal = s => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  assert.match(salida, new RegExp(`^✗ web_fetch del researcher: ${literal(join(agente, "web-search.json"))}: toolNames\\.fetchContent = null; debe ser "web_fetch"`, "m"));
+  assert.match(salida, /^✓ Vigilante del researcher: scripts\/vigilante\.mjs/m);
   assert.match(salida, /^✓ Web del researcher: \.pi\/npm\/node_modules\/pi-web-access\/dist\/index\.js/m);
   assert.doesNotMatch(salida, /safe_bash|puente web/);
-  assert.match(doctor({ PATH: vacio }), /^✗ timeout \(coreutils\): .*instalá coreutils$/m);
+  assert.match(doctor({ PATH: vacio }), /^✓ Vigilante del researcher/m);
 });
 
 test("loadProject carga las skills como pi-learn (-ns --skill .pi/skills): sin globales ni choque con teach", t => {

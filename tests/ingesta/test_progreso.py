@@ -21,15 +21,15 @@ class ProgresoTest(unittest.TestCase):
         (self.raiz / 'sesiones').mkdir(parents=True)
         (self.raiz / '_procesado/practico').mkdir(parents=True)
         # El control existente es el mismo que crea la ingesta real.
-        (self.raiz / '_procesado/control.json').write_text('{"generador":"pi-learning-ingesta","version":1}')
-        (self.raiz / 'indice.yaml').write_text(yaml.safe_dump({'documentos': [{'id': 'practico', 'tipo': 'ejercicios'}], 'temas': [{'id': 'derivacion'}, {'id': 'limites'}]}))
-        (self.raiz / '_procesado/practico/items.yaml').write_text('items:\n- {id: "1", enunciado: Derivar}\n')
+        (self.raiz / '_procesado/control.json').write_text('{"generador":"pi-learning-ingesta","version":1}', encoding="utf-8", newline="\n")
+        (self.raiz / 'indice.yaml').write_text(yaml.safe_dump({'documentos': [{'id': 'practico', 'tipo': 'ejercicios'}], 'temas': [{'id': 'derivacion'}, {'id': 'limites'}]}), encoding="utf-8", newline="\n")
+        (self.raiz / '_procesado/practico/items.yaml').write_text('items:\n- {id: "1", enunciado: Derivar}\n', encoding="utf-8", newline="\n")
         self.archivo = self.raiz / 'progreso.yaml'
         self.vacio = b'version: 1\r\ntemas: {}\r\nhistorial: []\r\n'
         self.archivo.write_bytes(self.vacio)
         self.hoy = date.today().isoformat()
         self.log = f'sesiones/{self.hoy}-derivacion.md'
-        (self.raiz / self.log).write_text('Intento sintético explícito, no respuesta del usuario.\n')
+        (self.raiz / self.log).write_text('Intento sintético explícito, no respuesta del usuario.\n', encoding="utf-8", newline="\n")
         self.datos = {'estado': 'en_curso', 'borde': {'domina': ['derivar un polinomio'], 'falla': ['composición']}, 'conceptos_firmes': ['tasa de cambio'], 'errores_de_concepto': [{'descripcion': 'confunde la función interna', 'detectado': self.hoy, 'resuelto': False}], 'ejercicios': [{'doc': 'practico', 'item': '1', 'fecha': self.hoy, 'resultado': 'parcial', 'notas': 'Falta justificar'}], 'discrepancias': [], 'proximo_paso': 'Identificar la interna', 'resumen': 'Borde observado en un intento sintético.'}
         self.addCleanup(self.tmp.cleanup)
 
@@ -48,9 +48,9 @@ class ProgresoTest(unittest.TestCase):
 
     def test_fusion_resuelve_borde_y_preserva_otro_tema(self):
         self.guardar()
-        p = yaml.safe_load(self.archivo.read_text())
+        p = yaml.safe_load(self.archivo.read_text(encoding="utf-8"))
         p['temas']['limites'] = {'estado': 'dominado', 'conceptos_firmes': ['otro tema']}
-        self.archivo.write_text(yaml.safe_dump(p))
+        self.archivo.write_text(yaml.safe_dump(p), encoding="utf-8", newline="\n")
         self.datos['borde'] = {'domina': ['composición'], 'falla': []}
         self.datos['errores_de_concepto'][0]['resuelto'] = True
         self.datos['ejercicios'].append({**self.datos['ejercicios'][0], 'resultado': 'correcto'})
@@ -83,12 +83,12 @@ class ProgresoTest(unittest.TestCase):
         self.assertIn('restaurado', r['avisos'][0])
 
     def test_invalido_sin_backup_sigue_sin_escribir(self):
-        self.archivo.write_text('version: incorrecta')
+        self.archivo.write_text('version: incorrecta', encoding="utf-8", newline="\n")
         r = leer(self.vault, 'ejemplo')
         self.assertFalse(r['disponible'])
         with self.assertRaises(ValueError):
             self.guardar()
-        self.assertEqual(self.archivo.read_text(), 'version: incorrecta')
+        self.assertEqual(self.archivo.read_text(encoding="utf-8"), 'version: incorrecta')
         self.assertFalse((self.raiz / 'progreso.yaml.bak').exists())
 
     def test_backup_invalido_no_se_sobrescribe_aunque_el_progreso_sea_valido(self):
@@ -110,14 +110,14 @@ class ProgresoTest(unittest.TestCase):
                 registrar(self.vault, 'ejemplo', 'derivacion', log, self.datos)
 
     def test_symlinks_no_se_siguen(self):
-        ajeno = self.vault / 'ajeno'; ajeno.write_text('NO TOCAR')
+        ajeno = self.vault / 'ajeno'; ajeno.write_text('NO TOCAR', encoding="utf-8", newline="\n")
         for nombre in ['progreso.yaml', 'progreso.yaml.bak']:
             f = self.raiz / nombre
             if f.exists(): f.unlink()
             f.symlink_to(ajeno)
             with self.assertRaises((Conflicto, ValueError)):
                 self.guardar()
-            self.assertEqual(ajeno.read_text(), 'NO TOCAR')
+            self.assertEqual(ajeno.read_text(encoding="utf-8"), 'NO TOCAR')
             f.unlink()
             self.archivo.write_bytes(self.vacio)
 
@@ -133,10 +133,10 @@ class ProgresoTest(unittest.TestCase):
     def test_no_pisa_edicion_concurrente_y_respeta_bloqueo(self):
         def editar(raiz, nombre, contenido):
             atomico(raiz, nombre, contenido)
-            if nombre == 'progreso.yaml.bak': self.archivo.write_text('EDICION CONCURRENTE')
+            if nombre == 'progreso.yaml.bak': self.archivo.write_text('EDICION CONCURRENTE', encoding="utf-8", newline="\n")
         with patch('progreso.atomico', side_effect=editar):
             with self.assertRaises(Conflicto): self.guardar()
-        self.assertEqual(self.archivo.read_text(), 'EDICION CONCURRENTE')
+        self.assertEqual(self.archivo.read_text(encoding="utf-8"), 'EDICION CONCURRENTE')
         with patch('almacen.ESPERA', 0.2), esperar(self.raiz / '.progreso.lock'):
             with self.assertRaises(Conflicto): self.guardar()
 

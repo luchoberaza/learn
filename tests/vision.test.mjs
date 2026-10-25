@@ -5,10 +5,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 import { transcribir } from "../extensions/curso/ingesta.ts";
-import { piDir, loadProject } from "../scripts/lib/pi-sdk.mjs";
+import { piDir, loadProject, pythonDelVenv } from "../scripts/lib/pi-sdk.mjs";
 
 const temporal = mkdtempSync(join(tmpdir(), "pi-vision-test-"));
-const python = join(piDir, ".venv/bin/python");
+const python = pythonDelVenv(piDir);
 const config = { modelo_vision: "openai/gpt-6-luna", max_paginas_vision_sin_confirmar: 50, umbral_calidad_pagina: 0.6 };
 const texto = "El ejercicio solicita calcular la derivada de una función y justificar el procedimiento. ".repeat(3) + "$f(x)=x^2$.";
 const uso = { input: 7, output: 5, cacheRead: 0, cacheWrite: 0, totalTokens: 12, cost: { input: 0.001, output: 0.002, cacheRead: 0, cacheWrite: 0, total: 0.003 } };

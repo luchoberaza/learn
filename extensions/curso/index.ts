@@ -2,7 +2,7 @@ import { Type } from "@earendil-works/pi-ai";
 import { type ExtensionAPI, withFileMutationQueue } from "@earendil-works/pi-coding-agent";
 import { existsSync, lstatSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { piDir, vaultDir } from "../../scripts/lib/pi-sdk.mjs";
+import { piDir, vaultDir, leerConfig } from "../../scripts/lib/pi-sdk.mjs";
 import { python, transcribir } from "./ingesta.ts";
 import { guardarCurso, registrarCuracion } from "./curacion.ts";
 import { registrarSesion } from "./sesion.ts";
@@ -107,7 +107,7 @@ export default function (pi: ExtensionAPI) {
     async execute(_id, args, signal, onUpdate, ctx) {
       const raiz = salida(args.curso);
       return withFileMutationQueue(raiz, async () => {
-        const config = JSON.parse(readFileSync(join(piDir, "curso.config.json"), "utf8"));
+        const config = leerConfig(piDir);
         const { resumen, usage } = await transcribir(ctx, { vault: vaultDir, salida: raiz, doc: args.doc, paginas: args.paginas }, config, signal,
           texto => onUpdate?.({ content: [{ type: "text", text: texto }], details: undefined }));
         return { content: [{ type: "text", text: `${resumen.cancelada ? "Tanda cancelada. " : ""}Transcritas: ${resumen.transcritas}; caché: ${resumen.cache}; fallidas: ${resumen.fallidas.join(", ") || "ninguna"}; pendientes de calidad: ${resumen.pendientes.join(", ") || "ninguna nueva"}. La fidelidad requiere revisión humana. ${resumen.avisos.join(" ")}` }],

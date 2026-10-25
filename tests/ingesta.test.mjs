@@ -5,9 +5,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 import { buscar, normalizar } from "../scripts/ingesta/bm25.ts";
-import { piDir, vaultDir } from "../scripts/lib/pi-sdk.mjs";
+import { piDir, vaultDir, pythonDelVenv } from "../scripts/lib/pi-sdk.mjs";
 
-const python = join(piDir, ".venv/bin/python");
+const python = pythonDelVenv(piDir);
 const cli = join(piDir, "scripts/ingesta/ingestar.py");
 const temporal = mkdtempSync(join(tmpdir(), "pi-ingesta-bm25-"));
 const salida = join(temporal, "_procesado/prueba");
@@ -27,7 +27,8 @@ before(() => {
 after(() => rmSync(temporal, { recursive: true, force: true }));
 
 test("ingesta Python: clasificación, calidad, OCR local, reanudación, fallos y protección de fuentes", () => {
-  const resultado = spawnSync(python, ["-m", "unittest", "discover", "-s", join(piDir, "tests/ingesta"), "-v"], { cwd: vaultDir, encoding: "utf8", timeout: 90000 });
+  // La suite tarda ~80 s sola (con OCR real); dentro de la suite Node, con la máquina cargada, 90 s vencían (SETUP, «Tests»).
+  const resultado = spawnSync(python, ["-m", "unittest", "discover", "-s", join(piDir, "tests/ingesta"), "-v"], { cwd: vaultDir, encoding: "utf8", timeout: 300000 });
   assert.equal(resultado.status, 0, resultado.stderr);
   assert.match(resultado.stderr, /Ran \d+ tests/);
 });

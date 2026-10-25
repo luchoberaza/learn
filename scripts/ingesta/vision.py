@@ -192,7 +192,7 @@ def guardar_items(raiz: Path, vault: Path, datos: dict) -> dict:
             smeta, _, _ = cargar(raiz, vault, solucion["doc"])
             destino = ruta_segura(raiz, f"{solucion['doc']}/items.yaml")
             try:
-                vinculados = yaml.safe_load(destino.read_text()) if destino.exists() else {}
+                vinculados = yaml.safe_load(destino.read_text(encoding="utf-8")) if destino.exists() else {}
             except yaml.YAMLError:
                 raise ValueError("El archivo de ítems de soluciones no es YAML válido; se preservó.") from None
             if not isinstance(vinculados, dict) or not isinstance(vinculados.get("items", []), list):

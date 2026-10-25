@@ -5,6 +5,7 @@ from pathlib import Path
 import subprocess
 import sys
 
+from almacen import cargar_config, usar_tesseract
 from pipeline import MOTORES
 
 RECETA = "recrealo desde el vault: UV_PROJECT_ENVIRONMENT=$PWD/.pi/.venv uv sync --project .pi/scripts/ingesta --python 3.13.13 --python-preference only-managed --locked"
@@ -23,8 +24,9 @@ for nombre, esperada in {"pymupdf": "1.28.2", "ocrmypdf": "17.13.0", "wordfreq":
     except PackageNotFoundError:
         encontrada = "ausente"
     verificar(encontrada == esperada, nombre, f"{encontrada}; se requiere {esperada}" + ("" if encontrada == esperada else f"; {RECETA}"))
-config = json.loads((Path(__file__).resolve().parents[2] / "curso.config.json").read_text(encoding="utf-8"))
+config = cargar_config()
 tesseract = Path(config.get("ruta_tesseract", "tesseract")).expanduser()
+usar_tesseract(config)
 try:
     resultado = subprocess.run([tesseract, "--version"], capture_output=True, text=True, timeout=10, check=True)
     encontrada = next(iter(resultado.stdout.splitlines()), "sin versión")

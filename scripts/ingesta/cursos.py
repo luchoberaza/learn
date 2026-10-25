@@ -20,7 +20,7 @@ import time
 import pymupdf
 import yaml
 
-from almacen import ESPERA, Conflicto, atomico, bloquear, guardar_json, leer_json, ruta_segura, sha256
+from almacen import ESPERA, PYTHON_TEXTO, Conflicto, cargar_config, atomico, bloquear, guardar_json, leer_json, proceso_vivo, ruta_segura, sha256
 from extraccion import normalizar
 from pipeline import TIPOS, cita, contenido_pagina, firma
 
@@ -181,7 +181,7 @@ def validar(raiz: Path, slug: str, *, indice=None, contrato=None, origenes=None,
                     pendientes.add((doc, p))
                 elif q.get("sha256_markdown") and sha256(archivo) != q["sha256_markdown"]:
                     errores.append(f"Transcripción editada fuera de la ingesta: {doc}/{p}. Para conservarla, desde la raíz del vault: "
-                                   f".pi/.venv/bin/python .pi/scripts/ingesta/ingestar.py adoptar --salida cursos/{slug}/_procesado --doc {doc} --pagina {p}")
+                                   f"{PYTHON_TEXTO} .pi/scripts/ingesta/ingestar.py adoptar --salida cursos/{slug}/_procesado --doc {doc} --pagina {p}")
         hay_evaluaciones = any(d["tipo"] == "evaluaciones" for d in documentos.values())
         # La preparación automática asigna los ítems que el índice no asigna; el índice curado manda igual.
         evaluados = set()
@@ -325,16 +325,6 @@ def validar_progreso(p, temas, documentos, items):
     return huerfanos
 
 
-def vivo(pid: int) -> bool:
-    try:
-        os.kill(pid, 0)
-    except ProcessLookupError:
-        return False
-    except PermissionError:
-        pass
-    return True
-
-
 def revisar(vault: Path, slug: str, propuesta: Path, max_tokens=1500) -> tuple[dict, dict]:
     raiz = carpeta(vault, slug)
     relativa = propuesta.absolute().relative_to(vault)
@@ -353,7 +343,7 @@ def revisar(vault: Path, slug: str, propuesta: Path, max_tokens=1500) -> tuple[d
         # Copias de un aplicar cortado sin limpieza (SIGTERM): sólo las de procesos que ya terminaron.
         for parcial in raiz.glob("fuentes/*/.*.parcial-*"):
             pid = re.fullmatch(r"\..+\.parcial-(\d+)", parcial.name)
-            if pid and not vivo(int(pid[1])):
+            if pid and not proceso_vivo(int(pid[1])):
                 ruta_segura(raiz, str(parcial.relative_to(raiz))).unlink()
         for nombre in ["indice.yaml", "curso.md", "progreso.yaml"]:
             base[nombre] = texto(raiz, nombre)
@@ -451,7 +441,7 @@ def manifiesto(vault: Path, slug: str, todo: bool, max_tokens=1500) -> dict:
               "paginas": sum(d["paginas"] for d in indice) if todo else len(resultado["sin_transcripcion"])}
     if documentos:
         guardar_json(vault, nombre, {"version": 1, "documentos": documentos})
-        salida["siguiente"] = f".pi/.venv/bin/python .pi/scripts/ingesta/ingestar.py iniciar --manifiesto {nombre} --salida cursos/{slug}/_procesado"
+        salida["siguiente"] = f"{PYTHON_TEXTO} .pi/scripts/ingesta/ingestar.py iniciar --manifiesto {nombre} --salida cursos/{slug}/_procesado"
     return salida
 
 
@@ -570,7 +560,7 @@ def main():
     alcance.add_argument("--pendientes", action="store_true", help="manifiesto: sólo las páginas referidas sin transcripción (predeterminado)")
     args = p.parse_args()
     vault = args.vault.resolve()
-    config = json.loads((Path(__file__).resolve().parents[2] / "curso.config.json").read_text())
+    config = cargar_config()
     limite = config["max_tokens_curso_md"]
     if args.accion in {"revisar", "aplicar"}:
         if args.propuesta is None:

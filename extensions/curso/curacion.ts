@@ -1,7 +1,7 @@
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { readdirSync } from "node:fs";
 import { join } from "node:path";
-import { piDir, vaultDir } from "../../scripts/lib/pi-sdk.mjs";
+import { piDir, vaultDir, pythonDelVenv, PYTHON_TEXTO } from "../../scripts/lib/pi-sdk.mjs";
 import { python } from "./ingesta.ts";
 import { elegir } from "../comun/elegir.ts";
 import { fallaPython } from "./sesion.ts";
@@ -10,7 +10,7 @@ const patron = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 async function ejecutar(pi: ExtensionAPI, accion: string, curso: string, extras: string[] = [], signal?: AbortSignal) {
   if (!patron.test(curso)) throw new Error("Curso inválido: indicá un slug sin tildes.");
-  const r = await pi.exec(join(piDir, ".venv/bin/python"), [join(piDir, "scripts/ingesta/cursos.py"), accion,
+  const r = await pi.exec(pythonDelVenv(piDir), [join(piDir, "scripts/ingesta/cursos.py"), accion,
     "--vault", vaultDir, "--curso", curso, ...extras], { cwd: vaultDir, timeout: 30000, signal });
   if (!r.killed && (r.code === 0 || r.stdout.trim().startsWith("{"))) try { return JSON.parse(r.stdout); } catch { /* Salida cortada: como un fallo del entorno. */ }
   throw new Error(fallaPython(r));
@@ -41,7 +41,7 @@ export function registrarCuracion(pi: ExtensionAPI) {
         const c = args.trim(), r = await ejecutar(pi, "validar", c);
         // Estado de la preparación automática por tema: es informativo, sin él la validación igual vale.
         const preparacion: string[] = await python("estado", { vault: vaultDir, curso: c }, undefined, "preparacion.py").catch(() => []);
-        const preparar = r.sin_transcripcion?.length ? `\n${r.sin_transcripcion.length} sin transcripción; preparalas sin modelo desde la raíz del vault:\n.pi/.venv/bin/python .pi/scripts/ingesta/cursos.py manifiesto --curso ${c} --pendientes\n.pi/.venv/bin/python .pi/scripts/ingesta/ingestar.py iniciar --manifiesto _procesado/manifiesto-${c}.json --salida cursos/${c}/_procesado` : "";
+        const preparar = r.sin_transcripcion?.length ? `\n${r.sin_transcripcion.length} sin transcripción; preparalas sin modelo desde la raíz del vault:\n${PYTHON_TEXTO} .pi/scripts/ingesta/cursos.py manifiesto --curso ${c} --pendientes\n${PYTHON_TEXTO} .pi/scripts/ingesta/ingestar.py iniciar --manifiesto _procesado/manifiesto-${c}.json --salida cursos/${c}/_procesado` : "";
         pi.sendMessage({ customType: "curso-check", display: true, content: `${c}: ${r.ok ? "estructura válida" : "con errores"}; ${r.pendientes.length === 1 ? "1 página referida pendiente" : `${r.pendientes.length} páginas referidas pendientes`}.${preparar}\n${[...r.errores, ...r.avisos, ...preparacion].join("\n")}\nInforme: cursos/${c}/informe-ingesta.md`, details: r });
       } catch (e) { ctx.ui.notify(e instanceof Error ? e.message : "No se pudo validar el curso.", "error"); }
     },
@@ -53,7 +53,7 @@ export function registrarCuracion(pi: ExtensionAPI) {
       const curso = args.trim();
       if (!patron.test(curso)) { ctx.ui.notify("Uso: /curso-estado <curso>", "warning"); return; }
       try {
-        const r = await pi.exec(join(piDir, ".venv/bin/python"), [join(piDir, "scripts/ingesta/ingestar.py"), "estado",
+        const r = await pi.exec(pythonDelVenv(piDir), [join(piDir, "scripts/ingesta/ingestar.py"), "estado",
           "--vault", vaultDir, "--salida", join(vaultDir, "cursos", curso, "_procesado")], { cwd: vaultDir, timeout: 10000 });
         let estado;
         try { estado = !r.killed && r.code === 0 ? JSON.parse(r.stdout) : undefined; } catch { /* Salida vacía o cortada. */ }

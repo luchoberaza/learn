@@ -2,9 +2,9 @@ import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-a
 import { mkdirSync, openSync, closeSync, readdirSync, readFileSync, renameSync, rmSync, statfsSync, statSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, join, relative, resolve, sep } from "node:path";
-import { piDir, vaultDir } from "../../scripts/lib/pi-sdk.mjs";
+import { piDir, vaultDir, pythonDelVenv, leerConfig } from "../../scripts/lib/pi-sdk.mjs";
 import { normalizar } from "../../scripts/ingesta/bm25.ts";
-import { buscarMaterial, cita, copiaEnPagina, documento, dossier, esSlug, leer, leerItems, leerPaginas, ordenarTemas, paginasReservadas, reservados, resolverTemas, rutaSegura,
+import { aBarra, buscarMaterial, cita, copiaEnPagina, documento, dossier, esSlug, leer, leerItems, leerPaginas, ordenarTemas, paginasReservadas, reservados, resolverTemas, rutaSegura,
   type Activo, type DatosCurso, type Ref, type Tema } from "./material.ts";
 
 import { verificacionPrevia } from "./researcher.ts";
@@ -60,7 +60,7 @@ export function registrarSesion(pi: ExtensionAPI, vault = vaultDir, recursos = p
   // Sin Python, la última carga buena del curso mantiene teach, modo-curso y dossier.
   async function cargar(curso: string, validar = false, signal?: AbortSignal, timeout = 10000): Promise<DatosCurso> {
     const copia = rutaSegura(raiz(curso), ".sesion-cargada.json");
-    const r = await pi.exec(join(recursos, ".venv/bin/python"), [join(recursos, "scripts/ingesta/sesion.py"), "cargar", "--vault", vault, "--curso", curso, ...(validar ? ["--validar"] : [])], { timeout, signal });
+    const r = await pi.exec(pythonDelVenv(recursos), [join(recursos, "scripts/ingesta/sesion.py"), "cargar", "--vault", vault, "--curso", curso, ...(validar ? ["--validar"] : [])], { timeout, signal });
     if (!r.killed && r.code === 0) try {
       const d = JSON.parse(r.stdout);
       try { escribir(copia, r.stdout); } catch { /* La copia es un respaldo: sin disco o sin permiso se sigue con lo cargado. */ }
@@ -96,7 +96,7 @@ export function registrarSesion(pi: ExtensionAPI, vault = vaultDir, recursos = p
     return true;
   }
   function preparar(a: Activo, d: DatosCurso) {
-    const config: Config = JSON.parse(readFileSync(join(recursos, "curso.config.json"), "utf8"));
+    const config: Config = leerConfig(recursos);
     const tema = a.adHoc || d.temas.find(t => t.id === a.tema);
     if (!tema) throw new Error("El tema ya no está en el índice; volvé a seleccionarlo con /estudiar.");
     let anterior = "";
@@ -173,7 +173,7 @@ export function registrarSesion(pi: ExtensionAPI, vault = vaultDir, recursos = p
     const { anterior, actual: nueva } = datos as { anterior: string; actual: string };
     try {
       if (!activo || anterior !== rutaSegura(vault, activo.nota ?? activo.log)) return;
-      const nota = relative(vault, nueva);
+      const nota = aBarra(relative(vault, nueva));
       // Fuera de sesiones/ se cierra por la ruta de origen, que md-log también reconoce.
       activo.nota = nota.startsWith(`cursos/${activo.curso}/sesiones/`) && nota.endsWith(".md") ? nota : undefined;
       pi.appendEntry("curso", { ...activo, ...(sinLog ? { sinLog } : {}), herramientas });
@@ -184,7 +184,7 @@ export function registrarSesion(pi: ExtensionAPI, vault = vaultDir, recursos = p
   // Durante el estudio read no lee material ni notas del curso (saltearía el filtro de soluciones) ni otros textos.
   pi.on("tool_call", (event, ctx) => {
     if (!activo || event.toolName !== "read") return;
-    const ruta = resolve(ctx.cwd, String((event.input as { path?: unknown }).path ?? "").replace(/^@/, "").replace(/^~(?=\/|$)/, homedir()));
+    const ruta = resolve(ctx.cwd, String((event.input as { path?: unknown }).path ?? "").replace(/^@/, "").replace(/^~(?=[\\/]|$)/, homedir()));
     if (!/\.(png|jpe?g|webp|gif)$/i.test(ruta) || ruta.startsWith(join(vault, "cursos") + sep)) return { block: true, reason: "Durante el estudio read sólo abre fotos del alumno; el material se lee con leer_paginas, leer_items o ver_pagina." };
   });
   let preguntas = 0;
@@ -371,7 +371,7 @@ export function registrarSesion(pi: ExtensionAPI, vault = vaultDir, recursos = p
       const ocultos = reservados(r, d);
       if (paginasReservadas(d, doc, ocultos).has(pagina) || copiaEnPagina(r, d, doc, pagina, ocultos)) throw new Error("Esa página trae un ítem reservado para /simulacro; elegí otra.");
       if (!despues_del_intento && (["evaluaciones", "soluciones"].includes(fuente.tipo) || d.items[doc]?.some(i => i.solucion_de !== undefined))) throw new Error("La imagen de esta página trae la solución: leé el enunciado con leer_items y mostrala recién después del intento (despues_del_intento:true).");
-      const resultado = await pi.exec(join(recursos, ".venv/bin/python"), [join(recursos, "scripts/ingesta/sesion.py"), "renderizar", "--vault", vault, "--curso", a.curso, "--doc", doc, "--pagina", String(pagina)], { timeout: 10000, signal });
+      const resultado = await pi.exec(pythonDelVenv(recursos), [join(recursos, "scripts/ingesta/sesion.py"), "renderizar", "--vault", vault, "--curso", a.curso, "--doc", doc, "--pagina", String(pagina)], { timeout: 10000, signal });
       if (resultado.killed || resultado.code !== 0) throw new Error(fallaPython(resultado));
       // render: la imagen queda en el vault y md-log la embebe en la nota (C5).
       const render = rutaSegura(r, `_procesado/${doc}/render/${String(pagina).padStart(4, "0")}.png`);

@@ -4,7 +4,7 @@ import { join, relative } from "node:path";
 import { python } from "./ingesta.ts";
 import { elegir } from "../comun/elegir.ts";
 import { cortarTurno } from "../comun/corte.ts";
-import { acotar, leer, ordenarTemas, reservas, type DatosCurso } from "./material.ts";
+import { aBarra, acotar, leer, ordenarTemas, reservas, type DatosCurso } from "./material.ts";
 import { ordenar, type registrarSesion } from "./sesion.ts";
 import { enCurso } from "./simulacro.ts";
 import { vaultDir } from "../../scripts/lib/pi-sdk.mjs";
@@ -27,9 +27,9 @@ export function registrarProgreso(pi: ExtensionAPI, sesion: ReturnType<typeof re
       if (!e) throw new Error("No hay curso activo. Usá /estudiar.");
       if (e.a.adHoc) throw new Error("Ad hoc no escribe progreso de un tema inexistente; ofrecé curarlo con /curso-agregar.");
       const { cierre = false, reconstruir_log, huella_log, ...datos } = args;
-      const log = reconstruir_log || relative(e.r, join(vault, e.a.log));
+      const log = reconstruir_log || aBarra(relative(e.r, join(vault, e.a.log)));
       // Con la nota renombrada en Obsidian, su ruta actual; sin nota no hay qué avisar: el alumno ya lo sabe.
-      const nota = reconstruir_log || e.sinLog ? undefined : relative(e.r, join(vault, e.a.nota ?? e.a.log));
+      const nota = reconstruir_log || e.sinLog ? undefined : aBarra(relative(e.r, join(vault, e.a.nota ?? e.a.log)));
       if (reconstruir_log) {
         if (reconstruir_log !== e.pendiente || !huella_log) throw new Error("Releé la última sesión pendiente antes de reconstruirla.");
         // ui.confirm de pi dibuja «Yes»/«No»; Esc o un corte valen como no.

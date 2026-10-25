@@ -156,7 +156,7 @@ test("H70: sin conversor, una foto HEIC avisa en una línea y el aviso no rompe 
   assert.ok(texto.includes(foto));
   // Una ruta de pegado en medio de una línea: el callout empieza su propio párrafo.
   await e.enviar(`Mi intento: ${join(e.dir, "pi-clipboard-11111111-2222-4333-8444-555555555555.png")} listo.`);
-  assert.match(readFileSync(e.file, "utf8"), /Mi intento: \n\n> \[!warning\] Imagen 1 no guardada\n> [^\n]+\n\n\/.*pi-clipboard-[^ ]+ listo\./);
+  assert.match(readFileSync(e.file, "utf8"), /Mi intento: \n\n> \[!warning\] Imagen 1 no guardada\n> [^\n]+\n\n(?:\/|[A-Za-z]:\\).*pi-clipboard-[^ ]+ listo\./);
 });
 
 test("H48: la página que el tutor muestra con ver_pagina queda enlazada en la nota, salvo si se rechazó", async t => {

@@ -14,7 +14,7 @@ import time
 
 import pymupdf
 
-from almacen import Conflicto, atomico, bloquear, guardar_json, leer_json, ruta_segura, salida_segura, sha256
+from almacen import PYTHON_TEXTO, Conflicto, atomico, bloquear, guardar_json, leer_json, ruta_segura, salida_segura, sha256
 from extraccion import calidad, clasificar, encabezados, etiqueta_impresa, extraer, identidad_motor, matematica_ocr, tokens
 
 TIPOS = {"programa", "bibliografia", "ejercicios", "evaluaciones", "soluciones", "otros"}
@@ -98,7 +98,7 @@ def contenido_pagina(texto: str) -> str:
 
 def editada(raiz: Path, doc: str, numero: int) -> Conflicto:
     return Conflicto(f"La página {doc}/{numero:04}.md fue editada fuera de la ingesta; se preservó y no se indexa. Para conservarla: "
-                     f".pi/.venv/bin/python .pi/scripts/ingesta/ingestar.py adoptar --salida {shlex.quote(str(raiz))} --doc {doc} --pagina {numero}")
+                     f"{PYTHON_TEXTO} .pi/scripts/ingesta/ingestar.py adoptar --salida {shlex.quote(str(raiz))} --doc {doc} --pagina {numero}")
 
 
 def pagina_verificada(raiz: Path, id_doc: str, numero: int, entrada: dict) -> str | None:
