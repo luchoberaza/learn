@@ -18,7 +18,7 @@ Actualizar entre semestres, no en semana de parciales.
 | tmux | `3.8` (paquete `3.8-1.1`) |
 | fish | `4.9.3` (paquete `4.9.3-1`) |
 | wl-clipboard | `2.3.0` (paquete `1:2.3.0-1.1`) |
-| coreutils (`timeout`) | `9.12` (paquete `9.12-2.1`) |
+| coreutils | `9.12` (paquete `9.12-2.1`); `timeout` ya no hace falta: el researcher lo corta `scripts/vigilante.mjs` (DA39) |
 | ImageMagick (opcional) | `7.1.2-34`, con libheif `1.23.6` |
 | Poppler | `26.10.0` (paquete `26.10.0-1.1`); sólo para inventarios manuales, el código no lo usa |
 | Git | `2.56.0` |
@@ -50,9 +50,10 @@ Viven fuera de `.pi/` y el proyecto no las instala. El doctor comprueba todas sa
 | pi `1.4.0` en `~/.pi/agent` | todo | doctor falla; con otra versión avisa con «!» y no lo cuenta como falla |
 | Node.js `26.1.0` | doctor, tests y ensayos | no corren |
 | fish | `pi-learn` y el shell de tmux (`config/tmux.conf`) | no hay lanzador |
-| tmux | `pi-learn` (una sesión por carpeta) y los paneles de los subagentes: los de `visualize` y el researcher de `teach` fuera de un curso | `pi-learn` dice «Falta tmux. Instalalo antes de usar pi-learn.» |
-| `wl-paste` (Wayland) o `xclip` (X11) | pegar fotos con Ctrl+V | Ctrl+V no pega la foto: guardala y escribí su ruta en el mensaje |
-| `timeout` de coreutils | cortar al researcher a los 180 s | el researcher no corre |
+| tmux | `pi-learn` (una sesión por carpeta) y los paneles de los subagentes: los de `visualize` y el researcher de `teach` fuera de un curso. La app no lo necesita: abre los subagentes en sus propios paneles (DA45) | `pi-learn` dice «Falta tmux. Instalalo antes de usar pi-learn.» |
+| `wl-paste` (Wayland) o `xclip` (X11) | pegar fotos con Ctrl+V en la terminal (en la app se pegan solas) | Ctrl+V no pega la foto: guardala y escribí su ruta en el mensaje |
+| Git Bash (sólo Windows, viene con Git for Windows) | la herramienta bash de pi y los paneles de los subagentes en la app | el doctor lo marca; pi no puede correr comandos |
+| Chrome, Chromium o Edge | los diagramas de `visualize` (DA46); Windows 11 trae Edge | el doctor avisa con «!»; los diagramas no se dibujan y el resto anda |
 | uv y su Python `3.13.13` | `.pi/.venv` | sin ese Python el venv no arranca: fallan la ingesta, la preparación por tema y el progreso, y la clase sigue con la última carga del curso (ver Fase 4); receta abajo |
 | Tesseract con `spa` y `eng` | OCR de páginas escaneadas | sólo esas páginas fallan y quedan pendientes |
 | ImageMagick (`magick`, con libheif) | fotos HEIC y BMP en la nota | pi avisa en una línea que la mandes en JPEG o PNG, y la nota marca «Imagen N no guardada» |
@@ -106,9 +107,12 @@ Desde la raíz del vault:
 pi install --local --approve git:github.com/amosblomqvist/pi-interactive-subagents@c3e8b53c0754ae5ccc19fdab5a7481ec039bc2f7
 pi install --local --approve npm:pi-web-access@0.42.0
 npm ci --ignore-scripts --prefix .pi/npm
+PUPPETEER_SKIP_DOWNLOAD=1 npm ci --omit=dev --ignore-scripts --prefix .pi/extensions/visual-tools
 pi list --approve
 .pi/scripts/instalar-config
 ```
+
+El segundo `npm ci` instala mermaid-cli para los diagramas de `visualize`, que dibujan con el Chrome, Chromium o Edge del sistema, sin bajar otro navegador (DA46). En Windows, con PowerShell: `$env:PUPPETEER_SKIP_DOWNLOAD=1; npm ci --omit=dev --ignore-scripts --prefix .pi/extensions/visual-tools`.
 
 El `npm ci` restaura el árbol exacto del lockfile versionado. Pi genera inicialmente un rango con `^` en `npm/package.json`; en este proyecto se lo fijó a `0.42.0`. No actualizarlo incidentalmente al reinstalar.
 
@@ -190,6 +194,26 @@ source ~/.config/fish/functions/pi-learn.fish
 ```
 
 `kill-server` cierra el servidor viejo (si no hay ninguno, da un «error connecting» inofensivo); `source` hace falta sólo si esa shell ya conocía otra definición.
+
+## La app de escritorio (Windows y Linux)
+
+`app/` es una interfaz gráfica para todo lo anterior: se usa sin comandos y la terminal sigue igual (DA44). Corre la misma pi 1.4.0 y el mismo `.pi/` del vault. Detalle, capturas y pruebas en `informes/interfaz.md`.
+
+- **Instaladores:** `npm run empaquetar` dentro de `app/` arma `dist/learn-<versión>-instalador-windows.exe` (NSIS) en Windows y `dist/learn-<versión>-linux.AppImage` en Linux. No están firmados: Windows muestra el aviso de SmartScreen la primera vez. En una distro con espacios de nombres sin privilegios restringidos (Ubuntu 24.04), el AppImage se abre con `--no-sandbox`; en Arch no hace falta.
+- **Desarrollo:** `cd .pi/app && npm ci && npm run dev`. Pruebas: `npm test` (host y lógica) y `npm run e2e` (Electron real con el proveedor falso de pi-ai; necesita el curso de demostración de `app/e2e/curso_demo.py`).
+- **Primera vez:** la app abre «Preparar la computadora», que corre este mismo doctor y tiene un botón para cada faltante (en Windows instala con winget, y Tesseract con micromamba en la carpeta del usuario, sin permisos de administrador). Pide confiar en la carpeta como pi la primera vez.
+- **Lo que necesita:** Node.js `>=22.19.0` (el piso de pi 1.4.0) y pi 1.4.0 instalada para la terminal. La app usa ese mismo Node para correr pi.
+- **Subagentes:** la app los abre en paneles propios, sin tmux. Hasta que `pi-interactive-subagents` traiga esa superficie, la app la agrega al checkout instalado en `.pi/git/` cada vez que abre (`app/subagentes/aplicar.mjs`, reversible con `--quitar`). En la terminal no cambia nada (DA45).
+
+## Windows
+
+learn corre en Windows con los mismos tests en verde que en Linux (DA39–DA41). Diferencias con la receta de arriba:
+
+- **Instalación:** Node.js, Git for Windows (trae Git Bash, que pi necesita), uv y pi con `npm install -g --ignore-scripts @earendil-works/pi-coding-agent@1.4.0`. Clonar con `git -c core.autocrlf=false clone -b cursos …`: el repo fuerza LF con `.gitattributes`, pero un clon con `autocrlf` previo puede traer CRLF.
+- **Sin `pi-learn`:** fish y tmux no aplican. Se abre con la app, o en una terminal con `pi -ns --skill .pi/skills` desde la raíz del vault.
+- **El venv:** `.pi/.venv/Scripts/python.exe`. Los textos que sugieren comandos ya usan esa ruta.
+- **Tesseract:** el de conda-forge (`micromamba create -p <carpeta> -c conda-forge tesseract=5.5.2 ghostscript libcurl`) más los modelos `spa`, `eng` y `osd` de `tessdata_fast`. Su ruta va en `curso.config.local.json` (`ruta_tesseract`), no en el `curso.config.json` versionado (DA40). La app lo hace sola desde «Preparar la computadora».
+- **Carpeta del vault:** conviene una local (por ejemplo `C:\Users\<vos>\pi-learning`) y no una sincronizada con OneDrive, por los enlaces y bloqueos de archivos de la ingesta.
 
 ## Obsidian e imágenes
 
@@ -395,7 +419,7 @@ Carga las extensiones con confianza sólo para su propio proceso, sin modificar 
 - versiones de pi, Node.js, fish y tmux, y que corre dentro de tmux;
 - el lanzador instalado igual a la copia versionada, el portapapeles (`wl-paste` o `xclip`), las rutas del vault (`_entrada/` y `cursos/`) y al menos 2 GB libres en el disco del vault y de pi;
 - Obsidian con `_procesado` excluido;
-- subagentes y pi-web-access fijados, la configuración web, `timeout` (coreutils), la web del researcher, el renombre a `web_fetch` y que el modelo de `agents/researcher.md` coincida con `curso.config.json`;
+- subagentes y pi-web-access fijados, la configuración web, el vigilante del researcher (`scripts/vigilante.mjs`), la web del researcher, el renombre a `web_fetch` y que el modelo de `agents/researcher.md` coincida con `curso.config.json`;
 - `skills/teach/SKILL.md` sin cambios respecto de upstream;
 - carga de extensiones, cada tool y comando del curso, el guardado/embed de un PNG sintético en md-log (sin modelo), el prompt del tutor sin secciones ajenas, las skills de cursos sin colisiones y el thinking oculto;
 - credenciales del principal, del researcher y de visión, sin llamar al modelo;
@@ -443,9 +467,9 @@ La Fase 0 se cierra con la aceptación explícita del smoke técnico, los tests 
 
 ## Researcher anclado y caché (Fase 6)
 
-Requiere `sh`, `timeout` (coreutils) y pi-web-access en `.pi/npm`; no usa tmux ni pi-interactive-subagents. Con `/estudiar redes retardos`, si el dossier no trae caché vigente, el tutor llama `investigar_tema({modo: "alcance", afirmaciones: ["…"]})` antes del probe; para 1–3 afirmaciones nuevas, `modo: "verificar"` (en ad hoc, sólo ese modo). La tool adjunta contrato del tema, citas preparadas y enunciados curados de ejercicios sin soluciones (sin los ítems reservados ni sus casi copias, ni las páginas que traen una), lanza el researcher y no espera su informe.
+Requiere pi-web-access en `.pi/npm`; no usa tmux, `sh` ni pi-interactive-subagents, y corre igual en Windows (DA39). Con `/estudiar redes retardos`, si el dossier no trae caché vigente, el tutor llama `investigar_tema({modo: "alcance", afirmaciones: ["…"]})` antes del probe; para 1–3 afirmaciones nuevas, `modo: "verificar"` (en ad hoc, sólo ese modo). La tool adjunta contrato del tema, citas preparadas y enunciados curados de ejercicios sin soluciones (sin los ítems reservados ni sus casi copias, ni las páginas que traen una), lanza el researcher y no espera su informe.
 
-**Cómo se lanza.** Un `pi -p` propio y desacoplado, sin sesión, extensiones, skills ni archivos de contexto, que carga sólo pi-web-access y usa el modelo, el thinking y las tools (`web_search, web_fetch, read`) de `agents/researcher.md`. `timeout -k 5 180` lo corta a los 180 s. Trabaja en `cursos/<curso>/notas/verificaciones/.trabajos/<clave>/` (oculta para Obsidian): se borra al recoger con éxito y tras un fallo conserva `error.txt`, `salida.md` y `fallo` para diagnóstico. El hijo sobrevive a `/reload`, a un kill y al cierre de la terminal; cualquier sesión lo recoge por huella. Tras un plazo vencido, esa huella espera 10 min antes de relanzarse. Sin credenciales del modelo del researcher no se lanza nada.
+**Cómo se lanza.** Un `pi -p` propio y desacoplado, sin sesión, extensiones, skills ni archivos de contexto, que carga sólo pi-web-access y usa el modelo, el thinking y las tools (`web_search, web_fetch, read`) de `agents/researcher.md`. `scripts/vigilante.mjs`, también desacoplado, lo corta a los 180 s (y lo fuerza 5 s después si no terminó), igual que antes `timeout -k 5 180`. Trabaja en `cursos/<curso>/notas/verificaciones/.trabajos/<clave>/` (oculta para Obsidian): se borra al recoger con éxito y tras un fallo conserva `error.txt`, `salida.md` y `fallo` para diagnóstico. El hijo sobrevive a `/reload`, a un kill y al cierre de la terminal; cualquier sesión lo recoge por huella. Tras un plazo vencido, esa huella espera 10 min antes de relanzarse. Sin credenciales del modelo del researcher no se lanza nada.
 
 **Mientras se prepara el tema.** Si alguna página que el alcance usa de ancla sigue pendiente de visión y el curso se está preparando (`_procesado/.preparacion.lock` vigente), `investigar_tema` contesta enseguida «Verificación en segundo plano; seguí con el material.» y lanza el researcher más tarde, cuando esas anclas dejan de estar pendientes o la preparación termina, con las afirmaciones que pasó el tutor; la primera pregunta no espera. Si se lanza con anclas todavía pendientes, la tarea las nombra y el informe guardado empieza con «Páginas pendientes de transcripción al verificar (…)», y si esas páginas cambian después, la caché pasa a «previa». Límites: la espera mira el lock de todo el curso, así que si la preparación no va a reescribir un ancla pendiente (una página del programa o una que excede el tope de 150) espera a que termine toda; vive en memoria (un `/reload` o un kill la pierden y el tutor la vuelve a pedir) y se resuelve recién al terminar el próximo mensaje o al empezar el próximo turno; si ese lanzamiento diferido falla, nadie se entera y el dossier sigue diciendo «Sin caché vigente». El modo verificar no espera: si la preparación cambia sus anclas durante la corrida, el informe se descarta.
 

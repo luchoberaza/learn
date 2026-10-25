@@ -18,6 +18,8 @@ Guía de uso de punta a punta: crear un curso, estudiar un tema, practicar, rend
 
 Para ver si todo está en orden en cualquier momento: `.pi/scripts/doctor` desde la raíz del vault y dentro de tmux. Un «✗» es una falla y un «!» es sólo un aviso.
 
+**Con la app de escritorio** (Windows o Linux) es lo mismo sin comandos. Los cursos y temas están en la barra de la izquierda, e Inicio ofrece «Seguir la clase» donde quedaste. Los botones de la clase son Simulacro y Terminar clase, y el quiz se responde con el mouse o con las teclas a, b, c y n. Con Ctrl+K se busca un tema, una sesión o cualquier comando. La tabla del final dice dónde está cada comando en la app.
+
 ## Mapa del vault
 
 ```
@@ -226,17 +228,18 @@ Cualquier otro texto en inglés es un defecto: anotalo junto con la nota de la c
 
 ## Resumen de comandos
 
-| Comando | Para qué |
-|---|---|
-| `pi-learn`, `pi-learn -c`, `pi-learn --resume` | abrir, seguir la última sesión, elegir una sesión |
-| `/curso-nuevo <slug>` | crear un curso desde `_entrada/` |
-| `/curso-agregar <slug> [archivos…]` | sumar material a un curso |
-| `/curso-check <slug>` | validar el curso y ver la preparación de cada tema |
-| `/curso-estado <slug>` | ver cómo va la indexación |
-| `/cursos` | listar cursos |
-| `/estudiar [curso] [tema]` | abrir una clase |
-| `/simulacro` | rendir el ejercicio reservado del tema |
-| `/progreso [curso]` | ver el progreso y el próximo tema |
-| `/fin` | guardar y cerrar la clase |
-| `/compact`, `/resume` | resumir la clase, retomar otra sesión (de pi) |
-| `/md-log <nota>`, `/md-unlog` | vincular o desvincular una nota a mano |
+| Comando | Para qué | En la app |
+|---|---|---|
+| `pi-learn`, `pi-learn -c`, `pi-learn --resume` | abrir, seguir la última sesión, elegir una sesión | abrir la app; Inicio, «Seguir la clase»; «Todas las sesiones» |
+| `/curso-nuevo <slug>` | crear un curso desde `_entrada/` | «Crear curso», abajo a la izquierda |
+| `/curso-agregar <slug> [archivos…]` | sumar material a un curso | «Agregar material» en el curso |
+| `/curso-check <slug>` | validar el curso y ver la preparación de cada tema | pestaña Estado del curso, «Validar el curso» |
+| `/curso-estado <slug>` | ver cómo va la indexación | pestaña Estado; la barra de avance a la izquierda |
+| `/cursos` | listar cursos | la barra de la izquierda |
+| `/estudiar [curso] [tema]` | abrir una clase | tocar un tema y «Empezar la clase»; el buscador del curso acepta cualquier texto |
+| `/simulacro` | rendir el ejercicio reservado del tema | botón Simulacro de la clase |
+| `/progreso [curso]` | ver el progreso y el próximo tema | la vista del curso y la del tema |
+| `/fin` | guardar y cerrar la clase | botón Terminar clase |
+| `/compact`, `/resume` | resumir la clase, retomar otra sesión (de pi) | menú de la clase; «Todas las sesiones» |
+| `/md-log <nota>`, `/md-unlog` | vincular o desvincular una nota a mano | menú de la clase |
+| `/skill:teach <tema>` | estudiar un tema suelto, sin curso | «Tema libre» |

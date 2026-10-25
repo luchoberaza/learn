@@ -24,6 +24,8 @@
 
 La primera prueba de punta a punta con el modelo real (`gpt-6.1-sol`, una clase de retardos con kill, `/compact`, `/simulacro` y `/fin` sobre una copia del vault, 41 llamadas) llegó a la primera pregunta a los 15,7 s y no perdió estado ni mostró soluciones antes del intento, pero encontró tres fallas graves: se enseñó de memoria sin leer la bibliografía, `/simulacro` gastó el reservado a mitad del tema y el reservado era casi copia de un ejercicio del dossier; además, textos de pi en inglés. Con los restos de la etapa anterior y los arreglos de fidelidad y plomería (DA29–DA36), la rama llega a `64cb42d`: sin modelo ni red, 267 tests Node en verde (incluyen la suite Python) y 151 tests Python OK. Pendiente: verificar con el modelo real las reglas nuevas de modo-curso (DA31) y en Obsidian el embed de la página mostrada (DA30); no hay simulacro de varios temas ni del curso completo, ni ficha del alumno (H58: patrones de error entre temas, confianza declarada y fechas de evaluación).
 
+**Interfaz de escritorio y Windows (2026-10-25, propuesta en un PR de luchoberaza):** app de escritorio en `app/` y núcleo portable a Windows, sin cambios de comportamiento en Linux ni en la terminal. Sin modelo ni red: suite Node 286 tests (Windows 264 en verde y 22 salteadas con motivo; Linux 273 y 13), Python 160 OK en las dos, y la app con 25 tests de host y lógica y 8 de punta a punta con Electron real en las dos. Pendiente: probarla con el modelo real y decidir el fork de los subagentes. Ver DA39–DA46 y `informes/interfaz.md`.
+
 ## D0.1 — Conservar el upstream y fijar los subagentes
 
 - `.pi/` es el clon del fork `santi-esquerre/learn`, rama `cursos`.
@@ -646,3 +648,77 @@ node --test .pi/tests/*.test.mjs
 - **Por qué:** Tesseract no mejora lo que deja pendiente una capa previa (las fórmulas) y cuesta horas; lo que importa es que el tutor sepa qué está leyendo y que las páginas dudosas sigan yendo a visión.
 - **Límites:** las páginas ya pasadas por Tesseract se conservan en caché. Una capa previa mala se usa igual: queda pendiente y la preparación del tema la pasa por visión, pero sin visión el tutor lee ese texto con el aviso. La marca está sólo en `leer_paginas`: `buscar_material` devuelve fragmentos sin ella.
 - **Verifica:** `test_ingesta.py`: «test_capa_ocr_previa_se_usa_siempre_y_sin_capa_hay_tesseract»; `fidelidad-auditoria.test.mjs`: «DA38: una página con la capa OCR del escaneo llega al tutor marcada como OCR, y deja de estarlo al pasar por visión».
+
+## Interfaz de escritorio y Windows — 2026-10-25
+
+Propuesta de luchoberaza en un PR, para que la apruebe el dueño del repo. La app (`app/`) usa learn sin quitarle nada: todo lo que hoy es un comando pasa a ser algo que se ve y se toca, y la terminal sigue igual. Para que funcione en Windows hubo que tocar el núcleo (DA39–DA41) y, para que el quiz y las preguntas existan fuera de la terminal, sumar un puente (DA42–DA43). Informe completo, con capturas y pruebas: `informes/interfaz.md`.
+
+### DA39 — learn corre en Windows sin cambiar su comportamiento en Linux
+
+- **Contexto:** el núcleo no arrancaba en Windows. Python importaba `fcntl` y usaba `os.O_NOFOLLOW`; `os.kill(pid, 0)`, que en Windows **termina** el proceso en lugar de consultarlo; `start_new_session`. TypeScript tenía la ruta fija `.venv/bin/python` y comparaba con `/` las rutas de `path.relative`. El researcher se lanzaba con `sh -c "timeout …"`. Y Git con `autocrlf=true` convertía los archivos a CRLF, que rompían las huellas y los frontmatter. Línea de base en Windows: 147 tests Node en verde y 119 en rojo; la suite Python casi entera en rojo.
+- **Decisión:**
+  - **Python** (`almacen.py`): `tomar_bloqueo` usa `msvcrt.locking` en Windows y `fcntl.flock` en POSIX. `SIN_SEGUIR = getattr(os, "O_NOFOLLOW", 0)`, y sin él se rechaza el enlace simbólico con `is_symlink()` antes de abrir. `proceso_vivo` usa `OpenProcess` + `GetExitCodeProcess` (ctypes) en Windows. `opciones_desacoplado` da `DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP` en Windows. `_reemplazar` reintenta un momento si un lector retiene el destino. `atomico` escribe siempre LF y no sincroniza directorios en Windows. Los scripts reconfiguran stdin, stdout y stderr a UTF-8, y sus hijos reciben `PYTHONUTF8`.
+  - **TypeScript:** `pythonDelVenv()` y `PYTHON_TEXTO` en `scripts/lib/pi-sdk.mjs`, usados en todas las extensiones y en los textos que sugieren comandos. `aBarra()` en `material.ts` para comparar rutas en formato `/`. md-log acepta `C:\…` y barras invertidas en las fotos, y sin `O_NOFOLLOW` rechaza el enlace con `lstat`.
+  - **Researcher:** `scripts/vigilante.mjs` (Node, desacoplado) lanza `pi -p`, lo corta al vencer el plazo (`taskkill /T` en Windows, grupo de procesos en POSIX) y escribe `codigo` en forma atómica: 124 si venció, 137 si hubo que forzarlo. El hijo corre con cwd en la carpeta temporal, para que Windows pueda borrar su carpeta al recoger. `comandoPi()` lanza pi como `[process.execPath, cli.js]` en Windows (allá `pi` es un `.cmd`).
+  - **pi:** `rutaModuloPi` encuentra también una pi instalada con `npm install -g` (Windows no tiene la instalación administrada de Linux).
+  - **Repo:** `.gitattributes` con `* text=auto eol=lf`.
+- **Por qué:** el comportamiento en Linux es el mismo de antes. En cada lugar, la rama de Windows reemplaza sólo lo que allá no existe o hace otra cosa.
+- **Límites:** en Windows no hay `pi-learn` (fish + tmux): se abre con la app (DA44) o con `pi -ns --skill .pi/skills`. Un PDF abierto en otro programa puede demorar un reemplazo hasta un segundo.
+- **Verifica:** `test_portabilidad.py`: «test_proceso_vivo_consulta_sin_terminar_el_proceso», «test_bloqueo_exclusivo_entre_procesos», «test_un_mismo_proceso_no_toma_dos_veces_el_bloqueo», «test_enlace_simbolico_rechazado», «test_atomico_escribe_saltos_de_linea_lf», «test_python_del_venv_y_arranque_desacoplado_segun_la_plataforma». `researcher-auditoria.test.mjs` y `researcher.test.mjs` corren con el vigilante en las dos plataformas. Las dos suites en verde en Windows y en Linux (cifras en `informes/interfaz.md`).
+
+### DA40 — Lo propio de cada máquina va en `curso.config.local.json`
+
+- **Contexto:** `curso.config.json` versiona valores de una computadora: `vault`, `ruta_tesseract` y los modelos. En Windows hubo que apuntar a otro Tesseract, y cambiarlo ensuciaba el repo.
+- **Decisión:** `curso.config.local.json` (en `.gitignore`) puede pisar sólo `vault`, `ruta_tesseract`, `modelo_vision` y `modelo_researcher` (`leerConfig` y `leerConfigLocal` en `pi-sdk.mjs`; `cargar_config` y `CLAVES_LOCALES` en `almacen.py`). El researcher toma su modelo de ahí si está. `usar_tesseract` pone la carpeta del Tesseract primero en el PATH y fija `TESSDATA_PREFIX` si encuentra `../share/tessdata` (el Tesseract de conda-forge en Windows).
+- **Por qué:** cada máquina usa lo suyo sin tocar archivos versionados. La app escribe ahí lo que el alumno elige en Ajustes y en «Preparar la computadora».
+- **Límite:** una clave que no está en la lista se ignora en el archivo local: los umbrales siguen siendo del curso.
+- **Verifica:** `test_portabilidad.py`: «test_la_configuracion_local_pisa_solo_sus_claves». El doctor muestra el modelo del researcher de la máquina si difiere.
+
+### DA41 — El doctor revisa lo que corresponde a cada plataforma
+
+- **Contexto:** el doctor exigía fish, tmux, `wl-paste` y `timeout`, que en Windows no existen ni hacen falta.
+- **Decisión:** en Windows informa que fish, tmux y `pi-learn` no aplican y revisa Git Bash, que pi usa para su herramienta bash. El chequeo de `timeout` pasa a ser «Vigilante del researcher». Un Node distinto del verificado pero que cumple el piso de pi 1.4.0 (`>=22.19.0`) es un aviso (`!`), no una falla. Suma «Diagramas (visualize)» (DA46) como aviso.
+- **Por qué:** el diagnóstico tiene que decir qué falta de verdad en esa máquina.
+- **Verifica:** `entorno-auditoria.test.mjs` y «H80: el doctor revisa el vigilante, la web del researcher y el renombre a web_fetch en vez de safe_bash».
+
+### DA42 — Quiz y preguntas fuera de la terminal: `ctx.ui.preguntar`
+
+- **Contexto:** fuera de la terminal (modo RPC o SDK), `ctx.ui.custom` devuelve `undefined`: el quiz quedaba «cancelado», `ask_user_question` con opciones también, y la aprobación del plan («Dale» / «Ajustar») nunca aparecía.
+- **Decisión:** `extensions/comun/preguntar.ts`. Si la interfaz trae `ctx.ui.preguntar` y `ctx.mode !== "tui"`, `quiz.ts` y `ask-user-question.ts` le mandan la pregunta armada en lugar de dibujarla. El quiz manda el enunciado limpio, las opciones ya barajadas con su número, el modo, las correctas y la explicación. Ask manda las opciones y la etiqueta de «Otra». Todo lo demás queda igual: la normalización, el rechazo con menos de tres opciones, `cortable`, el `onUpdate` previo para md-log y `buildResult`. La interfaz es la que hace cumplir lo mismo que el popup. La app recibe la correcta y la explicación recién cuando el alumno respondió: la corrección la arma el proceso que corre pi, no la ventana (`app/host/interfaz.mjs`). Un corte cierra la pregunta como cancelada, salvo un quiz ya corregido, cuya respuesta se conserva (DA35).
+- **Por qué:** sin esto, la app perdía la parte central de la clase. En la terminal el popup sigue siendo el de siempre.
+- **Verifica:** `preguntar.test.mjs`: «Puente: el quiz llega a la app barajado, sin enlaces ni LaTeX en el enunciado, con la correcta y la explicación para después», «Puente: respuesta incorrecta, «No sé» con nota y multi-select se corrigen igual que en el popup», «Puente: cancelar en la app o mandar una respuesta vacía deja la pregunta cancelada, sin calificar», «Puente: ask_user_question con botones, «Otra» con texto, varias respuestas ordenadas y texto libre», «Puente: sin preguntar todo sigue como antes, y en la terminal manda el popup aunque haya preguntar», «Puente: un corte del turno con la pregunta abierta en la app la cierra como cancelada y termina el turno».
+
+### DA43 — Una sola tabla de etiquetas para la terminal y la app
+
+- **Contexto:** la terminal muestra cada tool del curso como una línea en español y nunca su resultado (DA18). La tabla vivía en `render.ts`, que importa pi-tui.
+- **Decisión:** `extensions/curso/etiquetas.ts` (sin pi-tui) tiene `TOOLS_DEL_CURSO`, `etiquetaLlamada`, `etiquetaResultado` y `textoParcial`. `render.ts` y la app la usan.
+- **Por qué:** una tool nueva sigue necesitando su fila, y queda igual en las dos interfaces.
+- **Verifica:** `etiquetas.test.mjs`: «etiquetas: cubre cada tool del curso y nunca muestra el texto del resultado», «etiquetas: la terminal dibuja exactamente las mismas líneas», que compara con el `ToolExecutionComponent` real de pi.
+
+### DA44 — La app de escritorio: Electron, un proceso aparte para pi y un filtro
+
+- **Contexto:** hoy se usa sólo desde la terminal, recordando comandos (`/estudiar redes retardos`, `/simulacro`, `/fin`, `pi-learn -c`), y las notas se leen aparte en Obsidian.
+- **Decisión:** `app/`, con Electron, React y TypeScript. pi no corre en la ventana sino en un proceso aparte (`app/host/inicio.mjs`), con el **Node del sistema** y la misma instalación de pi 1.4.0 que usa la terminal. Las extensiones, skills y settings son las del `.pi/` del vault, sin bifurcar, y se cargan como hace `pi-learn` (`noSkills` más `.pi/skills`, `PI_OFFLINE` si faltan los paquetes fijados).
+  - **Filtro** (`app/host/filtro.mjs`): nada sale hacia la ventana salvo lo que se arma campo por campo. Nunca salen los args ni resultados de las tools del curso, la correcta o la explicación de un quiz antes de responder, los mensajes ocultos (`curso-orden`), el razonamiento ni el `SKILL.md` de una skill cargada.
+  - **Panel de página:** aplica las reglas de `ver_pagina`: nunca una página con el reservado o una casi copia, y en evaluaciones y soluciones sólo la página que el tutor citó.
+  - **Datos del curso:** salen de `sesion.py cargar`, en sólo lectura.
+  - **Comandos de pi:** los que necesitan una pantalla (`/tree`, `/fork`, `/login`, `/model`…) tienen la suya. `/share`, `/bug` y `/llama` avisan que siguen en la terminal.
+- **Por qué:** si pi trabaja o se cuelga, la ventana no se congela, y hay una sola pi para todo. Tauri se descartó porque en Linux usa WebKitGTK, con problemas conocidos en Wayland y NVIDIA (Omarchy).
+- **Límites:** la app no se probó todavía con el modelo real (sin credenciales en la máquina de prueba): las pruebas usan el proveedor falso de pi-ai con guion. Los instaladores no están firmados (SmartScreen avisa la primera vez).
+- **Verifica:** `app/host/test/filtro.test.mjs`, `host.test.mjs`, `instancia.test.mjs` y las ocho pruebas de punta a punta de `app/e2e/app.test.mjs`, con Electron real en Windows y en Linux.
+
+### DA45 — Subagentes en paneles de la app, sin tmux
+
+- **Contexto:** `pi-interactive-subagents` (de un tercero, fijado en `c3e8b53`) exige tmux. En Windows no hay tmux, así que `visualize` (mermaid-maker, svg-maker), el researcher de `teach` fuera de un curso, scout y worker no andaban.
+- **Decisión:** el paquete concentra en `tmux.ts` todo lo que hace con un panel. `app/subagentes/superficie.ts` exporta lo mismo y elige: si existe `globalThis.__piLearnSuperficie` (lo pone la app), usa sus paneles; si no, delega todo en `tmux.ts`, sin cambios. La app abre cada subagente en una terminal real (node-pty: ConPTY en Windows, PTY en Linux) con bash (Git Bash en Windows), lee la pantalla con `@xterm/headless` como `tmux capture-pane` y la dibuja con xterm.js. El alumno puede escribirle al subagente como en tmux. Lo que se escribe antes de que bash muestre su prompt se guarda y se manda después: Git Bash tarda más que los 300 ms que espera el paquete. Un panel que el alumno detiene cuenta como un fin con código 130, porque Windows da códigos negativos y el paquete sólo reconoce dígitos. Mientras el paquete no traiga la superficie, la app la agrega al checkout instalado en `.pi/git/` (`app/subagentes/aplicar.mjs`, reversible con `--quitar`; `.pi/git/` no se versiona). En la terminal no cambia nada.
+- **Por qué:** el comportamiento con tmux queda intacto, y en la app los subagentes andan en las dos plataformas.
+- **Decisión pendiente del dueño:** adoptar la superficie con un fork fijado del paquete o con un PR a su autor, y actualizar el pin en `.pi/settings.json`. Hasta entonces, la app aplica el parche local cada vez que abre (`PI_LEARN_SIN_PARCHE=1` lo evita).
+- **Verifica:** `app/host/test/superficie.test.mjs`: «superficie: un panel corre bash, se lee como tmux capture-pane y avisa a la app», «parche de subagentes: agrega la superficie, es idempotente y se quita», «superficie.ts del paquete: con la app usa sus paneles; sin ella, tmux como siempre». `app/e2e/app.test.mjs`: «app: un subagente corre en su panel (sin tmux) y su resultado vuelve a la clase», con un `scout` real.
+
+### DA46 — `visualize` dibuja en Windows y Linux, y sus dependencias se instalan
+
+- **Contexto:** `extensions/visual-tools` buscaba Chrome sólo en rutas de macOS y unía el PATH con `:` (en Windows es `;`). Lanzaba `node_modules/.bin/mmdc`, que en Windows es un `.cmd` que Node no ejecuta sin shell. Y su `package-lock.json` traía una dependencia de desarrollo enlazada a la máquina de su autor (`/Users/amos/.nvm/…`), así que `npm ci` fallaba en cualquier otra (`EMISSINGTARGET`): los diagramas no se dibujaban fuera de esa máquina.
+- **Decisión:** `chromeCandidates()` busca Chrome, Chromium y Edge en Windows, Linux y macOS, y `PI_VISUAL_CHROME` fija uno. `augmentedPath()` usa el separador de la plataforma. `render_mermaid` corre el `cli.js` de mermaid-cli con el Node de pi. `render_svg` suma un último recurso, `tools/svg-chrome.mjs`, que dibuja con ese navegador y el puppeteer que ya trae mermaid-cli, para cuando no hay `rsvg-convert` ni `magick` (lo normal en Windows). El lock se regeneró sin la entrada rota: las 196 dependencias de ejecución conservan su versión exacta y la de desarrollo pasa a `@earendil-works/pi-coding-agent` 1.4.0. Se instala con `PUPPETEER_SKIP_DOWNLOAD=1 npm ci --omit=dev --ignore-scripts --prefix .pi/extensions/visual-tools`, sin bajar otro navegador.
+- **Por qué:** `visualize` es parte de learn (README) y no funcionaba en ninguna de las dos máquinas.
+- **Límite:** necesita un Chrome, Chromium o Edge instalado. Windows 11 trae Edge; en Linux, si no hay ninguno, el doctor lo avisa.
+- **Verifica:** `visual-tools.test.mjs`: «visualize: busca Chrome, Chromium o Edge en Windows, Linux y macOS», «visualize: el PATH de los renders usa el separador de la plataforma», «visualize: Mermaid se dibuja con mmdc, el Node de pi y el navegador encontrado», «visualize: un SVG se dibuja con el navegador cuando no hay rsvg-convert ni magick».

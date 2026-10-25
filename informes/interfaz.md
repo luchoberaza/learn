@@ -1,0 +1,188 @@
+# Interfaz de escritorio y Windows
+
+**Propuesta de luchoberaza para revisar en el PR.** La app vive en `app/`, el núcleo corre también en Windows y la terminal (`pi-learn`) queda igual. Las decisiones están en `DECISIONES.md` (DA39–DA46). Sin commits del lado del autor: el dueño del repo decide.
+
+## Qué trae
+
+- **Una app de escritorio** (Electron) para Windows y Linux. Usa learn entero sin comandos.
+  - **Inicio:** «Seguir la clase» donde quedaste, con la última frase del tutor; el índice de cada curso como el de un libro; tu semana de foco.
+  - **La clase:** se lee como un libro anotado. Literata a 18 px. Las citas `[[…pdf#page=N]]` van al margen con la miniatura de la página. El quiz está dentro del texto (teclas a, b, c y n), con fórmulas y diagramas.
+  - **Panel de página** con las reglas de `ver_pagina`.
+  - **Simulacro** con el reloj proporcional del examen.
+  - **Temporizador de foco** que nunca corta la clase.
+  - **Paleta** (Ctrl+K) con todos los comandos de learn, de las skills y de pi.
+  - **Más pantallas:** «Preparar la computadora» (el doctor con un botón por faltante), Crear curso y Agregar material, Tema libre, lector de notas y Ajustes.
+  - **Subagentes** en paneles propios, sin tmux.
+- **El núcleo en Windows:**
+  - bloqueos, procesos y rutas portables;
+  - el researcher con un vigilante en Node;
+  - la configuración por máquina;
+  - el doctor por plataforma;
+  - `visualize` dibujando con Chrome, Chromium o Edge.
+- **Un puente para quiz y preguntas** fuera de la terminal (`ctx.ui.preguntar`) y **una sola tabla de etiquetas** para las dos interfaces.
+
+## Cómo se ve
+
+Capturas de las pruebas de punta a punta, con el curso de demostración y el tutor simulado.
+
+**Inicio.** Volver a la última clase, con su última frase; el índice del curso como el de un libro y la semana de foco.
+
+![Inicio](interfaz/inicio.png)
+
+**La clase.** La cita va al margen con la miniatura de la página; el quiz, dentro del texto, con fórmulas.
+
+![Quiz dentro de la clase](interfaz/clase-quiz.png)
+
+**Corrección, plan y diagrama.** La correcta llega recién después de responder; el plan aprobado y un bloque Mermaid del tutor, dibujado en la clase.
+
+![Corrección y diagrama](interfaz/clase-diagrama.png)
+
+**Panel de página.** La página original, fijable, con las reservadas para el simulacro salteadas.
+
+![Panel de página](interfaz/panel-pagina.png)
+
+**Simulacro.** El reloj proporcional del examen en la barra de la clase.
+
+![Simulacro](interfaz/simulacro.png)
+
+**Vista del tema.** Próximo paso, objetivo, plan, lo dominado y lo que todavía falla, de `progreso.yaml`.
+
+![Vista del tema](interfaz/tema.png)
+
+**Paleta (Ctrl+K).** Cualquier comando de learn, de las skills o de pi, sin escribirlo entero.
+
+![Paleta](interfaz/paleta.png)
+
+**Modo Día.**
+
+![Inicio en modo Día](interfaz/inicio-dia.png)
+
+**En Linux** (Ubuntu sobre WSL, la misma clase).
+
+![La clase en Linux](interfaz/linux-clase.png)
+
+## Contra lo que hay hoy (nada se pierde)
+
+| Hoy en la terminal | En la app |
+|---|---|
+| `pi-learn`, `pi-learn -c`, `--resume`, `/resume` | abrir la app; Inicio, «Seguir la clase»; «Todas las sesiones» |
+| `/cursos`, `/estudiar [curso] [tema]`, selector de temas | barra lateral y vista del tema, en el orden de `ordenarTemas`; buscador del curso con cualquier texto (alias, BM25, ad hoc) |
+| cambio de tema con clase abierta, tema fuera del índice | los mismos diálogos de la extensión («Guardar y cambiar»…) |
+| quiz, `ask_user_question` (single, multi, «Otra», texto), Esc | tarjetas dentro del texto; «Prefiero responder con mis palabras» |
+| confirmaciones «Sí, … / No» | diálogo con las mismas opciones; cerrar vale como No |
+| fotos (Ctrl+V, ruta) | pegar, arrastrar o elegir; HEIC y BMP como ruta, como en la terminal |
+| `ver_pagina`, citas | página en la clase, notas al margen y panel fijable |
+| barra «📚 curso › tema», «📝 Simulacro» | barra de la clase; reloj del examen en el simulacro |
+| preparación, verificación, ingesta | línea de estado y barra de avance en la barra lateral |
+| errores en español y «seguí» | línea de error con «Reintentar» |
+| `/simulacro`, `/fin`, `/progreso` | botones Simulacro y Terminar clase; vistas del curso y del tema |
+| `/compact`, `/md-log`, `/md-unlog` | menú de la clase |
+| `/curso-nuevo`, `/curso-agregar`, diff de `guardar_curso` | Crear curso y Agregar material; el diff en el diálogo de confirmación |
+| `/curso-check`, `/curso-estado`, informe de ingesta | pestaña Estado del curso |
+| notas en Obsidian | lector de notas y «Abrir en Obsidian» |
+| `/skill:teach`, `visualize` | Tema libre; los diagramas como imágenes |
+| subagentes en tmux | paneles con terminal real (DA45) |
+| herramientas generales (bash, edit…) | línea plegable con la entrada y la salida |
+| `/login`, `/logout`, `/model`, `/thinking`, `/settings` | Ajustes: Cuentas, Modelos (también visión y researcher), Conversación |
+| `/new`, `/tree`, `/fork`, `/clone`, `/import`, `/export`, `/copy`, `/name`, `/session`, `/reload`, `/trust`, `/hotkeys`, `/changelog`, `/quit` | menú de la clase, paleta y diálogos propios |
+| `/share`, `/bug`, `/llama` | avisan que siguen en la terminal |
+| `doctor` | «Preparar la computadora» |
+
+## Cómo funciona
+
+La ventana no corre pi. Un proceso aparte (`app/host`) la corre con el Node del sistema y la misma instalación de pi 1.4.0 de la terminal, con el `.pi/` del vault, sin bifurcar nada. Arma la sesión como `pi-learn` (`-ns --skill .pi/skills`, `PI_OFFLINE` si faltan paquetes) y trabaja desde la carpeta del vault.
+
+**Qué ve la ventana.** Lo decide un filtro, campo por campo. Nunca llegan:
+
+- los argumentos ni los resultados de las tools del curso (salen sus líneas en español, de `etiquetas.ts`);
+- la correcta ni la explicación de un quiz antes de responder (la corrección la arma el host);
+- los mensajes ocultos;
+- el razonamiento;
+- el `SKILL.md` de una skill cargada.
+
+El panel de página aplica las reglas de `ver_pagina`. Los datos del curso salen de `sesion.py cargar`, en sólo lectura.
+
+## Pruebas
+
+Sin modelo ni red: el proveedor falso de pi-ai con guion hace de tutor. Windows 11 con Node 24.12; Linux con Ubuntu en WSL, Node 26.1 y Electron sobre WSLg.
+
+| Suite | Windows | Linux |
+|---|---|---|
+| Node de learn (`tests/*.test.mjs`) | 286: 264 en verde, 0 en rojo, 22 salteadas con motivo | 286: 273 en verde, 0 en rojo, 13 salteadas con motivo |
+| Python de learn (`tests/ingesta`) | 160 OK, 5 salteadas | 160 OK, 3 salteadas |
+| App: host y lógica (`npm test`) | 25 de 25 | 25 de 25 |
+| App: punta a punta con Electron (`npm run e2e`) | 8 de 8 | 8 de 8 |
+| App empaquetada (instalador NSIS / AppImage) | abre una clase | abre una clase |
+
+**Línea de base en Windows, antes de los cambios:** 147 tests Node en verde y 119 en rojo; la suite Python casi entera en rojo.
+
+**Las salteadas, todas con su motivo en la salida:**
+
+- 10 necesitan el curso real de Redes (no está en el repo).
+- 9, sólo en Windows, son del lanzador `pi-learn` (fish + tmux).
+- Las demás dependen de algo que esa máquina no tiene: ImageMagick con HEIC, `chmod` de carpetas o espacios de nombres en Windows, un Chrome en el Linux de prueba.
+- Las dos de diagramas de Linux pasaron aparte con un Chrome real.
+
+**Las pruebas de punta a punta recorren:**
+
+- una clase entera: lectura del libro, página mostrada, cita al margen con miniatura, fórmulas, quiz sin la correcta antes de responder, corrección, aprobación del plan, diagrama, plan guardado, foco, Terminar clase con nota y progreso, Inicio con «Volvé a…» y la vista del tema;
+- el panel de página (avanzar, fijar, Esc), la paleta y el modo Día;
+- el simulacro con su confirmación y el reloj del examen;
+- un barrido de todas las pantallas sin botones sin nombre ni errores de consola;
+- tema libre con su nota;
+- crear curso desde un PDF;
+- un subagente real en su panel;
+- el buscador del curso con un alias.
+
+**Errores encontrados al verificar, y corregidos:**
+
+- **Mensajes del tutor:** dos que compartían milisegundo se pisaban. Ahora cada uno lleva su id.
+- **Diálogos:** los de las extensiones no se cerraban al responder.
+- **«Seguir donde quedaste»:** salteaba las clases cerradas con `/fin`.
+- **El host:** corría con el directorio de Electron, y los subagentes no encontraban sus agentes.
+- **Terminal de los subagentes:**
+  - Git Bash descartaba lo escrito antes de su prompt;
+  - un panel cortado en Windows daba un código negativo que el paquete no reconoce.
+- **Skills:** el `SKILL.md` aparecía como mensaje del alumno.
+- **`visual-tools`:**
+  - su lock no se podía instalar fuera de la máquina de su autor;
+  - buscaba Chrome sólo en macOS;
+  - unía el PATH con `:`.
+- **Detalles de pantalla:**
+  - la fecha del progreso salía corrida un día;
+  - los avisos tapaban la caja de texto;
+  - las fórmulas de la última frase salían en crudo;
+  - el reloj de foco arrancaba en 25:01.
+
+## Lo que falta
+
+- **Probar con el modelo real**, en Windows y en Omarchy, con la cuenta del dueño: en esta máquina no hay credenciales.
+- **Subagentes:** decidir un fork fijado de `pi-interactive-subagents` o un PR a su autor, para no depender del parche local (DA45).
+- **Probar en Omarchy mismo** (Hyprland, Wayland). Linux se probó en Ubuntu sobre WSL.
+- **Instaladores sin firma.** El AppImage pide `--no-sandbox` en distros que restringen los espacios de nombres (Ubuntu 24.04); en Arch no.
+- **`.pi/settings.json`** sigue con la entrada de ponytail del dueño. En una máquina sin ese paquete, pi intenta clonarlo al arrancar. Se propone moverla a su configuración personal; no se tocó.
+- **Dos avisos de severidad baja** de `npm audit` en KaTeX (dentro de Mermaid), en la interfaz. Requieren una contaminación de prototipo previa y la opción `trust` de KaTeX, que la app no usa. Las dependencias que van en el instalador no tienen avisos.
+
+## Propuestas para después (no implementadas)
+
+- **Repaso espaciado:** traer de vuelta errores de concepto y nodos dominados con el tiempo; los datos ya están en `progreso.yaml`.
+- **Mapa del curso** como grafo de prerequisitos, con el estado de cada tema.
+- **Foco por tema:** minutos de foco y aciertos del quiz por tema, en la vista del tema.
+- **Simulacro de varios temas**, o de un parcial entero (H58).
+- **Lectura:** tamaño de letra y ancho de columna configurables.
+- **Búsqueda** en todas las notas de clase.
+- **Avisos del sistema** cuando termina una ingesta o una preparación con la app minimizada.
+- **Actualizaciones automáticas** de la app, con instaladores firmados.
+
+## Cómo probarla
+
+```bash
+cd ~/Projects/pi-learning
+.pi/.venv/bin/python .pi/app/e2e/curso_demo.py --vault .   # el curso de demostración que usan las pruebas
+cd .pi/app
+npm ci
+npm run dev        # la app
+npm test           # host y lógica
+npm run e2e        # punta a punta
+npm run empaquetar # AppImage (o instalador NSIS en Windows)
+```

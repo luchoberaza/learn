@@ -16,6 +16,7 @@ Fork de [amosblomqvist/learn](https://github.com/amosblomqvist/learn), el sistem
 - **Practicar como en el examen.** Los ejercicios son ítems reales del curso, corregidos con sus criterios, y la solución nunca se muestra antes del intento. Un ítem de parcial por tema queda reservado: `/simulacro` lo toma como en el examen, y ni ese ítem ni sus casi copias aparecen antes.
 - **No perder nada.** `/fin` guarda el progreso en `cursos/<curso>/progreso.yaml` y `/progreso` sugiere el próximo tema. Un `/compact`, un `/resume` o cerrar la ventana no pierden la clase: `pi-learn -c` la retoma donde quedó.
 - **Si falla algo externo** (red, cuota, Python, visión), la clase sigue con un aviso de una línea.
+- **Con interfaz gráfica, en Windows y Linux.** La app de `app/` hace todo lo anterior sin comandos. La clase se lee como un libro anotado: las citas al margen con la miniatura de la página, el quiz dentro del texto y un temporizador de foco. También abre los subagentes en paneles propios, sin tmux. La terminal sigue igual. Ver [`informes/interfaz.md`](informes/interfaz.md).
 
 ## Cómo está armado
 
@@ -30,6 +31,7 @@ Fork de [amosblomqvist/learn](https://github.com/amosblomqvist/learn), el sistem
 | `scripts/doctor` | chequeo de la instalación, sin red ni gasto de modelo |
 | `config/` | lanzador fish `pi-learn` y configuración de tmux |
 | `tests/` | suites Node (`node --test`) y Python (`unittest`) |
+| `app/` | la app de escritorio (Electron): interfaz, el proceso que corre pi con su filtro, paneles de subagentes y pruebas de punta a punta. pi no la carga como recurso |
 
 ## Instalación
 
@@ -45,6 +47,8 @@ Fork de [amosblomqvist/learn](https://github.com/amosblomqvist/learn), el sistem
 4. Instalar los paquetes de pi del proyecto, el venv de Python y el lanzador (comandos en SETUP), y apuntar `ruta_tesseract` de `curso.config.json` a tu Tesseract.
 5. Comprobar con `node .pi/scripts/doctor`.
 6. Abrir con `pi-learn`, no con `pi` a secas: así el tutor ve sólo las skills del proyecto. Desde ahí, seguí [`GET_STARTED.md`](GET_STARTED.md).
+
+Con la app, la instalación se hace desde su pantalla «Preparar la computadora», que corre el doctor y resuelve cada faltante. En Windows, ver la sección «Windows» de SETUP.
 
 ## Documentación
 
