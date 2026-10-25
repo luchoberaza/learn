@@ -1,0 +1,117 @@
+/* Inicio, curso, tema, notas, crear curso, ajustes y preparar. */
+
+.inicio { padding: 54px 64px 60px; display: grid; grid-template-columns: minmax(0, 1fr) 290px; gap: 30px 64px; align-content: start; }
+.retomar { grid-column: 1 / -1; max-width: 740px; margin-bottom: 8px; }
+.cuando { font-size: 13.5px; color: var(--muted); margin-bottom: 12px; }
+.titular { font-weight: 500; font-size: 38px; line-height: 1.15; letter-spacing: -.6px; color: var(--strong); margin-bottom: 18px; }
+.ultima-frase { font-family: var(--leer); font-style: italic; font-size: 17px; line-height: 1.6; color: var(--text); border-left: 2px solid var(--accent); padding: 2px 0 2px 18px; margin-bottom: 24px; max-width: 62ch; }
+.ultima-frase small { display: block; font-style: normal; font-family: var(--ui); font-size: 12.5px; color: var(--muted); margin-top: 6px; }
+.inicio-indices { display: grid; gap: 34px; align-content: start; min-width: 0; }
+.indice-curso h3, .semana h3, .recientes h3 { font-weight: 600; font-size: 17px; color: var(--strong); margin-bottom: 12px; }
+.indice-curso h3 button { font: inherit; color: inherit; }
+.indice-curso h3 button:hover { color: var(--accent); }
+.inicio-columna { display: grid; gap: 38px; align-content: start; }
+.semana p { font-size: 14.5px; line-height: 1.6; color: var(--text); margin-bottom: 16px; }
+.barras { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; align-items: end; height: 70px; }
+.barras div { background: var(--line); border-radius: 3px 3px 0 0; min-height: 3px; }
+.barras div.hoy { background: var(--focus); }
+.dias { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; margin-top: 6px; font-size: 11.5px; color: var(--muted); text-align: center; }
+.recientes ul, .sesiones { list-style: none; margin-bottom: 12px; }
+.recientes li button, .sesiones li button { display: flex; flex-direction: column; gap: 2px; width: 100%; padding: 8px 10px; margin-left: -10px; border-radius: 7px; font-size: 14px; }
+.recientes li button:hover, .sesiones li button:hover { background: var(--wash); }
+.sesiones li button { flex-direction: row; justify-content: space-between; gap: 18px; }
+.sesiones li button .fuerte { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sesiones li button .apagado { white-space: nowrap; font-size: 13px; }
+
+/* Curso. */
+.grupo-material { margin-bottom: 28px; }
+.grupo-material h3 { font-size: 16px; font-weight: 600; color: var(--strong); margin-bottom: 8px; }
+.documentos { list-style: none; }
+.documentos li { display: flex; align-items: baseline; gap: 14px; padding: 7px 0; border-bottom: 1px solid var(--line); font-size: 14.5px; }
+.documentos li .fuerte { flex: 1; min-width: 0; }
+.documentos li .apagado { font-size: 13px; white-space: nowrap; }
+.estado-curso section { margin-bottom: 34px; max-width: 720px; }
+.estado-curso h3 { font-size: 17px; font-weight: 600; color: var(--strong); margin-bottom: 8px; }
+.estado-curso p { font-size: 14.5px; line-height: 1.6; }
+.estado-curso .acciones { margin-top: 12px; }
+.informe { border: 1px solid var(--line); border-radius: 10px; padding: 16px 20px; max-height: 60vh; overflow-y: auto; background: var(--raised); }
+
+/* Tema. */
+.estado-tema { font-size: 14px; color: var(--muted); margin-bottom: 18px; }
+.estado-tema.dominado { color: var(--ok); }
+.estado-tema.en_curso { color: var(--accent); }
+.estado-tema.repasar { color: var(--warn); }
+.seccion-tema { margin-bottom: 30px; }
+.seccion-tema h2 { font-size: 18px; font-weight: 600; color: var(--strong); margin-bottom: 10px; }
+.seccion-tema h3 { font-size: 13.5px; font-weight: 600; color: var(--muted); margin-bottom: 6px; }
+.seccion-tema p { font-family: var(--leer); font-size: 16.5px; line-height: 1.65; }
+.seccion-tema .proximo { border-left: 2px solid var(--accent); padding-left: 16px; color: var(--strong); }
+.plan-lista { padding-left: 1.4em; font-family: var(--leer); font-size: 16px; line-height: 1.7; }
+.plan-lista li::marker { color: var(--deco); }
+.plan-lista li.hecho { color: var(--ok); }
+.plan-lista li.actual { color: var(--strong); font-weight: 600; }
+.borde { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 30px; }
+.borde h2 { grid-column: 1 / -1; }
+.borde ul, .lista { padding-left: 1.2em; font-size: 15px; line-height: 1.6; }
+.borde ul li::marker { color: var(--ok); }
+.borde ul.falla li::marker { color: var(--bad); }
+.lista li + li { margin-top: 4px; }
+.tabla { border-collapse: collapse; width: 100%; font-size: 14px; }
+.tabla th, .tabla td { text-align: left; padding: 7px 14px 7px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+.tabla th { color: var(--muted); font-weight: 600; font-size: 13px; }
+
+/* Nota. */
+.nota-prosa { font-size: 17px; }
+.nota .con-margen { grid-template-columns: minmax(0, 640px) 180px; }
+
+/* Crear curso. */
+.zona-soltar { border: 1.5px dashed var(--line); border-radius: 12px; padding: 26px; display: grid; justify-items: start; gap: 10px; }
+.zona-soltar p:first-child { font-family: var(--leer); font-size: 17px; color: var(--strong); }
+.zona-soltar.activa { border-color: var(--accent); background: var(--wash); }
+.lista-archivos { list-style: none; display: grid; gap: 8px; max-height: 320px; overflow-y: auto; padding: 2px; }
+
+/* Ajustes. */
+.ajustes { display: grid; grid-template-columns: 230px minmax(0, 1fr); }
+.ajustes-nav { padding: 48px 20px 40px 40px; border-right: 1px solid var(--line); display: flex; flex-direction: column; align-items: stretch; gap: 2px; }
+.ajustes-nav h1 { margin-bottom: 18px; font-size: 28px; }
+.ajustes-nav button { padding: 8px 10px; border-radius: 7px; color: var(--muted); font-size: 14px; }
+.ajustes-nav button:hover { color: var(--strong); background: var(--wash); }
+.ajustes-nav button.on { color: var(--strong); background: var(--wash); }
+.ajustes-cuerpo { padding: 52px 56px 80px; overflow-y: auto; }
+.ajuste { max-width: 620px; }
+.ajuste h2 { font-size: 22px; font-weight: 600; color: var(--strong); margin-bottom: 18px; }
+.subtitulo-ajuste { font-family: var(--leer); font-size: 17px; color: var(--strong); margin: 34px 0 6px; font-weight: 600; }
+.opciones-radio { display: grid; gap: 14px; }
+.numeros { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 20px; }
+.numero { display: grid; gap: 6px; font-size: 13.5px; color: var(--muted); }
+.numero .campo { max-width: 120px; }
+.cuentas { list-style: none; }
+.cuentas li { display: flex; align-items: center; gap: 14px; padding: 12px 0; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+.conectado { color: var(--ok); font-size: 13px; }
+.cuentas .apagado { font-size: 13px; }
+.datos { display: grid; grid-template-columns: max-content 1fr; gap: 8px 18px; font-size: 14px; }
+.datos dt { color: var(--muted); }
+.datos dd { color: var(--strong); overflow-wrap: anywhere; }
+.datos .ruta { font-family: var(--mono); font-size: 12.5px; }
+
+/* Preparar. */
+.chequeos { list-style: none; display: grid; gap: 2px; margin-top: 8px; }
+.chequeo { display: flex; align-items: center; gap: 12px; padding: 9px 0; border-bottom: 1px solid var(--line); font-size: 14px; flex-wrap: wrap; }
+.chequeo > div { flex: 1; min-width: 240px; display: flex; flex-direction: column; gap: 2px; }
+.chequeo b { color: var(--strong); font-weight: 600; }
+.chequeo span { color: var(--muted); font-size: 13px; overflow-wrap: anywhere; }
+.marca-chequeo { width: 16px; text-align: center; font-weight: 700; align-self: flex-start; margin-top: 2px; }
+.chequeo.estado-ok .marca-chequeo { color: var(--ok); }
+.chequeo.estado-falla .marca-chequeo { color: var(--bad); }
+.chequeo.estado-aviso .marca-chequeo { color: var(--warn); }
+.chequeo.estado-info .marca-chequeo { color: var(--deco); }
+.consola { max-height: 300px; }
+
+@media (max-width: 1100px) {
+  .inicio { grid-template-columns: minmax(0, 1fr); padding: 44px 40px; }
+  .pagina-lectura, .pagina-ancha { padding: 40px 36px 70px; }
+  .ajustes { grid-template-columns: 190px minmax(0, 1fr); }
+  .ajustes-cuerpo { padding: 44px 32px 70px; }
+}
+.buscador-curso { display: flex; gap: 10px; margin-bottom: 22px; max-width: 880px; }
+.buscador-curso .campo { flex: 1; }
