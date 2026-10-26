@@ -227,7 +227,7 @@ def construir_busqueda(raiz: Path) -> dict:
 
 def informe(raiz: Path) -> None:
     lineas = ["# Informe de ingesta base", "", "> Preparación técnica: no es un curso curado ni una validación de ítems.",
-              "", "Las páginas son las del PDF (base 1). Los enlaces abren los originales sin modificarlos.",
+              "", "Las páginas son las del PDF (base 1); en una grabación, los tramos de 5 minutos (base 1). Los enlaces abren los originales sin modificarlos.",
               "Los puntajes son heurísticos: no prueban fidelidad matemática. La matemática no recuperada en LaTeX se señala para revisión.", ""]
     for carpeta in sorted(raiz.iterdir()):
         if not carpeta.is_dir() or carpeta.is_symlink() or not (carpeta / "meta.json").exists():

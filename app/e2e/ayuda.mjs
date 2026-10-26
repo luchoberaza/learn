@@ -52,3 +52,15 @@ export function notas() {
 }
 
 export const espera = ms => new Promise(r => setTimeout(r, ms));
+
+// Los bloques de la clase usan content-visibility: auto: lo recién llegado ya está en el DOM, pero hasta el cuadro
+// siguiente no se dibuja y su innerText sale vacío (en WSLg ese cuadro llegó a tardar más de un segundo). Espera a que
+// se dibuje de verdad; el locator se resuelve de nuevo en cada vuelta, así que no importa si React cambió el nodo.
+export async function dibujado(locator, timeout = 60000) {
+  const hasta = Date.now() + timeout;
+  await locator.waitFor({ timeout });
+  while (!(await locator.evaluate(el => el.checkVisibility({ contentVisibilityAuto: true })))) {
+    if (Date.now() > hasta) throw new Error(`no se dibujó en ${timeout} ms: ${locator}`);
+    await espera(50);
+  }
+}

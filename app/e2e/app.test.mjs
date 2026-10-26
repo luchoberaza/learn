@@ -4,7 +4,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
-import { abrirApp, CURSO, espera, hayCurso, notas, VAULT } from "./ayuda.mjs";
+import { abrirApp, CURSO, dibujado, espera, hayCurso, notas, VAULT } from "./ayuda.mjs";
 
 const sinCurso = !hayCurso && "falta el curso de demostración: corré app/e2e/curso_demo.py";
 const CAPTURAS = process.env.LEARN_CAPTURAS;
@@ -58,7 +58,7 @@ test("app: una clase entera, de la primera pregunta al cierre con nota y progres
   // La cita al margen, la fórmula y la página mostrada.
   const quiz = win.getByRole("group", { name: "Pregunta del tutor" });
   await quiz.waitFor({ timeout: 60000 });
-  await win.locator(".nota-margen").first().waitFor();
+  await dibujado(win.locator(".nota-margen").first());
   assert.match(await win.locator(".nota-margen").first().innerText(), /Kurose y Ross \(extracto de demostración\), página 2/);
   assert.ok(await win.locator(".tutor .katex").count() >= 2, "fórmulas con KaTeX");
   // Las miniaturas se piden recién cuando la nota entra en pantalla.

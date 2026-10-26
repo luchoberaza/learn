@@ -26,7 +26,7 @@ La primera prueba de punta a punta con el modelo real (`gpt-6.1-sol`, una clase 
 
 **Interfaz de escritorio y Windows (2026-10-25, propuesta en un PR de luchoberaza):** app de escritorio en `app/` y núcleo portable a Windows, sin cambios de comportamiento en Linux ni en la terminal. Sin modelo ni red: suite Node 293 tests (Windows 271 en verde y 22 salteadas con motivo; Linux 280 y 13), Python 165 OK en las dos, y la app con 39 tests de host y lógica y 10 de punta a punta con Electron real en las dos. Con el modelo real se probó Claude Sonnet 5.5 en la app (DA48). La ingesta base procesa varias páginas a la vez según los hilos de cada máquina y deja los mismos archivos que de a una (DA50). Pendiente: probarla con `openai-codex` y decidir el fork de los subagentes. Ver DA39–DA50 y `informes/interfaz.md`.
 
-**Grabaciones de clase (2026-10-26, propuesta en un PR aparte):** un video o audio de clase es material del curso, transcripto en local con faster-whisper en tramos de cinco minutos que el tutor cita al segundo y la app reproduce en su propia ventana. Ver DA51.
+**Grabaciones de clase (2026-10-26, propuesta en el mismo PR):** un video o audio de clase es material del curso, transcripto en local con faster-whisper en tramos de cinco minutos que el tutor cita al segundo y la app reproduce en su propia ventana. Con DA51, sin modelo ni red: suite Node 298 tests (Windows 276 en verde y 22 salteadas; Linux 285 y 13), Python 175 (Windows 169 OK y 6 salteadas; Linux 171 y 4), y la app con 40 tests y 11 de punta a punta en las dos. Con el modelo real, una grabación de 41 minutos se transcribió sin placa de video. Ver DA51.
 
 ## D0.1 — Conservar el upstream y fijar los subagentes
 
@@ -802,7 +802,7 @@ Propuesta de luchoberaza en el mismo PR. Una condición: no cambia nada de lo qu
 
 ## Grabaciones de clase — 2026-10-26
 
-Propuesta de luchoberaza, en un PR aparte. Las grabaciones de las clases pasan a ser material del curso, transcriptas en local.
+Propuesta de luchoberaza en el mismo PR. Las grabaciones de las clases pasan a ser material del curso, transcriptas en local.
 
 ### DA51 — Las grabaciones de clase se transcriben en local, en tramos de cinco minutos que se citan al segundo
 
@@ -818,7 +818,7 @@ Propuesta de luchoberaza, en un PR aparte. Las grabaciones de las clases pasan a
 - **Por qué:** el texto se paga una vez, en la computadora, y después cuesta lo mismo que un PDF. Los tramos como páginas evitan un segundo sistema de material. Turbo es entre 2 y 3 veces más rápido que large-v3 con casi el mismo error (YouTube Commons: 13,4 % contra 13,2 %); las versiones «distil» son sólo inglés.
 - **Límites:**
   - Obsidian abre el video desde el principio: `#t=` sólo lo respetan complementos como Video Notes. La app sí salta al segundo.
-  - Sin placa NVIDIA con CUDA, transcribir lleva tiempo: en una notebook Ryzen 5 4600H, con 6 hilos, unos 57 s por cada 108 s de audio.
+  - Sin placa NVIDIA con CUDA, transcribir lleva tiempo: en una notebook Ryzen 5 4600H, con 6 hilos, unos 57 s por cada 108 s de audio; una grabación de 41 minutos, 23 minutos con otras pruebas corriendo a la vez. La primera vez se suma la descarga del modelo.
   - El audio decodificado entero queda en memoria mientras se transcribe: unos 230 MB por hora de grabación.
   - Chromium no reproduce todos los .mkv o .mov. La transcripción no depende de eso, y la ventana lo avisa.
   - Los rangos por tema de una grabación se asignan después de la ingesta, leyendo la transcripción.
@@ -834,7 +834,8 @@ Propuesta de luchoberaza, en un PR aparte. Las grabaciones de las clases pasan a
     - «sin memoria para el modelo los tramos quedan pendientes sin inventar el idioma»;
     - «una grabación no es ejercicio ni pasa por visión»;
     - «el inventario da páginas y tramos y el curso valida los tramos».
-  - Con el modelo real, si está descargado y `LEARN_GRABACION_REAL` apunta a una grabación: «faster-whisper transcribe el primer tramo en español». Con 108 s de Wikipedia hablada en español (dominio público), detectó el idioma y transcribió bien; erró nombres propios («Nobel» por Novell).
+  - Con el modelo real, si está descargado y `LEARN_GRABACION_REAL` apunta a una grabación: «faster-whisper transcribe el primer tramo en español». Con 108 s de Wikipedia hablada en español (dominio público), detectó el idioma y transcribió bien; erró nombres propios («Nobel» por Novell). Pasa también en Linux, con el modelo que bajó Windows a `carpeta_modelos`.
+  - Una grabación de 41 minutos de punta a punta, con `ingestar.py procesar` y la descarga del modelo: 9 tramos, los 8 cortes en pausas, idioma español y ningún tramo dudoso; erró términos poco comunes («coronario» por corolario).
   - `tests/grabaciones.test.mjs`: la cita al segundo, `leer_paginas` con el enlace de cada párrafo y lo que falta, el dossier, las etiquetas, la barra y las anclas del researcher.
   - `app/src/lib/texto.test.mjs`: «el momento de una grabación se reconoce aparte de una página».
   - `app/e2e/grabacion.test.mjs`: la cita abre la grabación en su segundo, se puede adelantar (rangos de bytes), otra cita reusa la ventana, `learn-medio://` no sirve un permiso ajeno y la ventana se cierra con la principal.

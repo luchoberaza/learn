@@ -124,10 +124,10 @@ Sin modelo ni red: el proveedor falso de pi-ai con guion hace de tutor. Windows 
 
 | Suite | Windows | Linux |
 |---|---|---|
-| Node de learn (`tests/*.test.mjs`) | 293: 271 en verde, 0 en rojo, 22 salteadas con motivo | 293: 280 en verde, 0 en rojo, 13 salteadas con motivo |
-| Python de learn (`tests/ingesta`) | 165 OK, 5 salteadas | 165 OK, 3 salteadas |
-| App: host y lógica (`npm test`) | 39 de 39 | 39 de 39 |
-| App: punta a punta con Electron (`npm run e2e`) | 10 de 10 | 10 de 10 |
+| Node de learn (`tests/*.test.mjs`) | 298: 276 en verde, 0 en rojo, 22 salteadas con motivo | 298: 285 en verde, 0 en rojo, 13 salteadas con motivo |
+| Python de learn (`tests/ingesta`) | 175: 169 OK, 6 salteadas | 175: 171 OK, 4 salteadas |
+| App: host y lógica (`npm test`) | 40 de 40 | 40 de 40 |
+| App: punta a punta con Electron (`npm run e2e`) | 11 de 11 | 11 de 11 |
 | App empaquetada (instalador NSIS / AppImage) | abre con el medidor y la cuenta de Claude | abre una clase, el medidor y un PDF |
 
 **Con el modelo real** (Claude Sonnet 5.5, en Windows, el 2026-10-26). Tres clases en la app con un alumno virtual, con un registrador entre pi y Anthropic que anota lo que factura cada respuesta:
@@ -145,12 +145,14 @@ Sin modelo ni red: el proveedor falso de pi-ai con guion hace de tutor. Windows 
 - 9, sólo en Windows, son del lanzador `pi-learn` (fish + tmux).
 - Las demás dependen de algo que esa máquina no tiene: ImageMagick con HEIC, `chmod` de carpetas o espacios de nombres en Windows, un Chrome en el Linux de prueba.
 - Las dos de diagramas de Linux pasaron aparte con un Chrome real.
+- La de Python con el modelo real de transcripción (DA51) necesita el modelo descargado y una grabación en `LEARN_GRABACION_REAL`; pasó aparte en las dos.
 
 **Las pruebas de punta a punta recorren:**
 
 - una clase entera: lectura del libro, página mostrada, cita al margen con miniatura, fórmulas, quiz sin la correcta antes de responder, corrección, aprobación del plan, diagrama, plan guardado, foco, Terminar clase con nota y progreso, Inicio con «Volvé a…» y la vista del tema;
 - el panel de página (avanzar, fijar, Esc), la paleta y el modo Día;
 - la ventana de PDF: abre en la página citada, busca sin distinguir tildes, muestra en blanco la página del problema reservado, se recarga cuando lo reservado cambia, no se duplica y se cierra con la ventana principal;
+- la ventana de grabación (DA51): la cita abre la grabación en su segundo, se puede adelantar, otra cita reusa la ventana, no sirve a un permiso ajeno y se cierra con la principal;
 - el simulacro con su confirmación y el reloj del examen;
 - un barrido de todas las pantallas sin botones sin nombre ni errores de consola;
 - tema libre con su nota;
@@ -186,6 +188,7 @@ Sin modelo ni red: el proveedor falso de pi-ai con guion hace de tutor. Windows 
 - **Subagentes:** decidir un fork fijado de `pi-interactive-subagents` o un PR a su autor, para no depender del parche local (DA45).
 - **Probar en Omarchy mismo** (Hyprland, Wayland). Linux se probó en Ubuntu sobre WSL.
 - **Medir DA50 con un libro real.** Los tiempos de la ingesta se midieron con PDFs sintéticos. La preparación con el modelo de visión sigue de a una página.
+- **Grabaciones con placa NVIDIA (DA51):** el camino con CUDA no se probó, porque ninguna máquina de prueba tiene una. Sin placa, una grabación de 41 minutos llevó 23.
 - **Instaladores sin firma.** El AppImage pide `--no-sandbox` en distros que restringen los espacios de nombres (Ubuntu 24.04); en Arch no.
 - **`.pi/settings.json`** sigue con la entrada de ponytail del dueño. En una máquina sin ese paquete, pi intenta clonarlo al arrancar. Se propone moverla a su configuración personal; no se tocó.
 - **Dos avisos de severidad baja** de `npm audit` en KaTeX (dentro de Mermaid), en la interfaz. Requieren una contaminación de prototipo previa y la opción `trust` de KaTeX, que la app no usa. Las dependencias que van en el instalador no tienen avisos.

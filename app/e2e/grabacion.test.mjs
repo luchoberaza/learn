@@ -5,7 +5,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { abrirApp, CURSO, hayCurso, VAULT } from "./ayuda.mjs";
+import { abrirApp, CURSO, dibujado, hayCurso, VAULT } from "./ayuda.mjs";
 
 const sinCurso = !hayCurso && "falta el curso de demostración: corré app/e2e/curso_demo.py";
 const CAPTURAS = process.env.LEARN_CAPTURAS;
@@ -31,7 +31,7 @@ test("ventana de grabación: la cita abre la grabación en su segundo, se puede 
   const { app, win, errores } = await abrirApp(t, { guion: CITA });
   await win.getByRole("button", { name: "Empezar la clase" }).click();
   const nota = win.locator(".nota-margen").filter({ hasText: "desde 0:12" });
-  await nota.waitFor({ timeout: 60000 });
+  await dibujado(nota);
   assert.match(await nota.innerText(), /clase demo, desde 0:12/);
   const [ventana] = await Promise.all([app.waitForEvent("window"), nota.getByRole("button", { name: "Escuchar desde 0:12" }).click()]);
   const erroresVentana = [];
