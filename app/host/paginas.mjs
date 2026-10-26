@@ -3,9 +3,14 @@
 // - en evaluaciones, soluciones o documentos con soluciones integradas, sólo la página exacta que el tutor enlazó
 //   (las tools dan esos enlaces recién después del intento) o la que mostró con ver_pagina; nada de avanzar página a página;
 // - en el resto (bibliografía, programa), se puede avanzar salteando las páginas vedadas.
+// La ventana de PDF (DA47) sigue las mismas reglas con el documento entero: ver lectura().
 import { execFile } from "node:child_process";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
+import { createHash } from "node:crypto";
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync } from "node:fs";
+import { basename, dirname, isAbsolute, join } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const aqui = dirname(fileURLToPath(import.meta.url));
 
 const conSolucion = (d, doc) => doc.tipo === "evaluaciones" || doc.tipo === "soluciones" || (d.items?.[doc.id] ?? []).some(i => i.solucion_de !== undefined);
 
@@ -42,6 +47,38 @@ export function crearPaginas({ vault, piDir, pythonDelVenv, material, cursos }) 
     return { curso, doc, pagina, titulo: fuente.titulo, total: fuente.paginas, anterior: vecina(-1), siguiente: vecina(1), restringido, imagen };
   }
 
+  // El documento entero para la ventana de PDF, con cada página vedada cambiada por una hoja en blanco que lo avisa
+  // (lectura.py), en la carpeta que da la app. Sin vedadas va el PDF original. Los parciales y las soluciones no se
+  // abren enteros. La clave cambia con el archivo y con las vedadas: así la ventana sabe cuándo recargar.
+  async function lectura({ cita, curso, doc, pagina, carpeta }) {
+    if (cita) ({ curso, doc, pagina } = await desdeCita(cita));
+    if (typeof carpeta !== "string" || !isAbsolute(carpeta)) throw new Error("Falta la carpeta de la copia para leer.");
+    const d = await cursos.cargar(curso), raiz = join(vault, "cursos", curso), fuente = material.documento(d, doc);
+    if (conSolucion(d, fuente)) throw new Error("Los parciales y las soluciones no se abren enteros: el tutor muestra cada página después de tu intento.");
+    const ocultos = material.reservados(raiz, d), vedadas = [];
+    for (let p = 1; p <= fuente.paginas; p++) if (vedada(raiz, d, doc, p, ocultos)) vedadas.push(p);
+    const original = material.rutaSegura(raiz, fuente.archivo), { size, mtimeMs } = statSync(original);
+    const base = { curso, doc, titulo: fuente.titulo, total: fuente.paginas, vedadas, pagina: Number.isInteger(pagina) ? Math.min(Math.max(pagina, 1), fuente.paginas) : 1 };
+    if (!vedadas.length) return { ...base, archivo: original, clave: `original-${size}-${mtimeMs}` };
+    const clave = createHash("sha256").update(JSON.stringify([original, size, mtimeMs, vedadas])).digest("hex").slice(0, 16);
+    // Los slugs no llevan «--»: el prefijo separa sin ambigüedad las copias de cada documento.
+    const prefijo = `${curso}--${doc}--`, archivo = join(carpeta, `${prefijo}${clave}.pdf`);
+    if (!existsSync(archivo)) {
+      mkdirSync(carpeta, { recursive: true });
+      await copiaParaLeer(original, archivo, vedadas);
+      for (const f of readdirSync(carpeta)) if (f.startsWith(prefijo) && f !== basename(archivo)) rmSync(join(carpeta, f), { force: true });
+    }
+    return { ...base, archivo, clave };
+  }
+
+  function copiaParaLeer(origen, destino, vedadas) {
+    return new Promise((resolver, rechazar) => {
+      execFile(pythonDelVenv(piDir), [join(aqui, "lectura.py"), "--origen", origen, "--destino", destino, "--vedadas", vedadas.join(",")],
+        { encoding: "utf8", timeout: 180000, windowsHide: true, env: { ...process.env, PYTHONUTF8: "1", PYTHONIOENCODING: "utf-8" } },
+        error => error ? rechazar(new Error("No se pudo preparar el PDF: el entorno de ingesta (Python) falló.")) : resolver());
+    });
+  }
+
   function renderizar(curso, doc, pagina) {
     return new Promise((resolver, rechazar) => {
       execFile(pythonDelVenv(piDir), [join(piDir, "scripts/ingesta/sesion.py"), "renderizar", "--vault", vault, "--curso", curso, "--doc", doc, "--pagina", String(pagina)],
@@ -53,5 +90,5 @@ export function crearPaginas({ vault, piDir, pythonDelVenv, material, cursos }) 
     });
   }
 
-  return { pedir, desdeCita };
+  return { pedir, lectura, desdeCita };
 }

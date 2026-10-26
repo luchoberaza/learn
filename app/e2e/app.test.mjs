@@ -138,11 +138,11 @@ test("app: el panel de página, la paleta y el modo Día", { skip: sinCurso, tim
   await win.locator(".tutor sup.llamada").first().click();
   const panel = win.getByRole("complementary", { name: "Página del material" });
   await panel.locator(".panel-cuerpo img").waitFor({ timeout: 20000 });
-  assert.match(await panel.locator(".panel-titulo").innerText(), /Página 2 de 7/);
+  assert.match(await panel.locator(".panel-titulo").innerText(), /Página 2 de 8/);
   await panel.getByRole("button", { name: "Página siguiente" }).click();
-  await panel.getByText("Página 3 de 7").waitFor({ timeout: 20000 });
+  await panel.getByText("Página 3 de 8").waitFor({ timeout: 20000 });
   await panel.getByRole("button", { name: "Página anterior" }).click();
-  await panel.getByText("Página 2 de 7").waitFor({ timeout: 20000 });
+  await panel.getByText("Página 2 de 8").waitFor({ timeout: 20000 });
   await panel.getByRole("button", { name: "Fijar el panel" }).click();
   await capturar(win, "panel-pagina");
   // Fijado, sobrevive a cambiar de pantalla; suelto, Esc lo cierra.

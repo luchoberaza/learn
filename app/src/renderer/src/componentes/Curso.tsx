@@ -1,7 +1,7 @@
 // Curso (§9.2): el índice, el material, las notas de clase y el estado (validación, ingesta e informe).
 import { useEffect, useState } from "react";
 import { cuando } from "../../../lib/texto.ts";
-import { abrirPagina, enviar, estudiar, navegar, pedir, refrescarCursos, usarTienda } from "../tienda";
+import { abrirPagina, abrirPdf, enviar, estudiar, navegar, pedir, refrescarCursos, usarTienda } from "../tienda";
 import type { NotaResumen } from "../tipos";
 import { IndiceCurso } from "./Inicio";
 import { Prosa } from "./Prosa";
@@ -28,7 +28,10 @@ function Material({ slug }: { slug: string }) {
                   <span className="apagado">{d.paginas === 1 ? "una página" : `${d.paginas} páginas`}</span>
                   {evaluacion
                     ? <span className="apagado" title="Para no ver la solución antes de intentarlo, el tutor abre estas páginas recién después de tu intento.">se abre en la práctica</span>
-                    : <button className="enlace cita" onClick={() => void abrirPagina({ curso: slug, doc: d.id, pagina: 1, origen: "material" })}>Hojear</button>}
+                    : <>
+                      <button className="enlace cita" onClick={() => void abrirPdf({ curso: slug, doc: d.id, pagina: 1 })} title="El PDF entero, en su propia ventana">Abrir</button>
+                      <button className="enlace cita" onClick={() => void abrirPagina({ curso: slug, doc: d.id, pagina: 1, origen: "material" })} title="Página por página, en el panel">Hojear</button>
+                    </>}
                 </li>
               );
             })}

@@ -299,6 +299,7 @@ async function arrancar() {
     cursos: () => cursos.todos(),
     curso: ({ slug }) => cursos.resumen(slug),
     pagina: args => paginas.pedir(args),
+    lectura: args => paginas.lectura(args),
     "imagen-render": ({ ruta }) => {
       const rel = relative(vault, resolve(String(ruta))).split(sep).join("/");
       if (!/^cursos\/[a-z0-9-]+\/_procesado\/[a-z0-9-]+\/render\/\d{4}\.png$/.test(rel)) throw new Error("Ruta de página inválida.");

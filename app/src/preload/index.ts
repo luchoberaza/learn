@@ -34,5 +34,6 @@ contextBridge.exposeInMainWorld("learn", {
   copiar: (texto: string) => ipcRenderer.invoke("app:copiar", texto),
   foco: (suma?: { dia: string; minutos: number; bloque: boolean }) => ipcRenderer.invoke("app:foco", suma),
   titulo: (titulo: string) => ipcRenderer.invoke("app:titulo", titulo),
+  abrirPdf: (pedido: unknown) => ipcRenderer.invoke("visor:abrir", pedido),
   salir: () => ipcRenderer.invoke("app:salir"),
 });

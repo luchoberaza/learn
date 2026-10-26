@@ -102,6 +102,7 @@ export interface ApiLearn {
   copiar(texto: string): Promise<void>;
   foco(suma?: { dia: string; minutos: number; bloque: boolean }): Promise<Record<string, { minutos: number; bloques: number }>>;
   titulo(titulo: string): Promise<void>;
+  abrirPdf(pedido: { cita?: string; curso?: string; doc?: string; pagina?: number }): Promise<void>;
   salir(): Promise<void>;
 }
 

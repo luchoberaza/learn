@@ -1,8 +1,8 @@
 // Panel de página (§9.3): el dibujo de la página del PDF que ya genera sesion.py, con las reglas de ver_pagina que
 // aplica el host. Se puede fijar para que quede abierto mientras seguís la clase.
 import { useState } from "react";
-import { abrirPagina, cambiar, cerrarPanel, guardarAjustes, usarTienda } from "../tienda";
-import { Cerrar, Chincheta, Derecha, Izquierda, Lupa } from "./Iconos";
+import { abrirPagina, abrirPdf, cambiar, cerrarPanel, guardarAjustes, usarTienda } from "../tienda";
+import { Afuera, Cerrar, Chincheta, Derecha, Izquierda, Lupa } from "./Iconos";
 
 export function PanelPagina() {
   const panel = usarTienda(e => e.panel);
@@ -14,6 +14,7 @@ export function PanelPagina() {
     <aside className="panel-pagina" aria-label="Página del material">
       <header>
         <div className="panel-titulo">{p ? <><b>{p.titulo}</b><span>Página {p.pagina} de {p.total}</span></> : <b>Página</b>}</div>
+        {p && !p.restringido && <button className="icono" onClick={() => void abrirPdf({ curso: p.curso, doc: p.doc, pagina: p.pagina })} aria-label="Abrir el PDF en una ventana" title="Abrir el PDF entero en una ventana"><Afuera /></button>}
         <button className="icono" onClick={() => setGrande(!grande)} aria-label={grande ? "Ajustar al ancho" : "Ver más grande"} title={grande ? "Ajustar al ancho" : "Ver más grande"}><Lupa mas={!grande} /></button>
         <button className={`icono ${panel.fijo ? "activo" : ""}`} onClick={fijar} aria-pressed={panel.fijo} aria-label={panel.fijo ? "Soltar el panel" : "Fijar el panel"} title={panel.fijo ? "Soltar: se cierra al cambiar de pantalla" : "Fijar: queda abierto mientras estudiás"}><Chincheta puesta={panel.fijo} /></button>
         <button className="icono" onClick={cerrarPanel} aria-label="Cerrar el panel" title="Cerrar (Esc)"><Cerrar /></button>

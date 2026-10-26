@@ -47,6 +47,12 @@ LIBRO = [
     ("3.1 Servicios de la capa de transporte",
      "La capa de transporte ofrece comunicación lógica entre procesos. La multiplexación junta datos de varios sockets; "
      "la demultiplexación entrega cada segmento al socket correcto usando los números de puerto."),
+    # Casi copia de la pregunta 1 del parcial, como los problemas del libro que la cátedra copia en los parciales:
+    # mientras esa pregunta esté reservada para el simulacro, esta página no se muestra.
+    ("1.5 Problemas",
+     "P29. Un archivo de 8 x 10^6 bits se envía por un enlace de 2 Mbps de 4000 km. Calcule el retardo de transmisión "
+     "y el de propagación (s = 2 x 10^8 m/s).\n\n"
+     "P30. Explique qué ocurre con el retardo de encolamiento cuando la intensidad de tráfico supera 1."),
 ]
 PRACTICO = [
     ("Práctico 1: retardos",

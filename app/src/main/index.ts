@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 import { guardarAjustes, leerAjustes, leerFoco, sumarFoco, type Ajustes } from "./ajustes.js";
 import { Host } from "./host.js";
 import { diagnostico, instalar } from "./sistema.js";
+import { crearVisores } from "./visor.js";
 
 const aqui = fileURLToPath(new URL(".", import.meta.url));
 if (process.platform === "linux") app.commandLine.appendSwitch("ozone-platform-hint", "auto");
@@ -18,6 +19,7 @@ let ventana: BrowserWindow | undefined;
 const aVentana = (canal: string, datos: unknown) => { if (ventana && !ventana.isDestroyed()) ventana.webContents.send(canal, datos); };
 host.on("mensaje", m => aVentana("host:mensaje", m));
 host.on("salio", codigo => aVentana("host:mensaje", { tipo: "host-cerrado", codigo }));
+const visores = crearVisores(host, aqui, () => ventana);
 
 function aplicarTema(tema: Ajustes["tema"]) { nativeTheme.themeSource = tema === "noche" ? "dark" : tema === "dia" ? "light" : "system"; }
 
@@ -40,6 +42,8 @@ function crearVentana() {
     const b = ventana.getNormalBounds();
     guardarAjustes({ ventana: { ancho: b.width, alto: b.height, x: b.x, y: b.y, maximizada: ventana.isMaximized() } });
   });
+  // Las ventanas de PDF dependen de la principal: se cierran con ella.
+  ventana.on("closed", () => visores.cerrarTodas());
   if (process.env.ELECTRON_RENDERER_URL) void ventana.loadURL(process.env.ELECTRON_RENDERER_URL);
   else void ventana.loadFile(join(aqui, "../renderer/index.html"));
 }
@@ -58,7 +62,7 @@ ipcMain.handle("app:info", () => ({ version: app.getVersion(), plataforma: proce
 ipcMain.handle("app:ajustes", (_e, cambios?: Partial<Ajustes>) => {
   if (!cambios) return leerAjustes();
   const nuevo = guardarAjustes(cambios);
-  if (cambios.tema) aplicarTema(nuevo.tema);
+  if (cambios.tema) { aplicarTema(nuevo.tema); visores.tema(nuevo.tema); }
   return nuevo;
 });
 ipcMain.handle("app:elegir-carpeta", async (_e, titulo: string) => {
@@ -76,7 +80,7 @@ ipcMain.handle("app:elegir-archivos", async (_e, filtro: keyof typeof FILTROS) =
     properties: filtro === "pdf" || filtro === "imagen" ? ["openFile", "multiSelections"] : ["openFile"], filters: FILTROS[filtro] ?? FILTROS.pdf });
   return r.canceled ? [] : r.filePaths;
 });
-ipcMain.handle("app:arrancar", (_e, vault: string) => { guardarAjustes({ vault }); host.arrancar(vault, leerAjustes().node || "node"); return host.estado; });
+ipcMain.handle("app:arrancar", (_e, vault: string) => { visores.cerrarTodas(); guardarAjustes({ vault }); host.arrancar(vault, leerAjustes().node || "node"); return host.estado; });
 ipcMain.handle("app:estado-host", () => ({ estado: host.estado, vault: host.vault }));
 ipcMain.handle("host:pedir", (_e, tipo: string, datos: unknown) => host.pedir(tipo, datos));
 ipcMain.on("host:enviar", (_e, mensaje) => host.enviar(mensaje));

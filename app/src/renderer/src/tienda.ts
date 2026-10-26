@@ -368,6 +368,11 @@ export async function abrirPagina(args: { cita?: string; curso?: string; doc?: s
 }
 export const cerrarPanel = () => cambiar({ panel: undefined });
 
+// La ventana de PDF (DA47): el documento entero en su propia ventana, en la página pedida.
+export async function abrirPdf(pedido: { cita?: string; curso?: string; doc?: string; pagina?: number }) {
+  try { await window.learn.abrirPdf(pedido); } catch (e) { error(e); }
+}
+
 // ---------- Diálogos propios de la app (no de pi) ----------
 
 type Confirmacion = { titulo: string; mensaje: string; si: string; no: string; resolver: (v: boolean) => void };

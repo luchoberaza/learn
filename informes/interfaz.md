@@ -1,6 +1,6 @@
 # Interfaz de escritorio y Windows
 
-**Propuesta de luchoberaza para revisar en el PR.** La app vive en `app/`, el núcleo corre también en Windows y la terminal (`pi-learn`) queda igual. Las decisiones están en `DECISIONES.md` (DA39–DA46). Sin commits del lado del autor: el dueño del repo decide.
+**Propuesta de luchoberaza para revisar en el PR.** La app vive en `app/`, el núcleo corre también en Windows y la terminal (`pi-learn`) queda igual. Las decisiones están en `DECISIONES.md` (DA39–DA47). Sin commits del lado del autor: el dueño del repo decide.
 
 ## Qué trae
 
@@ -8,6 +8,7 @@
   - **Inicio:** «Seguir la clase» donde quedaste, con la última frase del tutor; el índice de cada curso como el de un libro; tu semana de foco.
   - **La clase:** se lee como un libro anotado. Literata a 18 px. Las citas `[[…pdf#page=N]]` van al margen con la miniatura de la página. El quiz está dentro del texto (teclas a, b, c y n), con fórmulas y diagramas.
   - **Panel de página** con las reglas de `ver_pagina`.
+  - **Ventana de PDF:** cada documento del curso, entero, en su propia ventana y en la página citada. Trae búsqueda, miniaturas y texto seleccionable. Las páginas reservadas para el simulacro llegan en blanco (DA47).
   - **Simulacro** con el reloj proporcional del examen.
   - **Temporizador de foco** que nunca corta la clase.
   - **Paleta** (Ctrl+K) con todos los comandos de learn, de las skills y de pi.
@@ -41,6 +42,10 @@ Capturas de las pruebas de punta a punta, con el curso de demostración y el tut
 
 ![Panel de página](interfaz/panel-pagina.png)
 
+**Ventana de PDF.** El libro entero, abierto en la página citada, con la búsqueda sin distinguir tildes. Se puede mover a otro monitor y cerrar.
+
+![Ventana de PDF](interfaz/ventana-pdf.png)
+
 **Simulacro.** El reloj proporcional del examen en la barra de la clase.
 
 ![Simulacro](interfaz/simulacro.png)
@@ -71,7 +76,7 @@ Capturas de las pruebas de punta a punta, con el curso de demostración y el tut
 | quiz, `ask_user_question` (single, multi, «Otra», texto), Esc | tarjetas dentro del texto; «Prefiero responder con mis palabras» |
 | confirmaciones «Sí, … / No» | diálogo con las mismas opciones; cerrar vale como No |
 | fotos (Ctrl+V, ruta) | pegar, arrastrar o elegir; HEIC y BMP como ruta, como en la terminal |
-| `ver_pagina`, citas | página en la clase, notas al margen y panel fijable |
+| `ver_pagina`, citas | página en la clase, notas al margen, panel fijable y el PDF entero en su ventana, sin las páginas reservadas |
 | barra «📚 curso › tema», «📝 Simulacro» | barra de la clase; reloj del examen en el simulacro |
 | preparación, verificación, ingesta | línea de estado y barra de avance en la barra lateral |
 | errores en español y «seguí» | línea de error con «Reintentar» |
@@ -100,7 +105,7 @@ La ventana no corre pi. Un proceso aparte (`app/host`) la corre con el Node del 
 - el razonamiento;
 - el `SKILL.md` de una skill cargada.
 
-El panel de página aplica las reglas de `ver_pagina`. Los datos del curso salen de `sesion.py cargar`, en sólo lectura.
+El panel de página aplica las reglas de `ver_pagina`. La ventana de PDF también: no recibe el PDF original sino una copia con cada página vedada en blanco, y los parciales y las soluciones no se abren enteros. Los datos del curso salen de `sesion.py cargar`, en sólo lectura.
 
 ## Pruebas
 
@@ -110,9 +115,9 @@ Sin modelo ni red: el proveedor falso de pi-ai con guion hace de tutor. Windows 
 |---|---|---|
 | Node de learn (`tests/*.test.mjs`) | 286: 264 en verde, 0 en rojo, 22 salteadas con motivo | 286: 273 en verde, 0 en rojo, 13 salteadas con motivo |
 | Python de learn (`tests/ingesta`) | 160 OK, 5 salteadas | 160 OK, 3 salteadas |
-| App: host y lógica (`npm test`) | 25 de 25 | 25 de 25 |
-| App: punta a punta con Electron (`npm run e2e`) | 8 de 8 | 8 de 8 |
-| App empaquetada (instalador NSIS / AppImage) | abre una clase | abre una clase |
+| App: host y lógica (`npm test`) | 26 de 26 | 26 de 26 |
+| App: punta a punta con Electron (`npm run e2e`) | 9 de 9 | 9 de 9 |
+| App empaquetada (instalador NSIS / AppImage) | abre una clase y un PDF | abre una clase y un PDF |
 
 **Línea de base en Windows, antes de los cambios:** 147 tests Node en verde y 119 en rojo; la suite Python casi entera en rojo.
 
@@ -127,6 +132,7 @@ Sin modelo ni red: el proveedor falso de pi-ai con guion hace de tutor. Windows 
 
 - una clase entera: lectura del libro, página mostrada, cita al margen con miniatura, fórmulas, quiz sin la correcta antes de responder, corrección, aprobación del plan, diagrama, plan guardado, foco, Terminar clase con nota y progreso, Inicio con «Volvé a…» y la vista del tema;
 - el panel de página (avanzar, fijar, Esc), la paleta y el modo Día;
+- la ventana de PDF: abre en la página citada, busca sin distinguir tildes, muestra en blanco la página del problema reservado, se recarga cuando lo reservado cambia, no se duplica y se cierra con la ventana principal;
 - el simulacro con su confirmación y el reloj del examen;
 - un barrido de todas las pantallas sin botones sin nombre ni errores de consola;
 - tema libre con su nota;

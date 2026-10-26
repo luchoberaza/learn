@@ -1,8 +1,12 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, readdirSync, readFileSync, rmSync, statSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { levantarHost, VAULT } from "./ayuda.mjs";
+import { levantarHost, PI_DIR, VAULT } from "./ayuda.mjs";
+
+const PYTHON = join(PI_DIR, process.platform === "win32" ? ".venv/Scripts/python.exe" : ".venv/bin/python");
 
 // Requiere el curso de demostración (app/e2e/curso_demo.py) en el vault de trabajo.
 const CURSO = "redes-demo";
@@ -81,4 +85,29 @@ test("host: una página del parcial no se abre navegando, y una con el ítem res
   assert.equal(libro.pagina, 2); assert.equal(libro.anterior, 1); assert.equal(libro.siguiente, 3); assert.ok(libro.imagen.length > 1000);
   await assert.rejects(() => h.pedir("pagina", { curso: CURSO, doc: "parcial-2025", pagina: 2, origen: "navegar" }), /reservado|sólo desde una cita/);
   await assert.rejects(() => h.pedir("pagina", { curso: CURSO, doc: "kurose", pagina: 99, origen: "navegar" }), /fuera de rango/);
+});
+
+test("host: la ventana de PDF recibe el libro entero con la página vedada en blanco, y el parcial no se abre entero", { skip: sinCurso }, async t => {
+  const h = levantarHost(t);
+  await h.esperar(m => m.tipo === "listo", 60000, "listo");
+  const carpeta = mkdtempSync(join(tmpdir(), "learn-app-lectura-"));
+  t.after(() => rmSync(carpeta, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }));
+  // El problema P29 del libro es casi copia de la pregunta del parcial reservada para el simulacro: su página va en blanco.
+  const libro = await h.pedir("lectura", { cita: `[[cursos/${CURSO}/fuentes/bibliografia/kurose.pdf#page=2]]`, carpeta });
+  assert.deepEqual([libro.doc, libro.pagina, libro.total, libro.vedadas], ["kurose", 2, 8, [8]]);
+  assert.ok(libro.archivo.startsWith(carpeta), libro.archivo);
+  const textos = JSON.parse(execFileSync(PYTHON, ["-I", "-c", "import json, sys, pymupdf; print(json.dumps([p.get_text() for p in pymupdf.open(sys.argv[1])]))", libro.archivo], { encoding: "utf8" }));
+  assert.equal(textos.length, 8);
+  assert.match(textos[1], /1\.4\.1 Retardo de transmisión/);
+  assert.match(textos[7], /guardado para el simulacro/);
+  assert.doesNotMatch(textos.join("\n"), /P29|archivo de 8 x 10/);
+  // Pedirlo otra vez reusa la copia; un documento sin vedadas va con el PDF original.
+  const otra = await h.pedir("lectura", { curso: CURSO, doc: "kurose", carpeta });
+  assert.equal(otra.archivo, libro.archivo); assert.equal(otra.clave, libro.clave); assert.equal(otra.pagina, 1);
+  assert.deepEqual(readdirSync(carpeta), [libro.archivo.split(/[\\/]/).pop()]);
+  const practico = await h.pedir("lectura", { curso: CURSO, doc: "practico-1", pagina: 1, carpeta });
+  assert.deepEqual(practico.vedadas, []);
+  assert.match(practico.archivo.replaceAll("\\", "/"), /cursos\/redes-demo\/fuentes\/ejercicios\/practico-1\.pdf$/);
+  await assert.rejects(() => h.pedir("lectura", { curso: CURSO, doc: "parcial-2025", carpeta }), /no se abren enteros/);
+  await assert.rejects(() => h.pedir("lectura", { curso: CURSO, doc: "kurose", carpeta: "relativa" }), /carpeta/);
 });

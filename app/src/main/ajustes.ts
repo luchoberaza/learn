@@ -13,6 +13,7 @@ export interface Ajustes {
   panelFijo: boolean;
   foco: AjustesFoco;
   ventana?: { ancho: number; alto: number; x?: number; y?: number; maximizada?: boolean };
+  visor?: { ancho: number; alto: number };
 }
 export interface DiaFoco { minutos: number; bloques: number }
 export type HistorialFoco = Record<string, DiaFoco>;
