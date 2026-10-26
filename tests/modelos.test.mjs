@@ -2,7 +2,7 @@
 // proveedores y el modelo principal de la máquina, con un pi simulado y carpetas temporales.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { registrarModelos } from "../extensions/modelos.ts";
@@ -10,6 +10,11 @@ import { agotadoDeCabeceras, anotarConsumo, cupoDeCabeceras, duracion, leerConsu
 
 const USO = { input: 12, output: 480, cacheRead: 21000, cacheWrite: 900, cost: { total: 0.0105 } };
 const CODEX = { provider: "openai-codex", id: "gpt-6.1-sol" };
+
+// Las carpetas temporales de estos tests se borran al terminar.
+const temporales = [];
+const temporal = prefijo => { const d = mkdtempSync(join(tmpdir(), prefijo)); temporales.push(d); return d; };
+process.on("exit", () => { for (const d of temporales) rmSync(d, { recursive: true, force: true }); });
 
 // Un pi con lo justo: los manejadores registrados y el modelo que se eligió.
 function piSimulado(recursos) {
@@ -19,7 +24,7 @@ function piSimulado(recursos) {
   return { pi, h: (evento, ...args) => manejadores.get(evento)?.(...args) };
 }
 function carpetaNueva() {
-  process.env.LEARN_CONSUMO_DIR = mkdtempSync(join(tmpdir(), "learn-consumo-"));
+  process.env.LEARN_CONSUMO_DIR = temporal("learn-consumo-");
   return process.env.LEARN_CONSUMO_DIR;
 }
 
@@ -66,7 +71,7 @@ test("consumo: el verificador y los subagentes se anotan con su origen y no elig
   for (const [variable, origen] of [["LEARN_ORIGEN", "verificador"], ["PI_SUBAGENT_NAME", "subagente"]]) {
     process.env[variable] = variable === "LEARN_ORIGEN" ? "verificador" : "scout";
     try {
-      const recursos = mkdtempSync(join(tmpdir(), "learn-recursos-"));
+      const recursos = temporal("learn-recursos-");
       writeFileSync(join(recursos, "curso.config.local.json"), JSON.stringify({ modelo_principal: "anthropic/claude-sonnet-5-5" }));
       const { pi, h } = piSimulado(recursos);
       await h("session_start", { reason: "startup" }, { model: CODEX, modelRegistry: { find: (p, id) => ({ provider: p, id }), hasConfiguredAuth: () => true } });
@@ -119,7 +124,7 @@ test("cupos: la extensión guarda el último cupo, el agotado y cuánto de la ve
 
 test("modelo principal: una sesión nueva usa el de curso.config.local.json si tiene credenciales; una retomada o un --model, no", async () => {
   carpetaNueva();
-  const recursos = mkdtempSync(join(tmpdir(), "learn-recursos-"));
+  const recursos = temporal("learn-recursos-");
   const config = modelo => writeFileSync(join(recursos, "curso.config.local.json"), JSON.stringify({ modelo_principal: modelo }));
   const ctx = (credenciales = true) => ({ model: CODEX, modelRegistry: { find: (p, id) => p === "inexistente" ? undefined : { provider: p, id }, hasConfiguredAuth: () => credenciales } });
   config("anthropic/claude-sonnet-5-5");

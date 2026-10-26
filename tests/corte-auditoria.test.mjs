@@ -7,7 +7,8 @@ import { pathToFileURL } from "node:url";
 import { agentDir, importPi, vaultDir, importDependenciaPi } from "../scripts/lib/pi-sdk.mjs";
 import { cortarTurno } from "../extensions/comun/corte.ts";
 // Las llamadas simuladas anotan su consumo en una carpeta temporal, no en el registro real de la máquina (DA48).
-process.env.LEARN_CONSUMO_DIR = mkdtempSync(join(tmpdir(), "learn-consumo-"));
+const consumoTemporal = process.env.LEARN_CONSUMO_DIR = mkdtempSync(join(tmpdir(), "learn-consumo-"));
+process.on("exit", () => rmSync(consumoTemporal, { recursive: true, force: true }));
 
 // pi 1.4.0 real con faux: como con un proveedor real, la llamada que arranca con la señal abortada falla al resolver
 // credenciales (pi-ai auth/resolve.js:15) y lazyStream la da por error (api/lazy.js:57-63): «Error: This operation was aborted».
