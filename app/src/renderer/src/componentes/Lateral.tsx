@@ -1,11 +1,12 @@
 // Barra lateral siempre visible (usuario): Inicio arriba, cursos y temas en el orden del índice, y abajo lo que corre
-// en segundo plano (preparación, verificación, ingesta).
+// en segundo plano (preparación, verificación, ingesta) y el medidor de consumo del modelo de la clase.
 import { fraccion, sinEmoji } from "../../../lib/texto.ts";
 import { cambiar, navegar, usarTienda } from "../tienda";
 import type { ResumenTema } from "../tipos";
 import { usarFoco } from "./foco";
 import { abrirSubagentes, usarSubagentes } from "./Subagentes";
 import { mmss } from "../../../lib/foco.ts";
+import { MedidorLateral } from "./Consumo";
 
 export function EstadoTema({ t }: { t: ResumenTema }) {
   if (t.estado === "dominado") return <span className="st ok" aria-label="dominado">✓</span>;
@@ -97,6 +98,7 @@ export function Lateral() {
       </nav>
       <TareasDeFondo />
       <FocoMini />
+      <MedidorLateral />
       <div className="pie-lateral">
         <button onClick={() => navegar({ pantalla: "crear-curso" })} className={ruta.pantalla === "crear-curso" ? "on" : ""}>Crear curso</button>
         <button onClick={() => navegar({ pantalla: "ajustes" })} className={ruta.pantalla === "ajustes" ? "on" : ""}>Ajustes</button>

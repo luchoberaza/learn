@@ -14,6 +14,8 @@ import { loadProject, piDir, pythonDelVenv, vaultDir } from "../scripts/lib/pi-s
 import { python, transcribir } from "../extensions/curso/ingesta.ts";
 import { registrarPreparacion } from "../extensions/curso/preparacion.ts";
 import { guardarCurso, registrarCuracion } from "../extensions/curso/curacion.ts";
+// Las llamadas simuladas anotan su consumo en una carpeta temporal, no en el registro real de la máquina (DA48).
+process.env.LEARN_CONSUMO_DIR = mkdtempSync(join(tmpdir(), "learn-consumo-"));
 
 // Remates de integración: md-log, sesión y progreso reales sobre un bus de eventos, backend Python real, sin modelos.
 // retomar: el vault de una clase anterior, que otro pi retoma desde session_start (sin /estudiar).

@@ -1,8 +1,9 @@
 // Estado de la interfaz: una sola tienda, alimentada por los mensajes del host y por las acciones de las pantallas.
 // Las pantallas leen campos con usarTienda(e => e.campo): cada campo cambia de referencia sólo cuando cambia.
 import { useSyncExternalStore } from "react";
-import type { Ajustes, Aviso, Comando, EstadoSesion, Imagen, Item, Pagina, Pedido, ResumenCurso, Seguir, SesionGuardada } from "./tipos";
+import type { Ajustes, Aviso, Comando, Consumo, EstadoSesion, Imagen, Item, Pagina, Pedido, ResumenCurso, Seguir, SesionGuardada } from "./tipos";
 import { alMensajeSubagente, restaurarSubagentes } from "./componentes/Subagentes";
+import { cuando, textoRinde } from "../../lib/consumo.ts";
 
 export type Ruta =
   | { pantalla: "inicio" }
@@ -54,6 +55,7 @@ export interface Estado {
   textoEditor?: { texto: string; n: number };
   paleta: boolean;
   semanaFoco: Record<string, { minutos: number; bloques: number }>;
+  consumo?: Consumo;
 }
 
 let estado: Estado = {
@@ -83,10 +85,10 @@ export function volver() {
 // ---------- Avisos ----------
 
 let siguienteAviso = 1;
-export function avisar(texto: string, nivel: Aviso["nivel"] = "info") {
-  const a: Aviso = { id: siguienteAviso++, texto, nivel, hora: Date.now() };
+export function avisar(texto: string, nivel: Aviso["nivel"] = "info", accion?: Aviso["accion"]) {
+  const a: Aviso = { id: siguienteAviso++, texto, nivel, hora: Date.now(), accion };
   cambiar(e => ({ avisos: [...e.avisos.slice(-60), a], toasts: [...e.toasts.slice(-3), a] }));
-  if (nivel !== "error") setTimeout(() => cerrarToast(a.id), nivel === "info" ? 7000 : 12000);
+  if (nivel !== "error") setTimeout(() => cerrarToast(a.id), accion ? 20000 : nivel === "info" ? 7000 : 12000);
 }
 export const cerrarToast = (id: number) => cambiar(e => ({ toasts: e.toasts.filter(t => t.id !== id) }));
 const error = (e: unknown) => avisar(e instanceof Error ? e.message.replace(/^Error invoking remote method '[^']+': (Error: )?/, "") : String(e), "error");
@@ -110,7 +112,7 @@ let refresco: ReturnType<typeof setTimeout> | undefined;
 // Después de cada turno el progreso, la preparación o el índice pueden haber cambiado: se relee sin apuro.
 function refrescarLuego() {
   clearTimeout(refresco);
-  refresco = setTimeout(() => { void refrescarCursos(); void refrescarInicio(); }, 600);
+  refresco = setTimeout(() => { void refrescarCursos(); void refrescarInicio(); void refrescarConsumo(); }, 600);
 }
 
 function alMensaje(m: any) {
@@ -120,7 +122,7 @@ function alMensaje(m: any) {
     case "listo":
       cambiar({ arranque: "listo", info: { vault: m.vault, piDir: m.piDir, version: m.version, offline: m.offline, aviso: m.aviso }, confianza: undefined, errorFatal: undefined });
       if (m.aviso) avisar(m.aviso, "advertencia");
-      void refrescarCursos(); void refrescarInicio();
+      void refrescarCursos(); void refrescarInicio(); void refrescarConsumo();
       void pedir<Comando[]>("comandos", {}, true).then(c => c && cambiar({ comandos: c }));
       if (m.subagentes && !m.subagentes.disponible) avisar(`Los subagentes no van a poder abrir sus paneles: ${m.subagentes.motivo}`, "advertencia");
       return;
@@ -231,7 +233,7 @@ export async function iniciar() {
     cambiar({ arranque: "listo" });
     const s = await pedir<EstadoSesion>("estado", {}, true);
     if (s) cambiar({ sesion: s });
-    void refrescarCursos(); void refrescarInicio();
+    void refrescarCursos(); void refrescarInicio(); void refrescarConsumo();
     void pedir<Comando[]>("comandos", {}, true).then(c => c && cambiar({ comandos: c }));
     void pedir<{ id: string; nombre: string; vivo: boolean; historia: string }[]>("subagentes", {}, true).then(l => { if (l?.length) restaurarSubagentes(l); });
     return;
@@ -262,6 +264,7 @@ export async function guardarAjustes(cambios: Partial<Ajustes>) {
   const a = await window.learn.ajustes(cambios);
   cambiar({ ajustes: a });
   if (cambios.tema) aplicarTema(a.tema);
+  if (cambios.planes) void refrescarConsumo();
   return a;
 }
 
@@ -275,6 +278,46 @@ export async function refrescarInicio() {
   const [seguir, sesiones] = await Promise.all([pedir<Seguir>("seguir", {}, true), pedir<SesionGuardada[]>("sesiones", {}, true)]);
   cambiar({ seguir: seguir ?? null, sesiones: sesiones ?? [] });
 }
+// ---------- Consumo (DA48) ----------
+
+const avisadosConsumo = new Set<string>();
+export async function refrescarConsumo() {
+  const c = await pedir<Consumo>("consumo", { planes: leer().ajustes?.planes ?? {} }, true);
+  if (!c || c.sinRegistro) return;
+  cambiar({ consumo: c });
+  avisarSiEscasea(c);
+}
+// Una vez por umbral y por modelo en cada apertura de la app, con el modelo que alcanzaría para bastante más.
+function avisarSiEscasea(c: Consumo) {
+  const a = c.actual, cuenta = a && c.cuentas.find(x => x.proveedor === a.proveedor);
+  if (!a || !cuenta) return;
+  const s = c.sugerido;
+  const accion = s ? { texto: `Usar ${s.nombre}`, hacer: () => void elegirModelo(s.proveedor, s.id, s.nombre) } : undefined;
+  const alternativa = s ? ` Con ${s.nombre} ${s.gratis ? "no tiene costo" : `serían ${textoRinde(s)}`}.` : "";
+  let clave: string, texto: string;
+  if (cuenta.agotado) {
+    clave = `${a.clave}:agotado:${cuenta.agotado.desde}`;
+    texto = `La cuenta de ${cuenta.nombre} llegó a su límite por ahora${cuenta.agotado.hasta ? `: vuelve ${cuando(cuenta.agotado.hasta)}` : ""}.${alternativa}`;
+  } else {
+    if (a.quedan === undefined || a.quedan >= 30) return;
+    clave = `${a.clave}:${a.quedan < 10 ? 10 : 30}`;
+    texto = `Te quedan ${textoRinde(a)} con ${a.nombre}.${alternativa}`;
+  }
+  if (avisadosConsumo.has(clave)) return;
+  avisadosConsumo.add(clave);
+  avisar(texto, "advertencia", accion);
+}
+// El modelo de la clase: se cambia en la sesión y queda como modelo principal de esta computadora (DA49).
+export async function elegirModelo(proveedor: string, id: string, nombre?: string) {
+  const r = await pedir<EstadoSesion>("elegir-modelo", { proveedor, id });
+  if (!r) return false;
+  cambiar({ sesion: r });
+  await window.learn.configLocal({ modelo_principal: `${proveedor}/${id}` }).catch(() => undefined);
+  avisar(`La clase sigue con ${nombre ?? r.modelo?.nombre ?? id}. Queda elegido en esta computadora.`);
+  void refrescarConsumo();
+  return true;
+}
+
 export const nombreCurso = (slug: string) => leer().cursos.find(c => c.slug === slug)?.nombre ?? slug;
 export const nombreTema = (slug: string, id: string) => leer().cursos.find(c => c.slug === slug)?.temas.find(t => t.id === id)?.nombre ?? id;
 

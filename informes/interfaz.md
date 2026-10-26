@@ -1,6 +1,6 @@
 # Interfaz de escritorio y Windows
 
-**Propuesta de luchoberaza para revisar en el PR.** La app vive en `app/`, el núcleo corre también en Windows y la terminal (`pi-learn`) queda igual. Las decisiones están en `DECISIONES.md` (DA39–DA47). Sin commits del lado del autor: el dueño del repo decide.
+**Propuesta de luchoberaza para revisar en el PR.** La app vive en `app/`, el núcleo corre también en Windows y la terminal (`pi-learn`) queda igual. Las decisiones están en `DECISIONES.md` (DA39–DA49). Sin commits del lado del autor: el dueño del repo decide.
 
 ## Qué trae
 
@@ -14,6 +14,8 @@
   - **Paleta** (Ctrl+K) con todos los comandos de learn, de las skills y de pi.
   - **Más pantallas:** «Preparar la computadora» (el doctor con un botón por faltante), Crear curso y Agregar material, Tema libre, lector de notas y Ajustes.
   - **Subagentes** en paneles propios, sin tmux.
+  - **Medidor de consumo:** en la barra lateral, lo que queda en la cuenta del modelo de la clase (dólares del plan, % de la ventana de la suscripción o pedidos gratis del día) y cuántas consultas alcanzan; un clic para cambiar de modelo, y un aviso con otro modelo cuando se está por acabar. En Ajustes → Consumo, el plan de cada cuenta, lo gastado por día y por modelo, y cuánto rinde cada modelo. Los modelos gratis (DeepSeek o Qwen por OpenRouter, NVIDIA y otros) se cuentan en pedidos y tokens (DA48).
+- **El modelo principal de cada máquina**, que ya no vuelve al del repo en cada sesión nueva, también en la terminal (DA49).
 - **El núcleo en Windows:**
   - bloqueos, procesos y rutas portables;
   - el researcher con un vigilante en Node;
@@ -45,6 +47,14 @@ Capturas de las pruebas de punta a punta, con el curso de demostración y el tut
 **Ventana de PDF.** El libro entero, abierto en la página citada, con la búsqueda sin distinguir tildes. Se puede mover a otro monitor y cerrar.
 
 ![Ventana de PDF](interfaz/ventana-pdf.png)
+
+**Medidor de consumo.** Abajo en la barra lateral: el modelo de la clase, lo que queda en su cuenta y cuántas consultas alcanzan. Un clic abre los modelos de las cuentas conectadas, cada uno con lo que rinde.
+
+![Medidor y lista de modelos](interfaz/consumo-menu.png)
+
+**Ajustes → Consumo.** El plan de cada cuenta (para Claude, entre otros, los créditos de los planes Max), lo gastado por día, lo usado con cada modelo y cuánto rinde cada uno con lo que queda.
+
+![Ajustes, Consumo](interfaz/consumo-ajustes.png)
 
 **Simulacro.** El reloj proporcional del examen en la barra de la clase.
 
@@ -88,7 +98,7 @@ Capturas de las pruebas de punta a punta, con el curso de demostración y el tut
 | `/skill:teach`, `visualize` | Tema libre; los diagramas como imágenes |
 | subagentes en tmux | paneles con terminal real (DA45) |
 | herramientas generales (bash, edit…) | línea plegable con la entrada y la salida |
-| `/login`, `/logout`, `/model`, `/thinking`, `/settings` | Ajustes: Cuentas, Modelos (también visión y researcher), Conversación |
+| `/login`, `/logout`, `/model`, `/thinking`, `/settings` | Ajustes: Cuentas, Modelos (también visión y researcher), Consumo, Conversación; el modelo también desde el medidor de la barra |
 | `/new`, `/tree`, `/fork`, `/clone`, `/import`, `/export`, `/copy`, `/name`, `/session`, `/reload`, `/trust`, `/hotkeys`, `/changelog`, `/quit` | menú de la clase, paleta y diálogos propios |
 | `/share`, `/bug`, `/llama` | avisan que siguen en la terminal |
 | `doctor` | «Preparar la computadora» |
@@ -113,11 +123,18 @@ Sin modelo ni red: el proveedor falso de pi-ai con guion hace de tutor. Windows 
 
 | Suite | Windows | Linux |
 |---|---|---|
-| Node de learn (`tests/*.test.mjs`) | 286: 264 en verde, 0 en rojo, 22 salteadas con motivo | 286: 273 en verde, 0 en rojo, 13 salteadas con motivo |
+| Node de learn (`tests/*.test.mjs`) | 293: 271 en verde, 0 en rojo, 22 salteadas con motivo | 293: 280 en verde, 0 en rojo, 13 salteadas con motivo |
 | Python de learn (`tests/ingesta`) | 160 OK, 5 salteadas | 160 OK, 3 salteadas |
-| App: host y lógica (`npm test`) | 26 de 26 | 26 de 26 |
-| App: punta a punta con Electron (`npm run e2e`) | 9 de 9 | 9 de 9 |
-| App empaquetada (instalador NSIS / AppImage) | abre una clase y un PDF | abre una clase y un PDF |
+| App: host y lógica (`npm test`) | 39 de 39 | 39 de 39 |
+| App: punta a punta con Electron (`npm run e2e`) | 10 de 10 | 10 de 10 |
+| App empaquetada (instalador NSIS / AppImage) | abre con el medidor y la cuenta de Claude | abre una clase, el medidor y un PDF |
+
+**Con el modelo real** (Claude Sonnet 5.5, en Windows, el 2026-10-26). Tres clases en la app con un alumno virtual, con un registrador entre pi y Anthropic que anota lo que factura cada respuesta:
+
+- La app anda de punta a punta: el diagnóstico inicial, el quiz y las preguntas con su corrección, el verificador en segundo plano, el progreso guardado y la nota en Obsidian. El tutor tardó unos 5 s por respuesta.
+- Una clase de 10 intervenciones con su cierre costó 0,19 USD; el verificador del tema, una vez, 0,08; una página de visión, 0,01. Cada intervención del alumno cuesta unos 0,018 a 0,019 USD (1,3 a 1,5 llamadas al modelo).
+- El registro de learn (DA48) coincidió con lo facturado llamada por llamada: 19 llamadas y 0,2875 USD en una clase, 14 llamadas y 0,2088 USD en otra, separadas en clase, preparación y verificador.
+- Las dos últimas arrancaron con Claude sólo por `modelo_principal` (DA49), con el repo fijando `openai-codex`.
 
 **Línea de base en Windows, antes de los cambios:** 147 tests Node en verde y 119 en rojo; la suite Python casi entera en rojo.
 
@@ -138,7 +155,8 @@ Sin modelo ni red: el proveedor falso de pi-ai con guion hace de tutor. Windows 
 - tema libre con su nota;
 - crear curso desde un PDF;
 - un subagente real en su panel;
-- el buscador del curso con un alias.
+- el buscador del curso con un alias;
+- el medidor de consumo: lo que queda según el plan, la lista de modelos, la clase sumada al registro y al uso por modelo, y el plan cambiado desde Ajustes.
 
 **Errores encontrados al verificar, y corregidos:**
 
@@ -162,7 +180,8 @@ Sin modelo ni red: el proveedor falso de pi-ai con guion hace de tutor. Windows 
 
 ## Lo que falta
 
-- **Probar con el modelo real**, en Windows y en Omarchy, con la cuenta del dueño: en esta máquina no hay credenciales.
+- **Probar con `openai-codex`**, la cuenta del dueño, en Omarchy: con el modelo real se probó Claude Sonnet 5.5 en Windows. Con esa cuenta se ven por primera vez las ventanas de la suscripción en el medidor.
+- **Subagentes con otra cuenta:** scout, worker, mermaid-maker y svg-maker tienen `openai-codex` fijo en `agents/*.md`; con sólo Claude no arrancan.
 - **Subagentes:** decidir un fork fijado de `pi-interactive-subagents` o un PR a su autor, para no depender del parche local (DA45).
 - **Probar en Omarchy mismo** (Hyprland, Wayland). Linux se probó en Ubuntu sobre WSL.
 - **Instaladores sin firma.** El AppImage pide `--no-sandbox` en distros que restringen los espacios de nombres (Ubuntu 24.04); en Arch no.

@@ -242,7 +242,7 @@ test("app: barrido de pantallas, sin botones sin nombre ni errores", { skip: sin
   await sinNombre("Crear curso");
   await capturar(win, "crear-curso");
   await win.getByRole("button", { name: "Ajustes", exact: true }).click();
-  for (const s of ["Apariencia", "Foco", "Modelos", "Cuentas", "Conversación", "Carpeta del vault", "Avanzado"]) {
+  for (const s of ["Apariencia", "Foco", "Modelos", "Consumo", "Cuentas", "Conversación", "Carpeta del vault", "Avanzado"]) {
     await win.locator(".ajustes-nav").getByRole("button", { name: s }).click();
     await espera(500);
     await sinNombre(`Ajustes, ${s}`);
@@ -364,5 +364,48 @@ test("app: el buscador del curso acepta un alias y abre la clase de ese tema", {
   await win.getByRole("button", { name: "Estudiar", exact: true }).click();
   await win.getByText("Arranquemos con los retardos.").waitFor({ timeout: 60000 });
   assert.match(await win.locator(".miga").innerText(), /Redes \(demo\) \/ Retardos y tasa de transferencia/);
+  assert.deepEqual(errores, []);
+});
+
+// Medidor de consumo (DA48): tres consultas ya anotadas por 12,50 USD y un plan de 200 USD por mes para el proveedor falso.
+const consulta = (n, costo, hace) => JSON.stringify({ t: new Date(Date.now() - hace).toISOString(), origen: "clase", proveedor: "faux", modelo: "tutor-de-prueba",
+  consulta: `previa-${n}`, entrada: 3, salida: 700, cacheLeida: 30000, cacheEscrita: 3000, costo });
+const REGISTRO = `${[consulta(1, 5, 9000), consulta(2, 5, 6000), consulta(3, 2.5, 3000)].join("\n")}\n`;
+
+test("app: el medidor de consumo muestra lo que queda según el plan, cuánto rinde cada modelo y suma la clase", { skip: sinCurso, timeout: 180000 }, async t => {
+  const { win, errores } = await abrirApp(t, { guion: `export default ai => [ai.fauxAssistantMessage("Arranquemos con los retardos.")]`,
+    ajustes: { planes: { faux: { tipo: "mensual", monto: 200, dia: 1 } } }, agente: { "learn/consumo.jsonl": REGISTRO } });
+  const medidor = win.locator(".consumo-boton");
+  await medidor.waitFor({ timeout: 60000 });
+  await win.waitForFunction(() => /187,50 de 200,00 USD/.test(document.querySelector(".consumo-boton")?.textContent ?? ""), null, { timeout: 30000 });
+  assert.match(await medidor.innerText(), /Tutor de prueba/);
+  assert.match(await medidor.innerText(), /≈ [\d.]+ consultas/);
+  await capturar(win, "consumo-lateral");
+  // Una clase suma su consulta al registro: el perfil pasa de 3 a 4 consultas propias.
+  await win.getByRole("button", { name: "Empezar la clase" }).click();
+  await win.getByText("Arranquemos con los retardos.").waitFor({ timeout: 60000 });
+  await medidor.click();
+  const menu = win.getByRole("menu", { name: "Elegir el modelo de la clase" });
+  await menu.waitFor();
+  const caja = await menu.boundingBox(), alto = await win.evaluate(() => window.innerHeight);
+  assert.ok(caja && caja.y >= 0 && caja.y + caja.height <= alto, "el menú se abre hacia arriba, dentro de la ventana");
+  assert.equal(await menu.getByRole("menuitem", { name: /Tutor de prueba/ }).getAttribute("aria-current"), "true");
+  await capturar(win, "consumo-menu");
+  await menu.getByRole("menuitem", { name: "Ver el consumo y los planes" }).click();
+  const cuenta = win.locator(".tarjeta-cuenta").first();
+  await cuenta.waitFor({ timeout: 20000 });
+  assert.match(await cuenta.innerText(), /187,50 de 200,00 USD/);
+  assert.match(await cuenta.innerText(), /Gastado en este período: 12,50 USD/);
+  // El uso por modelo de la cuenta: las tres consultas anotadas más la de la clase, con su costo.
+  assert.match(await cuenta.locator(".tabla-por-modelo tbody tr").first().innerText(), /Tutor de prueba\s+4\s+4\s+[\d.,]+ mil\s+12,50 USD/);
+  await win.getByText(/según tus últimas 4 consultas/).waitFor({ timeout: 20000 });
+  assert.match(await win.locator(".tabla-consumo tr.actual").innerText(), /Tutor de prueba[\s\S]*En uso/);
+  // Cambiar el plan recalcula lo que queda, en Ajustes y en la barra.
+  const monto = win.getByLabel("USD por mes");
+  await monto.fill("100");
+  await monto.blur();
+  await win.waitForFunction(() => /87,50 de 100,00 USD/.test(document.querySelector(".tarjeta-cuenta")?.textContent ?? ""), null, { timeout: 15000 });
+  await win.waitForFunction(() => /87,50 de 100,00 USD/.test(document.querySelector(".consumo-boton")?.textContent ?? ""), null, { timeout: 15000 });
+  await capturar(win, "consumo-ajustes");
   assert.deepEqual(errores, []);
 });

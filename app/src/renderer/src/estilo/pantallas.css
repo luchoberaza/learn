@@ -115,3 +115,26 @@
 }
 .buscador-curso { display: flex; gap: 10px; margin-bottom: 22px; max-width: 880px; }
 .buscador-curso .campo { flex: 1; }
+
+/* ---------- Consumo (DA48) ---------- */
+.ajuste.ajuste-ancho { max-width: 860px; }
+.tarjeta-cuenta { border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; margin-bottom: 14px; }
+.tarjeta-cuenta h3 { font-family: var(--leer); font-size: 17px; color: var(--strong); margin-bottom: 6px; font-weight: 600; }
+.tarjeta-cuenta .consumo-texto { font-size: 15px; color: var(--strong); }
+.tarjeta-cuenta.nivel-mal .consumo-texto { color: var(--bad); }
+.tarjeta-cuenta .consumo-barra { height: 5px; max-width: 420px; margin: 8px 0 6px; }
+.tarjeta-cuenta .ayuda { margin-top: 4px; }
+.editor-plan { margin-top: 14px; max-width: 520px; }
+.dias-consumo { display: flex; align-items: flex-end; gap: 3px; height: 34px; margin: 10px 0 4px; max-width: 280px; }
+.dias-consumo span { flex: 1; background: var(--deco); border-radius: 2px 2px 0 0; }
+.dias-consumo span.cero { background: var(--line); border-radius: 1px; }
+.tabla-envoltura { overflow-x: auto; }
+.tabla-por-modelo { margin: 10px 0 2px; font-size: 13px; }
+.tabla-por-modelo td:last-child, .tabla-por-modelo th:last-child { padding-right: 0; }
+.tabla-consumo { width: 100%; border-collapse: collapse; font-size: 13.5px; font-variant-numeric: tabular-nums; }
+.tabla-consumo th { text-align: left; font-weight: 500; color: var(--muted); font-size: 12.5px; padding: 6px 12px 8px 0; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.tabla-consumo td { padding: 8px 12px 8px 0; border-bottom: 1px solid var(--line); color: var(--text); vertical-align: top; white-space: nowrap; }
+.tabla-consumo td:first-child { white-space: normal; }
+.tabla-consumo td small { display: block; color: var(--muted); font-size: 12px; }
+.tabla-consumo tr.actual td:first-child { color: var(--strong); font-weight: 600; }
+.tabla-consumo td:last-child, .tabla-consumo th:last-child { text-align: right; padding-right: 0; }

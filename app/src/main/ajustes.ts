@@ -1,10 +1,13 @@
 // Ajustes y datos propios de la app (no del vault ni del progreso): carpeta del vault, tema visual, temporizador de foco
-// y sus minutos por día. Viven en la carpeta de datos de la app y se escriben de forma atómica.
+// y sus minutos por día, y el plan de cada cuenta para el medidor de consumo. Viven en la carpeta de datos de la app y
+// se escriben de forma atómica.
 import { app } from "electron";
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 export type Tema = "sistema" | "noche" | "dia";
+// Cómo se paga cada cuenta (DA48): créditos o presupuesto por mes, un saldo cargado, un plan gratis o sin tope.
+export interface Plan { tipo: "mensual" | "saldo" | "gratis" | "sin-tope"; monto?: number; dia?: number; desde?: string; pedidosDia?: number; preset?: string }
 export interface AjustesFoco { activo: boolean; foco: number; descanso: number; descansoLargo: number; ciclos: number; sonido: boolean }
 export interface Ajustes {
   vault?: string;
@@ -14,6 +17,7 @@ export interface Ajustes {
   foco: AjustesFoco;
   ventana?: { ancho: number; alto: number; x?: number; y?: number; maximizada?: boolean };
   visor?: { ancho: number; alto: number };
+  planes?: Record<string, Plan>;
 }
 export interface DiaFoco { minutos: number; bloques: number }
 export type HistorialFoco = Record<string, DiaFoco>;

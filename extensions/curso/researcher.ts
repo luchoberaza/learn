@@ -168,12 +168,15 @@ function estadoTrabajo(dir: string): "libre" | "corriendo" | "terminada" | "inte
 function lanzar(dir: string, p: Pedido, a: ReturnType<typeof agente>, recursos: string, comando: string[], plazo: number) {
   writeFileSync(join(dir, "tarea.md"), p.tarea);
   writeFileSync(join(dir, "sistema.md"), a.cuerpo);
+  // extensions/modelos.ts sólo anota el consumo (DA48): con LEARN_ORIGEN no elige modelo.
   const args = ["-p", "--no-session", "--no-approve", "--offline", "--no-extensions", "-e", join(recursos, "npm/node_modules/pi-web-access/dist/index.js"),
+    "-e", join(recursos, "extensions/modelos.ts"),
     "--no-skills", "--no-prompt-templates", "--no-themes", "--no-context-files", "--model", a.modelo, ...(a.thinking ? ["--thinking", a.thinking] : []),
     "--tools", a.tools, "--append-system-prompt", join(dir, "sistema.md")];
   // El vigilante corta al hijo aunque este proceso ya no exista (/reload, kill, terminal cerrada); en Node, sin sh ni timeout, anda también en Windows.
   // Ni el vigilante ni el hijo se paran en la carpeta del trabajo: en Windows no se podría borrar al recogerlo.
-  const hijo = spawn(process.execPath, [VIGILANTE, dir, String(plazo), "--", ...comando, ...args], { cwd: tmpdir(), detached: true, stdio: "ignore", windowsHide: true });
+  const hijo = spawn(process.execPath, [VIGILANTE, dir, String(plazo), "--", ...comando, ...args], { cwd: tmpdir(), detached: true, stdio: "ignore", windowsHide: true,
+    env: { ...process.env, LEARN_ORIGEN: "verificador" } });
   hijo.on("error", () => {});
   hijo.unref();
   writeFileSync(join(dir, "trabajo.json"), JSON.stringify({ pid: hijo.pid, inicio: Date.now(), plazo }));

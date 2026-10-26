@@ -11,7 +11,9 @@ export const ai = await importDependenciaPi("@earendil-works/pi-ai");
 
 export const faux = ai.fauxProvider({
   provider: "faux",
-  models: [{ id: "tutor-de-prueba", name: "Tutor de prueba", contextWindow: 200000, maxTokens: 8000, input: ["text", "image"] }],
+  // Con los precios de Claude Sonnet 5.5, para que el medidor de consumo tenga qué estimar (el falso no cobra).
+  models: [{ id: "tutor-de-prueba", name: "Tutor de prueba", contextWindow: 200000, maxTokens: 8000, input: ["text", "image"],
+    cost: { input: 2, output: 10, cacheRead: 0.1, cacheWrite: 2.5 } }],
   // Escribe a una velocidad visible, como un modelo real, para probar el texto en tandas.
   tokensPerSecond: Number(process.env.PI_LEARN_E2E_TOKENS ?? 600),
 });

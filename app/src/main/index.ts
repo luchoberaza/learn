@@ -127,7 +127,7 @@ ipcMain.handle("archivos:config-local", (_e, cambios?: Record<string, string | u
   try { base = JSON.parse(readFileSync(enVault(".pi/curso.config.json"), "utf8")); } catch { /* sin learn */ }
   if (!cambios) return { base, local: actual };
   const nuevo = { ...actual };
-  for (const [k, v] of Object.entries(cambios)) if (["modelo_vision", "modelo_researcher", "ruta_tesseract"].includes(k)) { if (v) nuevo[k] = v; else delete nuevo[k]; }
+  for (const [k, v] of Object.entries(cambios)) if (["modelo_vision", "modelo_researcher", "modelo_principal", "ruta_tesseract"].includes(k)) { if (v) nuevo[k] = v; else delete nuevo[k]; }
   writeFileSync(archivo, `${JSON.stringify(nuevo, null, 2)}\n`);
   return { base, local: nuevo };
 });

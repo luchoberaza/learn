@@ -50,6 +50,7 @@ a { color: var(--cite); }
 .fantasma { display: inline-flex; align-items: center; gap: 7px; border: 1px solid var(--line); color: var(--text); border-radius: 8px; padding: 6px 13px; font-size: 13.5px; white-space: nowrap; }
 .fantasma:hover:not(:disabled) { border-color: var(--deco); color: var(--strong); }
 .fantasma.peligro { color: var(--bad); }
+.fantasma.chico { padding: 3px 10px; font-size: 12.5px; }
 .enlace { color: var(--muted); font-size: 14px; border-bottom: 1px solid var(--line); padding-bottom: 1px; }
 .enlace:hover { color: var(--strong); border-color: var(--deco); }
 .enlace.cita { color: var(--cite); border-color: currentColor; font-size: 12.5px; }

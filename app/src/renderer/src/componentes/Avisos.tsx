@@ -17,6 +17,7 @@ export function Avisos() {
             <div key={t.id} className={`aviso ${t.nivel}`} role={t.nivel === "error" ? "alert" : "status"}>
               <p>{largo ? `${lineas.slice(0, 4).join("\n").slice(0, 380)}…` : t.texto}</p>
               {largo && <button className="enlace" onClick={() => setAbierto(t.texto)}>Ver todo</button>}
+              {t.accion && <button className="enlace" onClick={() => { t.accion!.hacer(); cerrarToast(t.id); }}>{t.accion.texto}</button>}
               <button className="icono cerrar" onClick={() => cerrarToast(t.id)} aria-label="Cerrar el aviso"><Cerrar /></button>
             </div>
           );

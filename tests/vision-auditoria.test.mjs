@@ -7,6 +7,8 @@ import { spawnSync } from "node:child_process";
 import { registrarCuracion } from "../extensions/curso/curacion.ts";
 import { transcribir } from "../extensions/curso/ingesta.ts";
 import { piDir, pythonDelVenv } from "../scripts/lib/pi-sdk.mjs";
+// Las llamadas simuladas anotan su consumo en una carpeta temporal, no en el registro real de la máquina (DA48).
+process.env.LEARN_CONSUMO_DIR = mkdtempSync(join(tmpdir(), "learn-consumo-"));
 
 const temporal = mkdtempSync(join(tmpdir(), "pi-vision-auditoria-"));
 const config = { modelo_vision: "openai/gpt-6-luna", max_paginas_vision_sin_confirmar: 1, umbral_calidad_pagina: 0.6 };

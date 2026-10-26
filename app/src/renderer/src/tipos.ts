@@ -67,11 +67,33 @@ export interface SesionGuardada { ruta: string; id: string; nombre?: string; mod
 export interface Seguir { ruta: string; nombre?: string; curso?: { curso: string; tema: string; adHoc: boolean }; abierta: boolean; nota?: string; ultimaFrase?: string; modificada: string; accion: "retomar" | "estudiar" }
 export interface Comando { nombre: string; descripcion: string; origen: "learn" | "skill" | "pi" }
 export interface NotaResumen { ruta: string; nombre: string; modificada: string }
-export interface Aviso { id: number; texto: string; nivel: "info" | "advertencia" | "error"; hora: number }
+export interface Aviso { id: number; texto: string; nivel: "info" | "advertencia" | "error"; hora: number; accion?: { texto: string; hacer: () => void } }
+
+// Medidor de consumo (app/host/consumo.mjs, DA48).
+export interface Plan { tipo: "mensual" | "saldo" | "gratis" | "sin-tope"; monto?: number; dia?: number; desde?: string; pedidosDia?: number; preset?: string }
+export interface Ventana { minutos?: number; usado: number; renueva?: number }
+export interface CuentaConsumo {
+  proveedor: string; nombre: string; tipo: "dinero" | "ventanas" | "pedidos" | "local" | "sin-tope" | "sin-dato" | "gratis" | "suscripcion";
+  gastado: number; equivalente?: boolean; gratis?: boolean; porOrigen: Record<string, number>;
+  porModelo: { modelo: string; costo: number; consultas: number; pedidos: number; tokens: number }[];
+  uso: { periodo: { pedidos: number; tokens: number }; hoy: { pedidos: number; tokens: number } };
+  porDia: { dia: string; costo: number }[]; plan?: Plan; renueva?: number; fuente?: string;
+  limite?: number; queda?: number; moneda?: string; ventanas?: Ventana[]; planProveedor?: string; visto?: string;
+  pedidos?: { quedan?: number; limite?: number; usados?: number; renueva?: number; gratis?: boolean }; agotado?: { desde: number; hasta?: number };
+}
+export interface ModeloConsumo {
+  clave: string; proveedor: string; id: string; nombre: string; imagenes: boolean; razona: boolean; agotado: boolean;
+  usdConsulta?: number; porDolar?: number; gratis: boolean; quedan?: number; renueva?: number;
+}
+export interface Consumo {
+  actual?: ModeloConsumo; perfil: { entrada: number; salida: number; cacheLeida: number; cacheEscrita: number; llamadas: number; muestras: number };
+  cuentas: CuentaConsumo[]; modelos: ModeloConsumo[]; sugerido?: ModeloConsumo; hayRegistro: boolean; sinRegistro?: boolean;
+}
 
 export interface Ajustes {
   vault?: string; tema: "sistema" | "noche" | "dia"; node?: string; panelFijo: boolean;
   foco: { activo: boolean; foco: number; descanso: number; descansoLargo: number; ciclos: number; sonido: boolean };
+  planes?: Record<string, Plan>;
 }
 export type Chequeo = { estado: "ok" | "falla" | "aviso" | "info"; nombre: string; detalle: string };
 

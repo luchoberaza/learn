@@ -12,6 +12,7 @@ import { crearPaginas } from "./paginas.mjs";
 import { crearSesiones } from "./sesiones.mjs";
 import { clasesAbiertasPorOtros } from "./instancia.mjs";
 import { crearSuperficie } from "./superficie.mjs";
+import { crearConsumo } from "./consumo.mjs";
 
 const argumento = nombre => { const i = process.argv.indexOf(nombre); return i > 0 ? process.argv[i + 1] : undefined; };
 const vault = resolve(argumento("--vault") ?? process.cwd());
@@ -46,6 +47,7 @@ async function arrancar() {
   const material = await importar(join(piDir, "extensions/curso/material.ts"));
   const opcional = async ruta => { try { return await importar(join(piDir, ruta)); } catch { return undefined; } };
   const [simulacro, progreso] = [await opcional("extensions/curso/simulacro.ts"), await opcional("extensions/curso/progreso.ts")];
+  const libConsumo = await opcional("scripts/lib/consumo.mjs");
 
   // Confianza del proyecto, como el aviso de pi la primera vez; queda guardada con su mecanismo (trust.json).
   const confianza = new sdk.ProjectTrustStore(piSdk.agentDir);
@@ -147,6 +149,11 @@ async function arrancar() {
 
   const s = () => runtime.session;
   const aviso = (texto, nivel = "info") => enviar({ tipo: "aviso", texto, nivel });
+  // Un .pi/ anterior a DA48 no tiene el registro de consumo: la app sigue sin medidor.
+  const consumo = libConsumo && crearConsumo({ lib: libConsumo, actual: () => s().model,
+    modelos: async () => { const mr = s().modelRuntime; return mr.getAvailable().catch(() => mr.getAvailableSnapshot()); },
+    claveApi: async proveedor => (await s().modelRuntime.getAuth(proveedor))?.auth?.apiKey,
+    nombres: () => Object.fromEntries(s().modelRuntime.getProviders().map(p => [p.id, p.name])) });
   const enCasa = rel => material.rutaSegura(vault, String(rel).replaceAll("\\", "/"));
 
   // Comandos de pi (no de extensiones): los que no tienen sentido escritos se resuelven en una pantalla de la app.
@@ -369,6 +376,7 @@ async function arrancar() {
     "elegir-modelo": async ({ proveedor, id }) => { const m = s().modelRuntime.getModel(proveedor, id); if (!m) throw new Error("Modelo no encontrado."); await s().setModel(m); return estadoSesion(); },
     pensamiento: ({ nivel }) => { s().setThinkingLevel(nivel); return estadoSesion(); },
     cuentas: () => cuentas(),
+    consumo: ({ planes }) => consumo ? consumo.resumen(planes ?? {}) : { sinRegistro: true },
     "iniciar-sesion": args => { void iniciarSesion(args); return { iniciado: true }; },
     "login-respuesta": ({ id, valor, cancelar }) => { const p = pasosLogin.get(id); if (!p) return { abierto: false }; pasosLogin.delete(id); cancelar ? p.rechazar(new Error("cancelado")) : p.resolver(String(valor ?? "")); return { abierto: true }; },
     "cancelar-login": () => { loginEnCurso?.abort(); return {}; },

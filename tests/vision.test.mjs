@@ -6,6 +6,8 @@ import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 import { transcribir } from "../extensions/curso/ingesta.ts";
 import { piDir, loadProject, pythonDelVenv } from "../scripts/lib/pi-sdk.mjs";
+// Las llamadas simuladas anotan su consumo en una carpeta temporal, no en el registro real de la máquina (DA48).
+process.env.LEARN_CONSUMO_DIR = mkdtempSync(join(tmpdir(), "learn-consumo-"));
 
 const temporal = mkdtempSync(join(tmpdir(), "pi-vision-test-"));
 const python = pythonDelVenv(piDir);

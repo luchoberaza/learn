@@ -1,10 +1,11 @@
-// Ajustes (§9.8): apariencia, foco, modelos (el de la clase y los de visión y researcher de esta máquina), cuentas,
-// ajustes de pi que aplican fuera de la terminal, la carpeta del vault y lo avanzado.
+// Ajustes (§9.8): apariencia, foco, modelos (el de la clase y los de visión y researcher de esta máquina), consumo,
+// cuentas, ajustes de pi que aplican fuera de la terminal, la carpeta del vault y lo avanzado.
 import { useEffect, useState } from "react";
-import { arrancar, avisar, cambiar, confirmarApp, guardarAjustes, iniciarLogin, navegar, pedir, usarTienda } from "../tienda";
+import { arrancar, avisar, cambiar, confirmarApp, elegirModelo, guardarAjustes, iniciarLogin, navegar, pedir, usarTienda } from "../tienda";
+import { ConsumoAjuste } from "./Consumo";
 
-type Seccion = "apariencia" | "foco" | "modelos" | "cuentas" | "pi" | "vault" | "avanzado";
-const SECCIONES: [Seccion, string][] = [["apariencia", "Apariencia"], ["foco", "Foco"], ["modelos", "Modelos"], ["cuentas", "Cuentas"], ["pi", "Conversación"], ["vault", "Carpeta del vault"], ["avanzado", "Avanzado"]];
+type Seccion = "apariencia" | "foco" | "modelos" | "consumo" | "cuentas" | "pi" | "vault" | "avanzado";
+const SECCIONES: [Seccion, string][] = [["apariencia", "Apariencia"], ["foco", "Foco"], ["modelos", "Modelos"], ["consumo", "Consumo"], ["cuentas", "Cuentas"], ["pi", "Conversación"], ["vault", "Carpeta del vault"], ["avanzado", "Avanzado"]];
 
 function Apariencia() {
   const tema = usarTienda(e => e.ajustes?.tema ?? "sistema");
@@ -71,13 +72,13 @@ function ModelosAjuste() {
           {m.modelos.length ? (
             <select id="modelo" className="campo" value={valor} onChange={async e => {
               const [proveedor, ...id] = e.target.value.split("/");
-              const r = await pedir("elegir-modelo", { proveedor, id: id.join("/") });
-              if (r) { cambiar({ sesion: r }); setM(await pedir<Modelos>("modelos")); avisar("Modelo cambiado."); }
+              if (await elegirModelo(proveedor, id.join("/"))) setM(await pedir<Modelos>("modelos"));
             }}>
               {!valor && <option value="">Elegí un modelo</option>}
               {proveedores.map(p => <optgroup key={p} label={p}>{m.modelos.filter(x => x.proveedor === p).map(x => <option key={x.id} value={`${x.proveedor}/${x.id}`}>{x.nombre}{x.imagenes ? "" : " (sin imágenes)"}</option>)}</optgroup>)}
             </select>
           ) : <p className="aviso-bloque">No hay modelos disponibles: iniciá sesión con un proveedor en Cuentas.</p>}
+          {m.modelos.length > 0 && <p className="ayuda">Queda elegido en esta computadora (curso.config.local.json), aunque el repo traiga otro. Cuánto rinde cada uno está en Consumo.</p>}
           {m.niveles.length > 1 && (
             <>
               <label className="etiqueta" htmlFor="pensamiento" style={{ marginTop: 16 }}>Razonamiento</label>
@@ -225,6 +226,7 @@ export function Ajustes({ seccion }: { seccion?: string }) {
         {activa === "apariencia" && <Apariencia />}
         {activa === "foco" && <Foco />}
         {activa === "modelos" && <ModelosAjuste />}
+        {activa === "consumo" && <ConsumoAjuste />}
         {activa === "cuentas" && <Cuentas />}
         {activa === "pi" && <Conversacion />}
         {activa === "vault" && <Vault />}

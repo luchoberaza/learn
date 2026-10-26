@@ -127,7 +127,7 @@ try {
     colisiones.length ? `nombres repetidos: ${colisiones.join(", ")}; renombrá una en .pi/skills` : "teach, curso-nuevo y curso-agregar, sin colisiones; /reload tras cambios");
   const oculto = session.settingsManager.getHideThinkingBlock();
   check(oculto, "Thinking oculto", oculto ? "hideThinkingBlock activo" : "agregá \"hideThinkingBlock\": true a .pi/settings.json");
-  const registry = session.modelRuntime, principal = `${session.settingsManager.getDefaultProvider()}/${session.settingsManager.getDefaultModel()}`;
+  const registry = session.modelRuntime, principal = config.modelo_principal || `${session.settingsManager.getDefaultProvider()}/${session.settingsManager.getDefaultModel()}`;
   for (const [rol, id] of [["principal", principal], ["researcher", config.modelo_researcher], ["visión", config.modelo_vision]]) {
     const slash = id.indexOf("/"), model = registry.getModel(id.slice(0, slash), id.slice(slash + 1)), auth = Boolean(model) && registry.hasConfiguredAuth(model.provider);
     check(auth, `Credenciales ${rol}`, `${id}: ${!model ? "no está en el catálogo; revisá /model" : auth ? "configuradas (sin llamar al modelo)" : "sin credenciales; ejecutá /login en pi"}`);

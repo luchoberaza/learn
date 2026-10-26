@@ -4,6 +4,7 @@ import { createHash } from "node:crypto";
 import { closeSync, openSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { piDir, vaultDir, leerConfig } from "../../scripts/lib/pi-sdk.mjs";
+import { anotarConsumo } from "../../scripts/lib/consumo.mjs";
 import { corteModelo, modeloVision, python, transcribir } from "./ingesta.ts";
 import { leer, type DatosCurso, type Tema } from "./material.ts";
 import type { registrarSesion } from "./sesion.ts";
@@ -76,7 +77,8 @@ export function necesitaPreparacion(raiz: string, tema: string) {
 async function pedirJSON(ctx: Pick<ExtensionContext, "modelRegistry">, modelo: Model<Api>, sistema: string, texto: string, signal: AbortSignal, maxTokens: number) {
   const r = await ctx.modelRegistry.streamSimple(modelo, { systemPrompt: sistema, messages: [{ role: "user", timestamp: Date.now(), content: [{ type: "text", text: texto }] }] },
     { maxTokens, reasoning: "low", maxRetries: 0, signal: AbortSignal.any([signal, AbortSignal.timeout(300_000)]) }).result();
-  const salida = r.content.filter(b => b.type === "text").map(b => b.text).join("\n").trim();
+  anotarConsumo({ origen: "preparación", proveedor: modelo.provider, modelo: modelo.id, usage: r.usage });
+  const salida =r.content.filter(b => b.type === "text").map(b => b.text).join("\n").trim();
   // «aborted» sin un corte del usuario es el plazo de 5 minutos (pi-ai lo informa como «Request was aborted»).
   if (r.stopReason !== "stop" || !salida) throw Object.assign(new Error(r.stopReason === "aborted" ? "el modelo no respondió en 5 minutos" : r.errorMessage || "respuesta vacía o cortada"), { corte: corteModelo(r.errorMessage) });
   try { return JSON.parse(salida.replace(/^```(?:json)?\s*|\s*```$/g, "")); } catch { throw new Error("la respuesta no es JSON válido"); }

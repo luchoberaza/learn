@@ -2,7 +2,7 @@
 // (ajustes, confianza y sesiones aisladas) y el proveedor falso con guion. Nada de esto toca la configuración real.
 import { _electron } from "playwright";
 import electron from "electron";
-import { existsSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -13,10 +13,12 @@ export const VAULT = resolve(APP, "../..");
 export const CURSO = "redes-demo";
 export const hayCurso = existsSync(join(VAULT, "cursos", CURSO, "indice.yaml"));
 
-export async function abrirApp(t, { guion, ajustes = {}, tokens = 4000, confiar = true, entorno = {}, ancho = 1400, alto = 900 } = {}) {
+// agente: archivos que se escriben en la carpeta temporal del agente antes de abrir (por ejemplo, el registro de consumo).
+export async function abrirApp(t, { guion, ajustes = {}, tokens = 4000, confiar = true, entorno = {}, ancho = 1400, alto = 900, agente: archivosAgente = {} } = {}) {
   const datos = mkdtempSync(join(tmpdir(), "learn-app-datos-"));
   const agente = mkdtempSync(join(tmpdir(), "learn-app-agente-"));
   writeFileSync(join(datos, "ajustes.json"), JSON.stringify({ vault: VAULT, tema: "noche", ventana: { ancho, alto }, ...ajustes }));
+  for (const [ruta, contenido] of Object.entries(archivosAgente)) { mkdirSync(dirname(join(agente, ruta)), { recursive: true }); writeFileSync(join(agente, ruta), contenido); }
   let archivoGuion;
   if (guion) { archivoGuion = join(agente, "guion.mjs"); writeFileSync(archivoGuion, guion); }
   const notasAntes = notas();

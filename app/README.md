@@ -1,16 +1,16 @@
 # app — la interfaz de escritorio de learn
 
-Electron, React y TypeScript. Corre la misma pi 1.4.0 y el mismo `.pi/` del vault que la terminal: no reemplaza la lógica de learn, la muestra. Decisiones: `DECISIONES.md` (DA42–DA45 y DA47). Informe con capturas y pruebas: `informes/interfaz.md`.
+Electron, React y TypeScript. Corre la misma pi 1.4.0 y el mismo `.pi/` del vault que la terminal: no reemplaza la lógica de learn, la muestra. Decisiones: `DECISIONES.md` (DA42–DA45, DA47 y DA48). Informe con capturas y pruebas: `informes/interfaz.md`.
 
 ## Cómo está armada
 
 | Parte | Qué hace |
 |---|---|
-| `host/` | el proceso que corre pi, con el Node del sistema. `inicio.mjs` arma la sesión como `pi-learn` y atiende las acciones de la ventana. `filtro.mjs` decide qué sale hacia la ventana (nunca args ni resultados de las tools del curso, la correcta antes de responder, mensajes ocultos ni razonamiento). `interfaz.mjs` es la uiContext de pi (diálogos, quiz y preguntas). `paginas.mjs` aplica las reglas de `ver_pagina` al panel de página y a la ventana de PDF, que recibe una copia con las páginas vedadas en blanco (`lectura.py`). `curso.mjs` y `sesiones.mjs` leen el curso y las sesiones. `superficie.mjs` abre los paneles de subagentes |
+| `host/` | el proceso que corre pi, con el Node del sistema. `inicio.mjs` arma la sesión como `pi-learn` y atiende las acciones de la ventana. `filtro.mjs` decide qué sale hacia la ventana (nunca args ni resultados de las tools del curso, la correcta antes de responder, mensajes ocultos ni razonamiento). `interfaz.mjs` es la uiContext de pi (diálogos, quiz y preguntas). `paginas.mjs` aplica las reglas de `ver_pagina` al panel de página y a la ventana de PDF, que recibe una copia con las páginas vedadas en blanco (`lectura.py`). `curso.mjs` y `sesiones.mjs` leen el curso y las sesiones. `superficie.mjs` abre los paneles de subagentes. `consumo.mjs` junta el registro de consumo de learn, los cupos de los proveedores y el plan de cada cuenta, y estima cuántas consultas quedan con cada modelo |
 | `src/main/` | el proceso principal de Electron: ventana, ventanas de PDF (`visor.ts`), ajustes de la app, diálogos de archivos, «Preparar la computadora» (doctor e instalación) |
 | `src/preload/` | la API `window.learn` de la ventana y la `window.visor`, mínima, de cada ventana de PDF; sin acceso a Node |
 | `src/renderer/` | la interfaz: tienda de estado, pantallas, estilos (tokens Noche de Tokio y Día, Literata y Poppins empaquetadas). `visor.html` y `src/visor/` son la ventana de PDF, con PDF.js |
-| `src/lib/` | lógica pura con tests: temporizador de foco y textos (citas, plan, fechas) |
+| `src/lib/` | lógica pura con tests: temporizador de foco, textos (citas, plan, fechas) y los del medidor de consumo |
 | `subagentes/` | la superficie de paneles para pi-interactive-subagents y el script que la aplica al paquete instalado |
 | `e2e/` | proveedor falso de pi-ai con guion, curso de demostración y pruebas de punta a punta con Playwright |
 
