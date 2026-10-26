@@ -26,7 +26,7 @@ function accionDe(c: Chequeo, hayPi: boolean): Accion | undefined {
   if (n === "Carpeta del vault" && !hayPi) return ACCIONES.learn;
   if (/Subagentes fijados|Extensión web fijada|Web del researcher/.test(n)) return ACCIONES.paquetes;
   if (/Configuración web|web_fetch del researcher/.test(n)) return ACCIONES.config;
-  if (/Python de ingesta|pymupdf|ocrmypdf|wordfreq|pyyaml|Entorno de ingesta/i.test(n)) return ACCIONES.venv;
+  if (/Python de ingesta|pymupdf|ocrmypdf|wordfreq|pyyaml|faster-whisper|Entorno de ingesta/i.test(n)) return ACCIONES.venv;
   if (/Tesseract|Idiomas OCR/.test(n)) return ACCIONES.ocr;
   if (/Diagramas/.test(n) && /dependencias/.test(c.detalle)) return ACCIONES.visual;
   if (/^ImageMagick/.test(n) && c.estado === "info") return ACCIONES.magick;

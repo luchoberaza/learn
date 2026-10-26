@@ -4,8 +4,8 @@ import { homedir } from "node:os";
 import { basename, join, relative, resolve, sep } from "node:path";
 import { piDir, vaultDir, pythonDelVenv, leerConfig } from "../../scripts/lib/pi-sdk.mjs";
 import { normalizar } from "../../scripts/ingesta/bm25.ts";
-import { aBarra, buscarMaterial, cita, copiaEnPagina, documento, dossier, esSlug, leer, leerItems, leerPaginas, ordenarTemas, paginasReservadas, reservados, resolverTemas, rutaSegura,
-  type Activo, type DatosCurso, type Ref, type Tema } from "./material.ts";
+import { aBarra, buscarMaterial, cita, copiaEnPagina, documento, dossier, esGrabacion, esSlug, hora, leer, leerItems, leerPaginas, ordenarTemas, paginasReservadas, reservados,
+  resolverTemas, rutaSegura, TRAMO, type Activo, type DatosCurso, type Ref, type Tema } from "./material.ts";
 
 import { verificacionPrevia } from "./researcher.ts";
 import { elegir } from "../comun/elegir.ts";
@@ -363,10 +363,13 @@ export function registrarSesion(pi: ExtensionAPI, vault = vaultDir, recursos = p
     refrescar: () => { if (activo && datos) preparar(activo, datos); return resumen; },
     // Los ítems reservados para /simulacro (E3) no se muestran por ninguna vía; leer_items sí el que se está rindiendo.
     leer_paginas({ doc, desde, hasta, despues_del_intento = false }: { doc: string; desde: number; hasta: number; despues_del_intento?: boolean }) { const { d, r } = actual(); return leerPaginas(r, d, doc, desde, hasta, despues_del_intento, reservados(r, d)); },
+    // Para la etiqueta de la tool: en una grabación (DA51) se lee desde un minuto, no desde una página.
+    grabacion(doc: string, desde: number) { const { d } = actual(); return esGrabacion(documento(d, doc)) ? { grabacion: true, desde: hora((desde - 1) * TRAMO) } : undefined; },
     buscar_material({ consulta, tipo }: { consulta: string; tipo?: string }) { const { d, r } = actual(); return JSON.stringify(buscarMaterial(r, d, consulta, tipo, reservados(r, d))); },
     leer_items({ doc, ids, incluir_solucion = false }: { doc: string; ids: string[]; incluir_solucion?: boolean }, permitido?: Ref) { const { d, r } = actual(); return leerItems(d, doc, ids, incluir_solucion, reservados(r, d, permitido)); },
     async ver_pagina({ doc, pagina, despues_del_intento = false }: { doc: string; pagina: number; despues_del_intento?: boolean }, signal?: AbortSignal) {
       const { a, d, r } = actual(), fuente = documento(d, doc);
+      if (esGrabacion(fuente)) throw new Error(`${doc} es una grabación: no tiene páginas para mostrar. Su texto, con el enlace de cada minuto, está en leer_paginas (tramos de ${TRAMO / 60} minutos).`);
       if (!Number.isInteger(pagina) || pagina < 1 || pagina > fuente.paginas) throw new Error("Página PDF fuera de rango.");
       const ocultos = reservados(r, d);
       if (paginasReservadas(d, doc, ocultos).has(pagina) || copiaEnPagina(r, d, doc, pagina, ocultos)) throw new Error("Esa página trae un ítem reservado para /simulacro; elegí otra.");

@@ -37,12 +37,27 @@ export function acotar(t: string, bytes: number): string {
   const aviso = "\n[Resumen truncado: consultá las tools de lectura para ampliar.]";
   return Buffer.from(t).subarray(0, Math.max(0, bytes - Buffer.byteLength(aviso))).toString("utf8").replace(/\uFFFD+$/u, "") + (bytes >= Buffer.byteLength(aviso) ? aviso : "");
 }
+// Grabaciones de clase (DA51): sus «páginas» son tramos de cinco minutos (scripts/ingesta/transcripcion.py) y se citan al segundo.
+export const TRAMO = 300;
+export const esGrabacion = (d: Pick<Documento, "archivo">) => /\.(mp4|mkv|webm|mov|m4v|mp3|m4a|wav|ogg|opus|flac|aac)$/i.test(d.archivo);
+export const hora = (segundos: number) => {
+  const s = Math.floor(segundos), mm = String(Math.floor(s % 3600 / 60)), ss = String(s % 60).padStart(2, "0");
+  return s >= 3600 ? `${Math.floor(s / 3600)}:${mm.padStart(2, "0")}:${ss}` : `${mm}:${ss}`;
+};
 export function documento(datos: DatosCurso, id: string) {
   const d = datos.documentos.find(d => d.id === id);
-  if (!esSlug(id) || !d || !Number.isInteger(d.paginas) || d.paginas < 1 || !d.archivo.startsWith(`fuentes/${d.tipo}/`) || !d.archivo.toLowerCase().endsWith(".pdf") || /[#\[\]|\n\r]/.test(d.archivo)) throw new Error("Documento no identificado en el curso.");
+  if (!esSlug(id) || !d || !Number.isInteger(d.paginas) || d.paginas < 1 || !d.archivo.startsWith(`fuentes/${d.tipo}/`) || !(d.archivo.toLowerCase().endsWith(".pdf") || esGrabacion(d)) || /[#\[\]|\n\r]/.test(d.archivo)) throw new Error("Documento no identificado en el curso.");
   return d;
 }
-export const cita = (datos: DatosCurso, doc: string, p: number) => `[[cursos/${datos.curso}/${documento(datos, doc).archivo}#page=${p}]]`;
+// En una grabación, la página p cita el comienzo nominal de su tramo: el tramo empieza ahí o un poco después, nunca antes.
+export const cita = (datos: DatosCurso, doc: string, p: number) => {
+  const d = documento(datos, doc);
+  return esGrabacion(d) ? citaSegundo(datos, doc, (p - 1) * TRAMO) : `[[cursos/${datos.curso}/${d.archivo}#page=${p}]]`;
+};
+export const citaSegundo = (datos: DatosCurso, doc: string, segundo: number) => `[[cursos/${datos.curso}/${documento(datos, doc).archivo}#t=${Math.floor(segundo)}]]`;
+// «[12:05] …» abre cada párrafo de una transcripción (transcripcion.parrafos).
+const MARCA = /^\[(?:(\d+):)?(\d{1,2}):(\d{2})\] /;
+const segundosDe = (m: RegExpExecArray) => Number(m[1] ?? 0) * 3600 + Number(m[2]) * 60 + Number(m[3]);
 // Sin coincidencia por nombre, los temas cuya bibliografía contiene las páginas que encontró BM25, de más a menos páginas.
 export function resolverTemas(temas: Tema[], consulta: string, resultados: { doc: string; pagina: number }[] = []): Tema[] {
   const q = normalizar(consulta.trim());
@@ -188,8 +203,31 @@ function sinSoluciones(raiz: string, d: Documento, noSeparable: Error, reservada
   if (!preguntas || !marcada || [...reservadas].some(id => !vistas.has(id))) throw noSeparable;
   return paginas;
 }
+// Una grabación (DA51): cada tramo con su hora y cada párrafo con el enlace a su segundo, que es lo que se cita.
+function leerTramos(raiz: string, datos: DatosCurso, d: Documento, desde: number, hasta: number): string {
+  if (![desde, hasta].every(Number.isInteger) || desde < 1 || hasta < desde || hasta > d.paginas) throw new Error(`Rango de tramos inválido: ${d.id} tiene ${d.paginas} tramos de ${TRAMO / 60} minutos (base 1, extremos incluidos).`);
+  let calidades: Record<string, { inicio?: number; fin?: number; avisos?: string[]; error?: string }> = {};
+  try { calidades = JSON.parse(leer(raiz, `_procesado/${d.id}/calidad.json`, 50_000_000)).paginas || {}; } catch { /* Sin transcribir todavía. */ }
+  let salida = "[Transcripción automática del audio: puede confundir nombres, términos técnicos y fórmulas dichas en voz alta, y lo escrito en el pizarrón no está. Citá cada idea con el enlace de su párrafo; textual, sólo lo que se entiende sin dudas.]\n";
+  for (let p = desde; p <= hasta && Buffer.byteLength(salida) < 30000; p++) {
+    const q = calidades[String(p)];
+    let texto: string | undefined;
+    try { texto = textoPagina(raiz, d.id, p); } catch { /* El tramo todavía no tiene transcripción. */ }
+    if (texto === undefined || !q || q.error) {
+      salida += `\nTramo ${p} (desde ${hora((p - 1) * TRAMO)}): sin transcripción todavía; se transcribe en la preparación del curso. No lo cites.\n`;
+      continue;
+    }
+    const parrafos = texto.replace(/^<!--[^\n]*-->\n\n/, "").trim().split(/\n{2,}/).filter(Boolean)
+      .map(par => { const m = MARCA.exec(par); return m ? `${par} ${citaSegundo(datos, d.id, segundosDe(m))}` : par; });
+    salida += `\nTramo ${p} (${hora(q.inicio ?? (p - 1) * TRAMO)}–${hora(q.fin ?? p * TRAMO)}):\n${parrafos.join("\n\n") || "[Sin voz en este tramo.]"}\n`;
+    if (q.avisos?.length) salida += `[${q.avisos.join(" ")}]\n`;
+  }
+  if (Buffer.byteLength(salida) >= 30000) salida += "\n[Rango incompleto; pedí menos tramos.]";
+  return acotar(salida, 32000);
+}
 export function leerPaginas(raiz: string, datos: DatosCurso, doc: string, desde: number, hasta: number, despuesDelIntento = false, reservados = new Set<string>()): string {
   const d = documento(datos, doc);
+  if (esGrabacion(d)) return leerTramos(raiz, datos, d, desde, hasta);
   if (![desde, hasta].every(Number.isInteger) || desde < 1 || hasta < desde || hasta > d.paginas) throw new Error("Rango PDF inválido (base 1, extremos incluidos).");
   // Un ítem reservado (E3) no se ve ni después de otro intento: se omite su pregunta entera o se rechaza el rango.
   const enRango = [...paginasReservadas(datos, doc, reservados)].some(p => desde <= p && p <= hasta);
@@ -237,7 +275,9 @@ export function faltantesTema(raiz: string, datos: DatosCurso, tema: Tema): stri
     const [desde, hasta] = ref.paginas, total = hasta - desde + 1;
     // Una página que ya pasó por visión y sigue dudosa no se vuelve a preparar: la marca leer_paginas.
     const sin = Array.from({ length: total }, (_, i) => desde + i).filter(p => !qs[p] || (qs[p].pendiente && (!qs[p].vision || qs[p].error_vision))).length;
-    if (sin) faltan.push(`${ref.doc} PDF ${desde}–${hasta} (${sin} de ${total} páginas)`);
+    const grabacion = datos.documentos.some(d => d.id === ref.doc && esGrabacion(d));
+    if (sin) faltan.push(grabacion ? `${ref.doc} tramos ${desde}–${hasta} (${sin} de ${total} sin transcribir: la grabación se transcribe en la preparación del curso; no la cites hasta entonces)`
+      : `${ref.doc} PDF ${desde}–${hasta} (${sin} de ${total} páginas)`);
   }
   for (const clase of ["ejercicios", "evaluaciones"] as const) for (const ref of tema[clase] || []) {
     const sin = ref.items.filter(id => !datos.items[ref.doc]?.some(i => i.id === id));
@@ -282,8 +322,10 @@ export function dossier(raiz: string, datos: DatosCurso, tema: Tema, maxTokens: 
     // F1, F2: el rango con su tool y sin enlace; la cita sale de la página leída, no del comienzo del rango.
     tema.bibliografia?.length ? "Bibliografía del tema: antes de enseñar cada nodo, leé con leer_paginas la página que lo define y citá esa." : "Bibliografía del tema: ninguna; lo que no conste en el material va marcado «sin respaldo en el material»."];
   for (const ref of tema.bibliografia || []) {
-    try { const d = documento(datos, ref.doc); lineas.push(`- leer_paginas ${ref.doc} PDF ${ref.paginas.join("–")} · ${ref.seccion} · ${d.titulo}${d.prioridad ? ` (${d.prioridad})` : ""}`); }
-    catch { lineas.push("Referencia bibliográfica no disponible; no reconstruirla desde memoria."); }
+    try {
+      const d = documento(datos, ref.doc), donde = esGrabacion(d) ? `tramos ${ref.paginas.join("–")} (grabación, desde ${hora((ref.paginas[0] - 1) * TRAMO)})` : `PDF ${ref.paginas.join("–")}`;
+      lineas.push(`- leer_paginas ${ref.doc} ${donde} · ${ref.seccion} · ${d.titulo}${d.prioridad ? ` (${d.prioridad})` : ""}`);
+    } catch { lineas.push("Referencia bibliográfica no disponible; no reconstruirla desde memoria."); }
   }
   const items: { linea: string; id: string; automatico: boolean }[] = [], vistos = reservados(raiz, datos);
   // Lo que la preparación automática asignó al tema va después del índice curado, que manda.
@@ -305,7 +347,8 @@ export function dossier(raiz: string, datos: DatosCurso, tema: Tema, maxTokens: 
   if (resto.length) lineas.push(acotar(`Más ítems del tema (leelos con leer_items): ${[ids(false), ids(true) && `asignados automáticamente: ${ids(true)}`].filter(Boolean).join("; ")}`, 800));
   if (reservas(raiz, datos)[tema.id]) lineas.push("Simulacro: un ítem de evaluación del tema está reservado para /simulacro; no figura acá ni se puede leer. Con el plan cubierto y la práctica terminada, registrá estado dominado y, antes del cierre, ofrecé /simulacro.");
   const faltan = faltantesTema(raiz, datos, tema);
-  if (faltan.length) lineas.push(`Preparación del tema: sin texto confiable todavía en ${faltan.join("; ")}. Se preparan solos en segundo plano; mientras, cotejá esas páginas con ver_pagina antes de citarlas.`);
+  // Una grabación sin transcribir no tiene página que mirar: su línea ya dice que no se cite.
+  if (faltan.length) lineas.push(`Preparación del tema: sin texto confiable todavía en ${faltan.join("; ")}.${faltan.some(f => / PDF \d/.test(f)) ? " Se preparan solos en segundo plano; mientras, cotejá esas páginas con ver_pagina antes de citarlas." : ""}`);
   // Objetivo y plan acordados (H56) comparten los 3000 B del progreso del tema y ocupan hasta 2000 (en bytes: los caracteres pueden ser multibyte): retomar no los vuelve a pedir ni pierde el borde.
   const p = datos.progreso.temas[tema.id], acordado = acotar([p?.objetivo && `Objetivo acordado: ${String(p.objetivo).slice(0, 300)}`, p?.plan && `Plan: ${String(p.plan).slice(0, 1500)}`].filter(Boolean).join("\n\n"), 2000);
   // Lo que puede cortarse va al final: el progreso de los prerequisitos.

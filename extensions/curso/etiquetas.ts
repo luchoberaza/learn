@@ -23,7 +23,9 @@ const transcripcion = (r: Resultado) => {
 
 // Nunca el texto de leer_paginas, leer_items ni buscar_material: una página del parcial trae soluciones de otras preguntas.
 const filas: Record<string, Fila> = {
-  leer_paginas: { llamada: a => `Leyendo${rango(a)}${de(a)}`, hecho: a => `Leí${rango(a)}${de(a)}`, fallo: () => "No se pudo leer el material" },
+  // De una grabación (DA51) el resultado trae desde qué minuto se leyó.
+  leer_paginas: { llamada: a => `Leyendo${rango(a)}${de(a)}`, hecho: (a, r) => r.details?.grabacion ? `Leí la grabación${de(a)} desde ${r.details.desde}` : `Leí${rango(a)}${de(a)}`,
+    fallo: () => "No se pudo leer el material" },
   leer_items: { llamada: a => `Leyendo ítems${de(a)}`, hecho: a => `Leí ${cuantos(a.ids, "ítem", "ítems")}${de(a)}`, fallo: () => "No se pudieron leer los ítems" },
   buscar_material: { llamada: () => "Buscando en el material…", hecho: () => "Busqué en el material", fallo: () => "No se pudo buscar en el material" },
   ver_pagina: { llamada: a => `Página original${pagina(a)}`, hecho: a => `Página original${pagina(a)}`, fallo: () => "Página original no disponible" },

@@ -192,7 +192,7 @@ function recoger(vault: string, p: Pedido, dir: string): { estado: string; file?
     const desde = raw.indexOf("## Resumen");
     let texto = raw.slice(desde).trim();
     if (desde < 0 || Buffer.byteLength(texto) > 60_000 || !texto.includes("## Contra el material del curso") || !texto.includes("## Extensiones útiles") || (/\nA1: /.test(p.tarea) && !/concuerda|discrepa|el material no lo cubre/i.test(texto)) || !/https?:\/\//.test(texto)) throw new Error("Informe incompleto; no se guardó como verificación en caché.");
-    const enlaces = texto.match(/\[\[cursos\/[^\]\n]+#page=\d+(?:\|[^\]\n]+)?\]\]/g) || [];
+    const enlaces = texto.match(/\[\[cursos\/[^\]\n]+#(?:page|t)=\d+(?:\|[^\]\n]+)?\]\]/g) || [];
     if (!enlaces.length || enlaces.some(c => !p.citas.includes(c.replace(/\|[^\]]+(?=\]\])/, "")))) throw new Error("El informe cita páginas ajenas a las anclas; no se guardó como caché.");
     // Lo dicho sobre páginas pendientes no se presenta como verificado contra su transcripción definitiva; si cambian, la caché pasa a previa.
     if (p.pendientes?.length) texto = `Páginas pendientes de transcripción al verificar (lo dicho sobre ellas no está verificado contra su transcripción definitiva): ${p.pendientes.join(", ")}.\n\n${texto}`;

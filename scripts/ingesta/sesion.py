@@ -13,6 +13,7 @@ import pymupdf
 
 from almacen import Conflicto, atomico, bloquear, esperar, guardar_json, leer_json, ruta_segura, salida_segura, sha256
 from cursos import carpeta, cargar_yaml, texto, validar
+from transcripcion import es_grabacion
 from progreso import leer as leer_progreso
 
 
@@ -77,6 +78,8 @@ def renderizar(vault: Path, curso: str, doc: str, numero: int):
     d = next((d for d in datos["documentos"] if d["id"] == doc), None)
     if not isinstance(doc, str) or not re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", doc) or not d or type(numero) is not int or not 1 <= numero <= d["paginas"]:
         raise ValueError("Documento o página PDF fuera del curso.")
+    if es_grabacion(d["archivo"]):
+        raise ValueError(f"{doc} es una grabación: no tiene páginas para mostrar; su texto, con la hora de cada párrafo, está en leer_paginas.")
     raiz = carpeta(vault, curso)
     fuente = ruta_segura(raiz, d["archivo"])
     if Path(d["archivo"]).parts[:2] != ("fuentes", d["tipo"]):

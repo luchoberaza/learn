@@ -4,7 +4,7 @@ import { cpSync, mkdtempSync, mkdirSync, readdirSync, readFileSync, rmSync, syml
 import { tmpdir } from "node:os";
 import { delimiter, join } from "node:path";
 import { spawnSync } from "node:child_process";
-import { agentDir, importPi, piDir, vaultDir, pythonDelVenv } from "../scripts/lib/pi-sdk.mjs";
+import { agentDir, importPi, leerConfigLocal, piDir, vaultDir, pythonDelVenv } from "../scripts/lib/pi-sdk.mjs";
 
 const lanzador = join(piDir, "config/fish/pi-learn.fish"), instalacion = process.env.PI_MANAGED_INSTALL_ROOT || join(agentDir, "install");
 process.env.PI_OFFLINE = "1";
@@ -135,7 +135,9 @@ test("H80/H14/H09: el doctor del proyecto ve el prompt, las skills y el thinking
   assert.match(r.stdout, /^✓ Prompt del tutor: sin secciones ajenas/m);
   assert.match(r.stdout, /^✓ Skills de cursos: teach, curso-nuevo y curso-agregar, sin colisiones/m);
   assert.match(r.stdout, /^✓ Thinking oculto/m);
-  assert.match(r.stdout, /^[✓✗] Credenciales principal: openai-codex\/gpt-6\.1-sol: /m);
+  // El de settings.json, salvo que esta máquina tenga el suyo en curso.config.local.json (DA49).
+  const principal = leerConfigLocal(piDir).modelo_principal || "openai-codex/gpt-6.1-sol";
+  assert.match(r.stdout, new RegExp(`^[✓✗] Credenciales principal: ${principal.replace(/[.]/g, "[.]")}: `, "m"));
 });
 
 test("preventivo: la lista blanca de secciones del doctor cubre las que agrega el curso, también la de /simulacro", () => {
@@ -150,7 +152,9 @@ test("preventivo: la lista blanca de secciones del doctor cubre las que agrega e
 test("H80/H14/H09: el doctor marca credenciales, secciones, colisiones y thinking, y avisa por otra versión de pi", t => {
   const h = hogar(t), v = mkdtempSync(join(tmpdir(), "pi-doctor-")), copia = join(v, ".pi");
   t.after(() => rmSync(v, { recursive: true, force: true }));
-  cpSync(piDir, copia, { recursive: true, filter: f => !/[\\/]\.(git|venv)$/.test(f) });
+  // Como una máquina nueva: sin el venv ni los modelos propios de esta (curso.config.local.json, DA40 y DA49). Lo que se
+  // instala o se compila en app/ (dependencias, instaladores) no lo mira el doctor y pesa cientos de MB.
+  cpSync(piDir, copia, { recursive: true, filter: f => !/[\\/]\.(git|venv)$|[\\/]curso\.config\.local\.json$|[\\/]app[\\/](node_modules|dist|out)$/.test(f) });
   for (const d of ["cursos", "_entrada", ".pi/skills/otra-teach", "bin"]) mkdirSync(join(v, d), { recursive: true });
   const settings = JSON.parse(readFileSync(join(copia, "settings.json"), "utf8"));
   writeFileSync(join(copia, "settings.json"), JSON.stringify({ ...settings, hideThinkingBlock: undefined, packages: settings.packages.filter(p => typeof p === "string") }));

@@ -1,0 +1,14 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- La ventana de grabación: sin red. El video o audio llega por learn-medio://, que sirve sólo lo que abrió la ventana principal. -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; media-src learn-medio:; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>learn</title>
+</head>
+<body>
+  <div id="raiz"></div>
+  <script type="module" src="./src/reproductor/main.tsx"></script>
+</body>
+</html>

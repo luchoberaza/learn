@@ -46,7 +46,7 @@ class Conflicto(RuntimeError):
 
 
 # Lo que una máquina puede pisar sin tocar el curso.config.json versionado (mismas claves que leerConfig de pi-sdk.mjs).
-CLAVES_LOCALES = ("vault", "ruta_tesseract", "modelo_vision", "modelo_researcher")
+CLAVES_LOCALES = ("vault", "ruta_tesseract", "modelo_vision", "modelo_researcher", "modelo_transcripcion", "carpeta_modelos")
 
 
 def cargar_config(recursos: Path | None = None) -> dict:
@@ -129,6 +129,23 @@ def proceso_vivo(pid: object) -> bool:
     except PermissionError:
         pass
     return True
+
+
+def bajar_prioridad() -> None:
+    """La ingesta cede el procesador a lo que se está usando. Sus procesos y el OCR heredan la prioridad (en Windows,
+    un hijo de un proceso BELOW_NORMAL nace BELOW_NORMAL). Si el sistema no lo permite, sigue con la de siempre."""
+    if WINDOWS:
+        import ctypes
+        from ctypes import wintypes
+        kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        kernel32.GetCurrentProcess.restype = wintypes.HANDLE
+        kernel32.SetPriorityClass.argtypes = [wintypes.HANDLE, wintypes.DWORD]
+        kernel32.SetPriorityClass(kernel32.GetCurrentProcess(), 0x4000)  # BELOW_NORMAL_PRIORITY_CLASS
+        return
+    try:
+        os.nice(10)
+    except OSError:
+        pass
 
 
 def opciones_desacoplado() -> dict:

@@ -411,6 +411,10 @@ export async function abrirPagina(args: { cita?: string; curso?: string; doc?: s
 }
 export const cerrarPanel = () => cambiar({ panel: undefined });
 
+// La ventana de grabación (DA51): el video o audio de una clase en su propia ventana, en el segundo citado.
+export async function abrirGrabacion(cita: string, titulo?: string) {
+  try { await window.learn.abrirGrabacion({ cita, titulo }); } catch (e) { error(e); }
+}
 // La ventana de PDF (DA47): el documento entero en su propia ventana, en la página pedida.
 export async function abrirPdf(pedido: { cita?: string; curso?: string; doc?: string; pagina?: number }) {
   try { await window.learn.abrirPdf(pedido); } catch (e) { error(e); }

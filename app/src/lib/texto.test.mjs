@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { analizarEnlace, cuando, estadoEnIndice, fechaLarga, fraccion, marcarPlan, nodosDelPlan, nombreCorto, sinEmoji, slugDe } from "./texto.ts";
+import { analizarEnlace, cuando, esGrabacion, estadoEnIndice, fechaLarga, fraccion, hora, marcarPlan, nodosDelPlan, nombreCorto, nombreDeArchivo, sinEmoji, slugDe } from "./texto.ts";
 
 test("los enlaces de Obsidian se reconocen como cita, imagen, PDF o nota", () => {
   assert.deepEqual(analizarEnlace("cursos/redes-demo/fuentes/bibliografia/kurose.pdf#page=54"),
@@ -9,6 +9,17 @@ test("los enlaces de Obsidian se reconocen como cita, imagen, PDF o nota", () =>
   assert.deepEqual(analizarEnlace("viz-dag-retardos.png"), { tipo: "imagen", destino: "viz-dag-retardos.png", alias: undefined });
   assert.equal(analizarEnlace("_entrada/muestras/practico1.pdf#page=1|Práctico 1").tipo, "pdf");
   assert.equal(analizarEnlace("Otra nota").tipo, "nota");
+});
+
+test("DA51: el momento de una grabación se reconoce aparte de una página, y su hora se escribe como en la transcripción", () => {
+  assert.deepEqual(analizarEnlace("cursos/redes/fuentes/bibliografia/clase-3.mp4#t=725|Clase 3"),
+    { tipo: "momento", destino: "cursos/redes/fuentes/bibliografia/clase-3.mp4#t=725", curso: "redes", archivo: "fuentes/bibliografia/clase-3.mp4", segundo: 725, alias: "Clase 3" });
+  assert.equal(analizarEnlace("cursos/redes/fuentes/otros/charla.M4A#t=0").tipo, "momento");
+  // Un #t= en algo que no es una grabación no es un momento.
+  assert.equal(analizarEnlace("cursos/redes/fuentes/otros/notas.txt#t=5").tipo, "nota");
+  assert.ok(esGrabacion("clase.webm") && esGrabacion("audio.OGG") && !esGrabacion("libro.pdf"));
+  assert.deepEqual([hora(0), hora(725), hora(3725)], ["0:00", "12:05", "1:02:05"]);
+  assert.deepEqual([nombreDeArchivo("fuentes/bibliografia/kurose-ross-7.pdf"), nombreDeArchivo("fuentes/bibliografia/clase_3.mp4")], ["kurose ross 7", "clase 3"]);
 });
 
 test("el plan guardado se parte en nodos y se marca con lo que el alumno domina", () => {

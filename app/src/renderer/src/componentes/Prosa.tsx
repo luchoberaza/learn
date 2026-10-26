@@ -2,8 +2,8 @@
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { renderizar, type Cita } from "../lib/markdown";
 import { dibujar } from "../lib/mermaid";
-import { nombreDeArchivo } from "../../../lib/texto.ts";
-import { abrirPagina, leer, pedir } from "../tienda";
+import { analizarEnlace, hora, nombreDeArchivo } from "../../../lib/texto.ts";
+import { abrirGrabacion, abrirPagina, leer, pedir } from "../tienda";
 
 // Las imágenes y miniaturas se piden una vez por sesión de la app.
 const cacheImagenes = new Map<string, Promise<string | undefined>>();
@@ -23,11 +23,12 @@ export function imagenRender(ruta: string) {
 }
 
 // Nombre legible del documento citado: el título del índice del curso, o el nombre del archivo.
-export function tituloCita(c: { curso: string; archivo: string; pagina: number; alias?: string }) {
+export function tituloCita(c: { curso: string; archivo: string; pagina: number; segundo?: number; alias?: string }) {
   if (c.alias) return c.alias;
-  const doc = leer().cursos.find(x => x.slug === c.curso)?.documentos.find(d => d.archivo === c.archivo);
-  return `${doc?.titulo ?? nombreDeArchivo(c.archivo)}, página ${c.pagina}`;
+  return `${tituloDocumento(c)}, ${c.segundo === undefined ? `página ${c.pagina}` : `desde ${hora(c.segundo)}`}`;
 }
+const tituloDocumento = (c: { curso: string; archivo: string }) =>
+  leer().cursos.find(x => x.slug === c.curso)?.documentos.find(d => d.archivo === c.archivo)?.titulo ?? nombreDeArchivo(c.archivo);
 
 function Miniatura({ cita }: { cita: string }) {
   const [src, setSrc] = useState<string | null>(null);
@@ -51,6 +52,13 @@ function Miniatura({ cita }: { cita: string }) {
 }
 
 export function NotaAlMargen({ c }: { c: Cita }) {
+  // Un momento de una grabación (DA51): sin miniatura, se escucha desde ahí en su propia ventana.
+  if (c.segundo !== undefined) return (
+    <div className="nota-margen">
+      <span><b>{c.n}</b> {tituloCita(c)}</span>
+      <button className="enlace cita" onClick={() => void abrirGrabacion(`[[${c.destino}]]`, tituloDocumento(c))}>Escuchar desde {hora(c.segundo)}</button>
+    </div>
+  );
   return (
     <div className="nota-margen">
       <span><b>{c.n}</b> {tituloCita(c)}</span>
@@ -82,7 +90,9 @@ function alHacerClic(ev: React.MouseEvent | React.KeyboardEvent) {
   if (!sup) return;
   if ("key" in ev && ev.key !== "Enter" && ev.key !== " ") return;
   ev.preventDefault();
-  void abrirPagina({ cita: `[[${sup.dataset.cita}]]`, origen: "cita" });
+  const e = analizarEnlace(sup.dataset.cita!);
+  if (e.tipo === "momento") void abrirGrabacion(`[[${e.destino}]]`, tituloDocumento(e));
+  else void abrirPagina({ cita: `[[${sup.dataset.cita}]]`, origen: "cita" });
 }
 
 // Prosa con su margen: las citas numeradas a la derecha, como notas de un libro.

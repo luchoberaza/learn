@@ -69,9 +69,9 @@ export default function (pi: ExtensionAPI) {
     executionMode: "sequential", execute: investigar,
   });
   pi.registerTool({
-    name: "leer_paginas", label: "Leer páginas", description: "Leer transcripciones del curso activo por páginas PDF (base 1). Devuelve citas y texto acotado; si falta o es dudoso, consultá ver_pagina. En evaluaciones omite las soluciones y los enlaces, y rechaza documentos de soluciones; despues_del_intento:true sólo cuando el estudiante ya entregó su intento.",
+    name: "leer_paginas", label: "Leer páginas", description: "Leer transcripciones del curso activo por páginas PDF (base 1). Devuelve citas y texto acotado; si falta o es dudoso, consultá ver_pagina. En evaluaciones omite las soluciones y los enlaces, y rechaza documentos de soluciones; despues_del_intento:true sólo cuando el estudiante ya entregó su intento. En una grabación de clase cada página es un tramo de 5 minutos, y cada párrafo trae el enlace a su minuto (#t=).",
     parameters: Type.Object({ doc: slug, desde: Type.Integer({ minimum: 1 }), hasta: Type.Integer({ minimum: 1 }), despues_del_intento: Type.Optional(Type.Boolean()) }), executionMode: "sequential",
-    async execute(_id, args) { return { content: [{ type: "text", text: sesion.leer_paginas(args) }], details: undefined }; },
+    async execute(_id, args) { return { content: [{ type: "text", text: sesion.leer_paginas(args) }], details: sesion.grabacion(args.doc, args.desde) }; },
   });
   pi.registerTool({
     name: "buscar_material", label: "Buscar material", description: "Buscar material del curso activo mediante BM25 sin tildes. Devuelve ubicaciones y fragmentos, sin OCR. De evaluaciones y soluciones devuelve sólo la ubicación: leé esos enunciados con leer_items.",
@@ -84,7 +84,7 @@ export default function (pi: ExtensionAPI) {
     async execute(_id, args, _signal, _update, ctx) { return { content: [{ type: "text", text: sesion.leer_items(args, enCurso(ctx, sesion.actual())) }], details: undefined }; },
   });
   pi.registerTool({
-    name: "ver_pagina", label: "Ver página original", description: "Mostrar la imagen original de una página PDF del curso activo, con render local y caché. No ejecuta OCR ni llama al modelo de visión. En evaluaciones y soluciones la imagen trae la solución: exige despues_del_intento:true, sólo cuando el estudiante ya entregó su intento.",
+    name: "ver_pagina", label: "Ver página original", description: "Mostrar la imagen original de una página PDF del curso activo, con render local y caché. No ejecuta OCR ni llama al modelo de visión. En evaluaciones y soluciones la imagen trae la solución: exige despues_del_intento:true, sólo cuando el estudiante ya entregó su intento. Una grabación no tiene páginas para ver.",
     parameters: Type.Object({ doc: slug, pagina: Type.Integer({ minimum: 1 }), despues_del_intento: Type.Optional(Type.Boolean()) }), executionMode: "sequential",
     async execute(_id, args, signal) {
       const r = await sesion.ver_pagina(args, signal);
@@ -93,7 +93,7 @@ export default function (pi: ExtensionAPI) {
   });
   pi.registerTool({
     name: "guardar_curso", label: "Revisar y guardar curso",
-    description: "Preparación: valida una propuesta JSON en _procesado/ y copia PDFs nuevos desde _entrada/. Para un curso existente muestra el diff y exige confirmación humana real, sin autoaprobación desde argumentos. Rechaza ediciones concurrentes y conserva fuentes y progreso existentes.",
+    description: "Preparación: valida una propuesta JSON en _procesado/ y copia PDFs y grabaciones nuevos desde _entrada/. Para un curso existente muestra el diff y exige confirmación humana real, sin autoaprobación desde argumentos. Rechaza ediciones concurrentes y conserva fuentes y progreso existentes.",
     parameters: Type.Object({ curso: slug, propuesta: Type.String({ minLength: 1 }) }),
     executionMode: "sequential",
     execute: (_id, args, signal, onUpdate, ctx) => guardarCurso(pi, args, ctx, signal,

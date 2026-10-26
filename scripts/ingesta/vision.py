@@ -14,6 +14,7 @@ from almacen import Conflicto, atomico, guardar_json, leer_json, ruta_segura, sh
 from cursos import bloquear_breve, puntos_validos
 from extraccion import calidad
 from pipeline import ahora, cita, construir_busqueda, firma, informe, pagina_verificada, recuperar_registro
+from transcripcion import es_grabacion
 
 PROMPT = r"""Transcribí fielmente TODA esta única página, en su idioma original.
 No corrijas, completes ni uses tu memoria para reconstruir partes ausentes.
@@ -33,6 +34,8 @@ def cargar(raiz: Path, vault: Path, doc: str):
     meta = leer_json(raiz, f"{doc}/meta.json")
     if not meta or meta.get("id") != doc:
         raise ValueError("El documento no fue preparado por la ingesta base.")
+    if es_grabacion(meta["archivo"]):
+        raise ValueError(f"{doc} es una grabación: su texto sale de la transcripción de la ingesta base, no de la visión.")
     fuente = ruta_segura(vault, meta["archivo"])
     if fuente.suffix.lower() != ".pdf" or sha256(fuente) != meta["sha256"]:
         raise Conflicto("Cambió el PDF original; no se transcribió ni sobrescribió nada.")

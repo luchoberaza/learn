@@ -1,6 +1,6 @@
 # Interfaz de escritorio y Windows
 
-**Propuesta de luchoberaza para revisar en el PR.** La app vive en `app/`, el núcleo corre también en Windows y la terminal (`pi-learn`) queda igual. Las decisiones están en `DECISIONES.md` (DA39–DA49). Sin commits del lado del autor: el dueño del repo decide.
+**Propuesta de luchoberaza para revisar en el PR.** La app vive en `app/`, el núcleo corre también en Windows y la terminal (`pi-learn`) queda igual. Las decisiones están en `DECISIONES.md` (DA39–DA50). Sin commits del lado del autor: el dueño del repo decide.
 
 ## Qué trae
 
@@ -16,6 +16,7 @@
   - **Subagentes** en paneles propios, sin tmux.
   - **Medidor de consumo:** en la barra lateral, lo que queda en la cuenta del modelo de la clase (dólares del plan, % de la ventana de la suscripción o pedidos gratis del día) y cuántas consultas alcanzan; un clic para cambiar de modelo, y un aviso con otro modelo cuando se está por acabar. En Ajustes → Consumo, el plan de cada cuenta, lo gastado por día y por modelo, y cuánto rinde cada modelo. Los modelos gratis (DeepSeek o Qwen por OpenRouter, NVIDIA y otros) se cuentan en pedidos y tokens (DA48).
 - **El modelo principal de cada máquina**, que ya no vuelve al del repo en cada sesión nueva, también en la terminal (DA49).
+- **La ingesta base, entre 3 y 4,5 veces más rápida:** procesa varias páginas a la vez según los hilos de cada máquina, deja media máquina libre y corre con prioridad baja. Los archivos que deja son idénticos a los de antes (DA50).
 - **El núcleo en Windows:**
   - bloqueos, procesos y rutas portables;
   - el researcher con un vigilante en Node;
@@ -124,7 +125,7 @@ Sin modelo ni red: el proveedor falso de pi-ai con guion hace de tutor. Windows 
 | Suite | Windows | Linux |
 |---|---|---|
 | Node de learn (`tests/*.test.mjs`) | 293: 271 en verde, 0 en rojo, 22 salteadas con motivo | 293: 280 en verde, 0 en rojo, 13 salteadas con motivo |
-| Python de learn (`tests/ingesta`) | 160 OK, 5 salteadas | 160 OK, 3 salteadas |
+| Python de learn (`tests/ingesta`) | 165 OK, 5 salteadas | 165 OK, 3 salteadas |
 | App: host y lógica (`npm test`) | 39 de 39 | 39 de 39 |
 | App: punta a punta con Electron (`npm run e2e`) | 10 de 10 | 10 de 10 |
 | App empaquetada (instalador NSIS / AppImage) | abre con el medidor y la cuenta de Claude | abre una clase, el medidor y un PDF |
@@ -184,6 +185,7 @@ Sin modelo ni red: el proveedor falso de pi-ai con guion hace de tutor. Windows 
 - **Subagentes con otra cuenta:** scout, worker, mermaid-maker y svg-maker tienen `openai-codex` fijo en `agents/*.md`; con sólo Claude no arrancan.
 - **Subagentes:** decidir un fork fijado de `pi-interactive-subagents` o un PR a su autor, para no depender del parche local (DA45).
 - **Probar en Omarchy mismo** (Hyprland, Wayland). Linux se probó en Ubuntu sobre WSL.
+- **Medir DA50 con un libro real.** Los tiempos de la ingesta se midieron con PDFs sintéticos. La preparación con el modelo de visión sigue de a una página.
 - **Instaladores sin firma.** El AppImage pide `--no-sandbox` en distros que restringen los espacios de nombres (Ubuntu 24.04); en Arch no.
 - **`.pi/settings.json`** sigue con la entrada de ponytail del dueño. En una máquina sin ese paquete, pi intenta clonarlo al arrancar. Se propone moverla a su configuración personal; no se tocó.
 - **Dos avisos de severidad baja** de `npm audit` en KaTeX (dentro de Mermaid), en la interfaz. Requieren una contaminación de prototipo previa y la opción `trust` de KaTeX, que la app no usa. Las dependencias que van en el instalador no tienen avisos.

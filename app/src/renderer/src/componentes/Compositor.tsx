@@ -2,6 +2,7 @@
 // skill o de pi. Con el tutor escribiendo, Enter lo corrige sobre la marcha (steer) y Alt+Enter lo deja para después
 // (follow-up), como en pi.
 import { useEffect, useMemo, useRef, useState } from "react";
+import { esGrabacion } from "../../../lib/texto.ts";
 import type { Imagen } from "../tipos";
 import { avisar, cortar, enviar, leer, pedir, usarTienda } from "../tienda";
 import { Clip, Cerrar, Detener, Enviar } from "./Iconos";
@@ -67,13 +68,13 @@ export function Compositor({ bloqueado }: { bloqueado?: string }) {
         avisar("Las fotos HEIC o BMP van como archivo: el modelo no las ve, pero la nota las guarda convertidas si tenés ImageMagick. Si podés, mandala como JPG o PNG.", "advertencia");
         continue;
       }
-      if (/\.pdf$/i.test(f.name)) {
+      if (/\.pdf$/i.test(f.name) || esGrabacion(f.name)) {
         const ruta = window.learn.rutaDeArchivo(f);
         const copiados = ruta ? await window.learn.aEntrada([ruta]).catch(() => []) : [];
         if (copiados.length) avisar(`Copiaste ${copiados.join(", ")} a _entrada/. Sumalo a un curso desde Crear curso o Agregar material.`);
         continue;
       }
-      avisar(`No se puede adjuntar ${f.name}: sólo fotos (PNG, JPG, WEBP, GIF, HEIC) o PDFs para un curso.`, "advertencia");
+      avisar(`No se puede adjuntar ${f.name}: sólo fotos (PNG, JPG, WEBP, GIF, HEIC), o PDFs y grabaciones de clase para un curso.`, "advertencia");
     }
   }
   async function elegirFotos() {

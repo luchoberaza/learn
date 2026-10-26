@@ -40,11 +40,11 @@ Para ver si todo está en orden en cualquier momento: `.pi/scripts/doctor` desde
 
 ## 1. Crear un curso
 
-1. **Juntá el material** en `_entrada/`: el programa, la bibliografía, los prácticos y los parciales, mejor con solución. Pueden ir en subcarpetas. Los PDFs originales nunca se modifican.
+1. **Juntá el material** en `_entrada/`: el programa, la bibliografía, los prácticos y los parciales, mejor con solución. También las grabaciones de las clases, en video o audio (mp4, mp3, m4a, wav, ogg, webm, mkv…). Pueden ir en subcarpetas. Los originales nunca se modifican.
 2. **Abrí `pi-learn` y escribí** `/curso-nuevo <slug>`, por ejemplo `/curso-nuevo redes`. El slug es un nombre corto, sin espacios.
 3. **El agente inventaría los PDFs** y te muestra qué toma para el curso. Si algo es dudoso (otra materia, una edición vieja), te pregunta con botones.
 4. **Arma dos archivos.** `curso.md` es el contrato: objetivos, cómo se evalúa y formato de las preguntas, todo citado del programa o con «no consta». `indice.yaml` tiene los temas, el rango de páginas de la bibliografía de cada uno, los prerequisitos y los ejercicios.
-5. **Indexa todas las páginas en local, sin modelo**, en segundo plano. Sobre el editor aparece una barra con el avance («⏳ Ingesta de <slug> [████░░…] 568/2592 páginas · 22%»). No hace falta escribir nada: cuando termina, el agente sigue solo con el armado. Si se corta, te avisa y te propone reanudar.
+5. **Indexa todas las páginas en local, sin modelo**, en segundo plano, y transcribe las grabaciones con faster-whisper, también en tu computadora y sin costo. La primera vez baja el modelo de transcripción, unos 1,6 GB. Una grabación se parte en tramos de 5 minutos, que el índice usa como páginas; el tutor la cita al minuto (`[[clase.mp4#t=725]]`). En la app, la cita abre el video ahí mismo; en Obsidian, el video se abre desde el principio, salvo que tengas un complemento como Video Notes. Transcribir con el procesador puede tardar del orden de la mitad de la grabación o más, según la computadora. Sobre el editor aparece una barra con el avance («⏳ Ingesta de <slug> [████░░…] 568/2592 páginas · 22%»). No hace falta escribir nada: cuando termina, el agente sigue solo con el armado. Si se corta, te avisa y te propone reanudar.
 6. **Revisá la tabla tema → material** que te muestra y abrí `cursos/<slug>/informe-ingesta.md` en Obsidian. El curso queda como borrador hasta que la revises. Cada cambio a un curso ya guardado te muestra el diff y pide confirmación.
 
 Más adelante:
@@ -217,6 +217,7 @@ Cualquier otro texto en inglés es un defecto: anotalo junto con la nota de la c
 ## 8. Cuánto gasta
 
 - **Crear un curso:** el agente lee programa e índices y arma la propuesta. La indexación de páginas es local y no usa modelo.
+- **Transcribir grabaciones de clase:** nada; se hace en tu computadora con faster-whisper.
 - **Cada clase:** el modelo principal (`settings.json`), un turno por mensaje tuyo.
 - **Primera clase de un tema:** además, el modelo de visión (`modelo_vision` en `curso.config.json`):
   - una llamada por página pendiente;

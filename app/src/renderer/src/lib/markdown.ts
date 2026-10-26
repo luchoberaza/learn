@@ -6,9 +6,10 @@ import type StateInline from "markdown-it/lib/rules_inline/state_inline.mjs";
 import type StateBlock from "markdown-it/lib/rules_block/state_block.mjs";
 import type StateCore from "markdown-it/lib/rules_core/state_core.mjs";
 import katex from "katex";
-import { analizarEnlace, nombreDeArchivo, type Enlace } from "../../../lib/texto.ts";
+import { analizarEnlace, hora, nombreDeArchivo, type Enlace } from "../../../lib/texto.ts";
 
-export interface Cita { n: number; destino: string; curso: string; archivo: string; pagina: number; alias?: string }
+// segundo: la cita es un momento de una grabación (DA51) y no una página.
+export interface Cita { n: number; destino: string; curso: string; archivo: string; pagina: number; segundo?: number; alias?: string }
 interface Entorno { citas: Cita[] }
 
 const escapar = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -120,6 +121,11 @@ md.renderer.rules.enlace_obsidian = (t, i, _o, env: Entorno) => {
     let c = env.citas.find(x => x.destino === e.destino);
     if (!c) { c = { n: env.citas.length + 1, destino: e.destino, curso: e.curso, archivo: e.archivo, pagina: e.pagina, alias: e.alias }; env.citas.push(c); }
     return `<sup class="llamada" data-cita="${escapar(e.destino)}" role="button" tabindex="0" title="Abrir la página ${e.pagina}">${c.n}</sup>`;
+  }
+  if (e.tipo === "momento") {
+    let c = env.citas.find(x => x.destino === e.destino);
+    if (!c) { c = { n: env.citas.length + 1, destino: e.destino, curso: e.curso, archivo: e.archivo, pagina: 0, segundo: e.segundo, alias: e.alias }; env.citas.push(c); }
+    return `<sup class="llamada" data-cita="${escapar(e.destino)}" data-segundo="${e.segundo}" role="button" tabindex="0" title="Escuchar desde ${hora(e.segundo)}">${c.n}</sup>`;
   }
   if (e.tipo === "imagen") return `<img class="del-vault" data-vault="${escapar(e.destino)}" alt="${escapar(e.alias ?? "")}">`;
   if (e.tipo === "pdf") return `<span class="enlace-pdf">${escapar(e.alias ?? `${nombreDeArchivo(e.destino)}${e.pagina ? `, página ${e.pagina}` : ""}`)}</span>`;

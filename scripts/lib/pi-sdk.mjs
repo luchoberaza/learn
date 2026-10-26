@@ -23,7 +23,7 @@ export function pythonDelVenv(recursos = piDir) {
 export const PYTHON_TEXTO = WINDOWS ? ".pi/.venv/Scripts/python.exe" : ".pi/.venv/bin/python";
 
 // Claves que una máquina puede pisar sin tocar el curso.config.json versionado.
-export const CLAVES_LOCALES = ["vault", "ruta_tesseract", "modelo_vision", "modelo_researcher", "modelo_principal"];
+export const CLAVES_LOCALES = ["vault", "ruta_tesseract", "modelo_vision", "modelo_researcher", "modelo_principal", "modelo_transcripcion", "carpeta_modelos"];
 export function leerConfigLocal(recursos = piDir) {
   let local = {};
   try { local = JSON.parse(readFileSync(join(recursos, "curso.config.local.json"), "utf8")); } catch { return {}; }

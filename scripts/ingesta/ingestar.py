@@ -11,8 +11,10 @@ import subprocess
 import sys
 import time
 
-from almacen import bloquear, bloqueo_libre, cargar_config, guardar_json, leer_json, opciones_desacoplado, proceso_vivo, ruta_segura, usar_tesseract
-from pipeline import adoptar, ahora, ejecutar
+from almacen import (bajar_prioridad, bloquear, bloqueo_libre, cargar_config, guardar_json, leer_json, opciones_desacoplado, proceso_vivo,
+                     ruta_segura, usar_tesseract)
+from pipeline import adoptar, ahora, ejecutar, trabajadores_de_la_maquina
+from transcripcion import MODELO
 
 CONFIG = Path(__file__).resolve().parents[2] / "curso.config.json"
 
@@ -70,7 +72,8 @@ def main() -> int:
     # ocrmypdf y la comprobación de idiomas usan el tesseract fijado, no el primero del PATH.
     usar_tesseract(config)
     manifiesto = {"umbral_calidad": config["umbral_calidad_pagina"], "idiomas_ocr": config["idioma_ocr"],
-                  **json.loads(args.manifiesto.read_text(encoding="utf-8"))}
+                  "modelo_transcripcion": config.get("modelo_transcripcion", MODELO),
+                  "carpeta_modelos": str(Path(config["carpeta_modelos"]).expanduser()) if config.get("carpeta_modelos") else None, **json.loads(args.manifiesto.read_text(encoding="utf-8"))}
     if args.comando == "iniciar":
         # Validar la salida y marcar su propiedad antes de crear el log del proceso.
         with bloquear(salida, vault):
@@ -107,7 +110,9 @@ def main() -> int:
     def interrumpir(*_):
         raise KeyboardInterrupt()
     signal.signal(signal.SIGTERM, interrumpir)
-    estado = ejecutar(manifiesto, vault, salida, limite_paginas=args.limite_paginas)
+    # Varias páginas a la vez, según los hilos de esta máquina, y por debajo de lo que se esté usando (DA50).
+    bajar_prioridad()
+    estado = ejecutar(manifiesto, vault, salida, limite_paginas=args.limite_paginas, trabajadores=trabajadores_de_la_maquina())
     print(json.dumps(estado, ensure_ascii=False, indent=2))
     return 0
 

@@ -19,14 +19,14 @@ export default defineConfig({
   main: {
     build: { outDir: "out/main", rollupOptions: { external: ["electron"] } },
   },
-  // El preload corre en un renderer con sandbox: tiene que ser CommonJS. Uno para la ventana principal y otro, mínimo,
-  // para las ventanas de PDF.
+  // El preload corre en un renderer con sandbox: tiene que ser CommonJS. Uno para la ventana principal y otros, mínimos,
+  // para las ventanas de PDF y de grabación.
   preload: {
-    build: { outDir: "out/preload", rollupOptions: { input: { index: resolve("src/preload/index.ts"), visor: resolve("src/preload/visor.ts") }, output: { format: "cjs", entryFileNames: "[name].cjs" } } },
+    build: { outDir: "out/preload", rollupOptions: { input: { index: resolve("src/preload/index.ts"), visor: resolve("src/preload/visor.ts"), reproductor: resolve("src/preload/reproductor.ts") }, output: { format: "cjs", entryFileNames: "[name].cjs" } } },
   },
   renderer: {
     root: "src/renderer",
-    build: { outDir: "out/renderer", chunkSizeWarningLimit: 4000, rollupOptions: { input: { index: resolve("src/renderer/index.html"), visor: resolve("src/renderer/visor.html") } } },
+    build: { outDir: "out/renderer", chunkSizeWarningLimit: 4000, rollupOptions: { input: { index: resolve("src/renderer/index.html"), visor: resolve("src/renderer/visor.html"), reproductor: resolve("src/renderer/reproductor.html") } } },
     plugins: [react(), datosPdfjs()],
   },
 });

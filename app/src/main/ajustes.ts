@@ -17,6 +17,7 @@ export interface Ajustes {
   foco: AjustesFoco;
   ventana?: { ancho: number; alto: number; x?: number; y?: number; maximizada?: boolean };
   visor?: { ancho: number; alto: number };
+  reproductor?: { ancho: number; alto: number };
   planes?: Record<string, Plan>;
 }
 export interface DiaFoco { minutos: number; bloques: number }

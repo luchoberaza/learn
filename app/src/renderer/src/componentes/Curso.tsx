@@ -1,7 +1,7 @@
 // Curso (§9.2): el índice, el material, las notas de clase y el estado (validación, ingesta e informe).
 import { useEffect, useState } from "react";
-import { cuando } from "../../../lib/texto.ts";
-import { abrirPagina, abrirPdf, enviar, estudiar, navegar, pedir, refrescarCursos, usarTienda } from "../tienda";
+import { cuando, esGrabacion } from "../../../lib/texto.ts";
+import { abrirGrabacion, abrirPagina, abrirPdf, enviar, estudiar, navegar, pedir, refrescarCursos, usarTienda } from "../tienda";
 import type { NotaResumen } from "../tipos";
 import { IndiceCurso } from "./Inicio";
 import { Prosa } from "./Prosa";
@@ -22,6 +22,14 @@ function Material({ slug }: { slug: string }) {
           <ul className="documentos">
             {docs.map(d => {
               const evaluacion = d.restringido ?? (tipo === "evaluaciones" || tipo === "soluciones");
+              // Una grabación de clase (DA51) se cuenta en tramos de 5 minutos y se escucha en su propia ventana.
+              if (esGrabacion(d.archivo)) return (
+                <li key={d.id}>
+                  <span className="fuerte">{d.titulo}</span>
+                  <span className="apagado">grabación · {d.paginas === 1 ? "un tramo" : `${d.paginas} tramos`} de 5 minutos</span>
+                  <button className="enlace cita" onClick={() => void abrirGrabacion(`[[cursos/${slug}/${d.archivo}#t=0]]`, d.titulo)} title="La grabación, en su propia ventana">Escuchar</button>
+                </li>
+              );
               return (
                 <li key={d.id}>
                   <span className="fuerte">{d.titulo}</span>

@@ -24,7 +24,9 @@
 
 La primera prueba de punta a punta con el modelo real (`gpt-6.1-sol`, una clase de retardos con kill, `/compact`, `/simulacro` y `/fin` sobre una copia del vault, 41 llamadas) llegó a la primera pregunta a los 15,7 s y no perdió estado ni mostró soluciones antes del intento, pero encontró tres fallas graves: se enseñó de memoria sin leer la bibliografía, `/simulacro` gastó el reservado a mitad del tema y el reservado era casi copia de un ejercicio del dossier; además, textos de pi en inglés. Con los restos de la etapa anterior y los arreglos de fidelidad y plomería (DA29–DA36), la rama llega a `64cb42d`: sin modelo ni red, 267 tests Node en verde (incluyen la suite Python) y 151 tests Python OK. Pendiente: verificar con el modelo real las reglas nuevas de modo-curso (DA31) y en Obsidian el embed de la página mostrada (DA30); no hay simulacro de varios temas ni del curso completo, ni ficha del alumno (H58: patrones de error entre temas, confianza declarada y fechas de evaluación).
 
-**Interfaz de escritorio y Windows (2026-10-25, propuesta en un PR de luchoberaza):** app de escritorio en `app/` y núcleo portable a Windows, sin cambios de comportamiento en Linux ni en la terminal. Sin modelo ni red: suite Node 293 tests (Windows 271 en verde y 22 salteadas con motivo; Linux 280 y 13), Python 160 OK en las dos, y la app con 39 tests de host y lógica y 10 de punta a punta con Electron real en las dos. Con el modelo real se probó Claude Sonnet 5.5 en la app (DA48). Pendiente: probarla con `openai-codex` y decidir el fork de los subagentes. Ver DA39–DA49 y `informes/interfaz.md`.
+**Interfaz de escritorio y Windows (2026-10-25, propuesta en un PR de luchoberaza):** app de escritorio en `app/` y núcleo portable a Windows, sin cambios de comportamiento en Linux ni en la terminal. Sin modelo ni red: suite Node 293 tests (Windows 271 en verde y 22 salteadas con motivo; Linux 280 y 13), Python 165 OK en las dos, y la app con 39 tests de host y lógica y 10 de punta a punta con Electron real en las dos. Con el modelo real se probó Claude Sonnet 5.5 en la app (DA48). La ingesta base procesa varias páginas a la vez según los hilos de cada máquina y deja los mismos archivos que de a una (DA50). Pendiente: probarla con `openai-codex` y decidir el fork de los subagentes. Ver DA39–DA50 y `informes/interfaz.md`.
+
+**Grabaciones de clase (2026-10-26, propuesta en un PR aparte):** un video o audio de clase es material del curso, transcripto en local con faster-whisper en tramos de cinco minutos que el tutor cita al segundo y la app reproduce en su propia ventana. Ver DA51.
 
 ## D0.1 — Conservar el upstream y fijar los subagentes
 
@@ -754,4 +756,85 @@ Propuesta de luchoberaza en un PR, para que la apruebe el dueño del repo. La ap
 - **Decisión:** `modelo_principal` en `curso.config.local.json` (se suma a las claves de DA40). Al arrancar o abrir una sesión nueva, `extensions/modelos.ts` cambia a ése si existe y tiene credenciales. No toca una sesión retomada ni bifurcada, un `--model` explícito, el researcher ni los subagentes. La app lo guarda cuando se elige el modelo en Ajustes → Modelos, en el menú de la barra lateral o en Consumo. El doctor revisa las credenciales de ese modelo.
 - **Por qué:** cada máquina usa su cuenta sin tocar el repo, también en la terminal.
 - **Límite:** los subagentes (scout, worker, mermaid-maker, svg-maker) siguen con el modelo de su `agents/*.md`; sin credenciales de `openai-codex` no arrancan.
-- **Verifica:** `tests/modelos.test.mjs`: «modelo principal: una sesión nueva usa el de curso.config.local.json si tiene credenciales; una retomada o un --model, no» y «consumo: el verificador y los subagentes se anotan con su origen y no eligen modelo». La clase real con Claude arrancó con `modelo_principal` y nada más que lo eligiera.
+- **Verifica:** `tests/modelos.test.mjs`: «modelo principal: una sesión nueva usa el de curso.config.local.json si tiene credenciales; una retomada o un --model, no» y «consumo: el verificador y los subagentes se anotan con su origen y no eligen modelo». La clase real con Claude arrancó con `modelo_principal` y nada más que lo eligiera. Los dos tests del doctor de `entorno-auditoria.test.mjs` no dependen de la configuración local: en una máquina con modelo principal propio esperaban el del repo y fallaban.
+
+## Ingesta base más rápida — 2026-10-26
+
+Propuesta de luchoberaza en el mismo PR. Una condición: no cambia nada de lo que sale, sólo cuánto tarda.
+
+### DA50 — La ingesta base procesa varias páginas a la vez, según los hilos de cada máquina
+
+- **Contexto:** la ingesta procesaba una página por vez con un solo hilo, y después de cada página reescribía `calidad.json` y `estructura.json` enteros y `estado-ingesta.json` dos veces, cada uno con su fsync. En una PC de 12 hilos, sobre PDFs sintéticos:
+  - una página escaneada sin capa de texto tardaba 5,5 s en caliente;
+  - un PDF digital de 300 páginas tardaba 40 s, y más de la mitad era escritura: 21 s, contra 18,7 s de extracción;
+  - el mismo comando de OCR, con varias páginas a la vez, daba el mismo texto en 12 de 12 páginas.
+- **Decisión:**
+  - `ingestar.py procesar` (también el que lanza `iniciar`) usa `trabajadores_de_la_maquina()`: procesos para la mitad de los hilos (`os.process_cpu_count() // 2`, como mucho 61 por el límite de Windows) y, como cada OCR usa dos hilos, la mitad de eso en OCR a la vez (un semáforo). Con 12 hilos son 6 y 3; con 4 hilos, 2 y 1; con 2, una página por vez como antes.
+  - `pipeline.ejecutar` decide primero qué páginas van de la caché y manda las nuevas a un `ProcessPoolExecutor` (spawn, para no heredar el bloqueo ni el estado de MuPDF). Cada proceso abre el PDF por su cuenta, comprueba la huella y corre `analizar_pagina`, el mismo código de antes, ahora sin escribir nada. El proceso principal guarda los resultados en orden de página, como antes.
+  - `calidad.json`, `estructura.json` y `estado-ingesta.json` se guardan una vez por segundo como mucho, al terminar cada documento, al pausar y al cortarse. El registro de cada página en `cache/` se sigue guardando enseguida, y es lo que manda tras un corte (`recuperar_registro`).
+  - La ingesta corre con prioridad baja (`almacen.bajar_prioridad`: BELOW_NORMAL en Windows, `nice` 10 en POSIX), y sus procesos y el OCR la heredan.
+  - Si muere un proceso del grupo, esa página y las siguientes se procesan en el principal.
+  - Un extractor inyectado (los tests) va de a una, igual que `ejecutar` sin `trabajadores`.
+- **Por qué:** cada página se procesa sin depender de las otras, así que da lo mismo en qué orden y en qué proceso. Dejar media máquina libre mantiene usable la computadora, también la app, mientras se arma un curso. Se descartó todo lo que cambia el texto (otro motor de OCR, menos resolución) y lo que no ganaba nada: con `--output-type none` OCRmyPDF tardó 5,51 s contra 5,54.
+- **Resultado**, con los archivos idénticos a los de antes (606 en el PDF digital y 54 en el escaneado):
+
+  | 12 hilos, 6 y 3 trabajadores | Antes | Con DA50 |
+  |---|---|---|
+  | Windows 11, PDF digital de 300 páginas | 44,9 s | 12,9 s |
+  | Windows 11, escaneado de 24 páginas sin capa de texto | 178,8 s | 54,5 s |
+  | Ubuntu en WSL, PDF digital de 300 páginas | 61,4 s | 13,7 s |
+  | Ubuntu en WSL, escaneado de 24 páginas sin capa de texto | 105,2 s | 33,1 s |
+
+- **Límites:**
+  - Con un corte duro (kill -9, apagón), `calidad.json` puede quedar hasta un segundo atrás. Las páginas de ese segundo tienen su registro en `cache/` y la próxima corrida las recupera sin reextraer.
+  - Si se corta, los procesos que estaban con una página la terminan y salen solos: no escriben nada.
+  - Si muere un proceso del grupo, `ProcessPoolExecutor` cierra también los otros. El OCR que tenían en curso puede dejar su carpeta `pi-ingesta-ocr-*` en el temporal del sistema, como pasa hoy con un kill durante el OCR.
+  - Cuánto se gana depende de los hilos de cada máquina. Los tiempos se midieron con PDFs sintéticos; falta medir un libro real.
+  - La preparación con el modelo de visión, en la primera clase de cada tema, sigue de a una página.
+- **Verifica:** `tests/ingesta/test_paralelo.py`:
+  - «varias a la vez dejan los mismos archivos que de a una», con una página escaneada por el OCR real y un parcial;
+  - «una pausa a la vez no procesa de más y se reanuda igual»;
+  - «calidad se guarda una vez por segundo y entera al cortar»;
+  - «la mitad de los hilos y la mitad de eso para el OCR»;
+  - «la ingesta baja su prioridad y la heredan sus procesos».
+
+  Además, a mano: con un proceso del grupo matado en medio de una corrida, la ingesta terminó con los mismos archivos.
+
+## Grabaciones de clase — 2026-10-26
+
+Propuesta de luchoberaza, en un PR aparte. Las grabaciones de las clases pasan a ser material del curso, transcriptas en local.
+
+### DA51 — Las grabaciones de clase se transcriben en local, en tramos de cinco minutos que se citan al segundo
+
+- **Contexto:** learn sólo tomaba PDFs, y una clase grabada (video o audio) es a menudo el material que mejor sigue lo que se evalúa. Mandar el audio a un modelo cada vez gasta créditos y repite trabajo. Pasarlo a texto una sola vez, en la computadora, sigue la idea de la ingesta base: texto que se reusa en todas las clases.
+- **Decisión:**
+  - **Motor:** faster-whisper 1.2.1 en el venv de la ingesta, con el modelo `modelo_transcripcion` de `curso.config.json` (`large-v3-turbo` por defecto; una máquina puede pisarlo en `curso.config.local.json`). Se descarga la primera vez, unos 1,6 GB, a la caché de Hugging Face o a `carpeta_modelos` de `curso.config.local.json` (otro disco, por ejemplo). Precisión int8: en turbo da el mismo error que float16 (benchmark de faster-whisper, issue #1030). Va por tandas (`BatchedInferencePipeline`), con el filtro de voz Silero: los silencios y la música no llegan al modelo, que es donde Whisper inventa frases. Usa la mitad de los hilos de la máquina, como DA50, y una placa NVIDIA si están CUDA 12 y cuDNN 9; si no, el procesador. PyAV queda en 18.1.0: la 19 quitó `metadata_errors` de `av.open`, que faster-whisper 1.2.1 todavía pasa.
+  - **Tramos como páginas:** una grabación es un documento de tipo `bibliografia` u `otros` (no hay parciales grabados). Sus «páginas» son tramos de 5 minutos; un resto de menos de un minuto se suma al último. `paginas` es la cantidad de tramos, y los rangos del índice son tramos, así que la búsqueda, el índice, `leer_paginas`, el researcher y `/curso-check` funcionan sin cambios de fondo. `cursos.py inventario` da páginas o tramos, duración y SHA-256 de lo que hay en `_entrada/`.
+  - **Cortes en silencios:** el tramo k termina en el primer silencio desde el minuto 5·k, como mucho un minuto después; sin pausa, en el nominal y el tramo lo avisa. Así ningún tramo empieza antes de su minuto nominal, y su cita (`#t=` del inicio nominal) nunca cae después de lo que dice. Cortes e idioma, detectado una vez por grabación, quedan en `grabacion.json`: al reanudar, los tramos son los mismos.
+  - **Texto y citas:** cada párrafo dura hasta un minuto, se corta en las pausas y empieza con su hora (`[12:05] …`). `leer_paginas` le suma a cada párrafo el enlace a su segundo (`[[cursos/<curso>/fuentes/<tipo>/clase.mp4#t=725]]`) y avisa que es una transcripción automática: puede confundir nombres, términos y fórmulas dichas en voz alta, y lo escrito en el pizarrón no está. Los segmentos con poca confianza de Whisper (`avg_logprob` < −1 o compresión > 2,4) quedan como «audio dudoso» en los avisos del tramo.
+  - **Fuera de la visión:** ningún tramo va al modelo de visión. `ver_pagina` y `transcribir_paginas` rechazan una grabación con un mensaje claro, y la preparación por tema no la encola.
+  - **Ingesta:** cada tramo se guarda como una página, con caché por tramo y la misma pausa y reanudación. La barra muestra «Transcribiendo clase-3: tramo 2 de 9» y, la primera vez, la descarga del modelo.
+  - **App:** «Crear curso» y «Agregar material» aceptan grabaciones. Una cita `#t=` es una nota al margen con «Escuchar desde 12:05», que abre la grabación en su propia ventana, en ese segundo. La ventana pide el archivo por `learn-medio://<permiso>`: un protocolo propio que sólo sirve lo que abrió la ventana principal, con rangos de bytes para adelantar. Otra cita de la misma grabación salta en la ventana abierta.
+- **Por qué:** el texto se paga una vez, en la computadora, y después cuesta lo mismo que un PDF. Los tramos como páginas evitan un segundo sistema de material. Turbo es entre 2 y 3 veces más rápido que large-v3 con casi el mismo error (YouTube Commons: 13,4 % contra 13,2 %); las versiones «distil» son sólo inglés.
+- **Límites:**
+  - Obsidian abre el video desde el principio: `#t=` sólo lo respetan complementos como Video Notes. La app sí salta al segundo.
+  - Sin placa NVIDIA con CUDA, transcribir lleva tiempo: en una notebook Ryzen 5 4600H, con 6 hilos, unos 57 s por cada 108 s de audio.
+  - El audio decodificado entero queda en memoria mientras se transcribe: unos 230 MB por hora de grabación.
+  - Chromium no reproduce todos los .mkv o .mov. La transcripción no depende de eso, y la ventana lo avisa.
+  - Los rangos por tema de una grabación se asignan después de la ingesta, leyendo la transcripción.
+  - Sin memoria para cargar el modelo, cada tramo queda pendiente con el aviso «no hubo memoria para el modelo de transcripción», sin guardar un idioma que no se detectó; la próxima corrida lo reintenta.
+- **Verifica:**
+  - `tests/ingesta/test_grabaciones.py`, con un WAV sintético y un transcriptor falso:
+    - «tramos de cinco minutos y horas»;
+    - «cada corte cae en la primera pausa desde el inicio nominal»;
+    - «párrafos de hasta un minuto cortados en las pausas»;
+    - «una grabación se ingiere en tramos con su hora y su cita»;
+    - «una pausa se reanuda sin retranscribir ni recalcular los cortes»;
+    - «un tramo que falla queda pendiente y la próxima corrida lo reintenta»;
+    - «sin memoria para el modelo los tramos quedan pendientes sin inventar el idioma»;
+    - «una grabación no es ejercicio ni pasa por visión»;
+    - «el inventario da páginas y tramos y el curso valida los tramos».
+  - Con el modelo real, si está descargado y `LEARN_GRABACION_REAL` apunta a una grabación: «faster-whisper transcribe el primer tramo en español». Con 108 s de Wikipedia hablada en español (dominio público), detectó el idioma y transcribió bien; erró nombres propios («Nobel» por Novell).
+  - `tests/grabaciones.test.mjs`: la cita al segundo, `leer_paginas` con el enlace de cada párrafo y lo que falta, el dossier, las etiquetas, la barra y las anclas del researcher.
+  - `app/src/lib/texto.test.mjs`: «el momento de una grabación se reconoce aparte de una página».
+  - `app/e2e/grabacion.test.mjs`: la cita abre la grabación en su segundo, se puede adelantar (rangos de bytes), otra cita reusa la ventana, `learn-medio://` no sirve un permiso ajeno y la ventana se cierra con la principal.

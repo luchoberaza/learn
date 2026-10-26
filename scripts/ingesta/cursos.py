@@ -23,6 +23,7 @@ import yaml
 from almacen import ESPERA, PYTHON_TEXTO, Conflicto, cargar_config, atomico, bloquear, guardar_json, leer_json, proceso_vivo, ruta_segura, sha256
 from extraccion import normalizar
 from pipeline import TIPOS, cita, contenido_pagina, firma
+from transcripcion import TRAMO, cantidad_tramos, duracion, es_grabacion, hora
 
 SLUG = r"[a-z0-9]+(?:-[a-z0-9]+)*"
 
@@ -113,14 +114,21 @@ def validar(raiz: Path, slug: str, *, indice=None, contrato=None, origenes=None,
             if d.get("tipo") not in TIPOS or not isinstance(d.get("titulo"), str) or not d["titulo"].strip():
                 raise ValueError(f"Documento {d['id']}: tipo o título inválido.")
             relativa = d.get("archivo")
-            if not isinstance(relativa, str) or any(c in relativa for c in "#[]|\n\r") or Path(relativa).parts[:2] != ("fuentes", d["tipo"]) or Path(relativa).suffix.lower() != ".pdf":
-                raise ValueError(f"Documento {d['id']}: usá fuentes/<tipo>/archivo.pdf, compatible con citas.")
+            if not isinstance(relativa, str) or any(c in relativa for c in "#[]|\n\r") or Path(relativa).parts[:2] != ("fuentes", d["tipo"]) or (Path(relativa).suffix.lower() != ".pdf" and not es_grabacion(relativa)):
+                raise ValueError(f"Documento {d['id']}: usá fuentes/<tipo>/archivo.pdf (o una grabación), compatible con citas.")
             fuente = ruta_segura(raiz, relativa)
             if origenes and d["id"] in origenes:
                 fuente = origenes[d["id"]]
-            with pymupdf.open(fuente) as pdf:
-                if pdf.needs_pass or type(d.get("paginas")) is not int or d["paginas"] != len(pdf):
-                    raise ValueError(f"Documento {d['id']}: cantidad de páginas incorrecta o PDF protegido.")
+            if es_grabacion(relativa):
+                # Las «páginas» de una grabación son sus tramos de cinco minutos (DA51); el inventario de _entrada/ las cuenta.
+                if d["tipo"] not in {"bibliografia", "otros"}:
+                    raise ValueError(f"Documento {d['id']}: una grabación sólo puede ser bibliografía u otros.")
+                if type(d.get("paginas")) is not int or d["paginas"] != cantidad_tramos(duracion(fuente)):
+                    raise ValueError(f"Documento {d['id']}: en una grabación, paginas es la cantidad de tramos de {TRAMO // 60} minutos (cursos.py inventario la da).")
+            else:
+                with pymupdf.open(fuente) as pdf:
+                    if pdf.needs_pass or type(d.get("paginas")) is not int or d["paginas"] != len(pdf):
+                        raise ValueError(f"Documento {d['id']}: cantidad de páginas incorrecta o PDF protegido.")
             if d["tipo"] == "bibliografia" and d.get("prioridad") not in {"principal", "complementaria"}:
                 errores.append(f"Bibliografía {d['id']}: falta prioridad principal/complementaria.")
             if relativa in {x["archivo"] for x in documentos.values()}:
@@ -363,7 +371,7 @@ def revisar(vault: Path, slug: str, propuesta: Path, max_tokens=1500) -> tuple[d
         if not isinstance(origen, str) or Path(origen).parts[:1] != ("_entrada",):
             raise ValueError(f"Falta origen explícito en _entrada/ para {d['id']}.")
         fuente = ruta_segura(vault, origen)
-        if fuente.suffix.lower() != ".pdf" or sha256(fuente) != o.get("sha256"):
+        if (fuente.suffix.lower() != ".pdf" and not es_grabacion(fuente)) or sha256(fuente) != o.get("sha256"):
             raise Conflicto(f"Cambió la fuente de {d['id']} o su SHA-256 es incorrecto.")
         destino = ruta_segura(raiz, d["archivo"])
         if destino.exists() and sha256(destino) != o.get("sha256"):
@@ -504,6 +512,12 @@ def cruzar(vault: Path, slug: str, max_tokens=1500) -> dict:
     return {"curso": slug, "temas": temas}
 
 
+def rango_citado(slug: str, d: dict, rango: list) -> str:
+    """«[[…pdf#page=12]]–15», o en una grabación «tramos 2–4 desde [[…mp4#t=300]]» (DA51)."""
+    enlace = cita(f"cursos/{slug}/{d['archivo']}", rango[0])
+    return f"tramos {rango[0]}–{rango[1]} desde {enlace}" if es_grabacion(d["archivo"]) else f"{enlace}–{rango[1]}"
+
+
 def publicar_informe(vault: Path, slug: str, max_tokens=1500) -> dict:
     raiz = carpeta(vault, slug)
     resultado = validar(raiz, slug, max_tokens=max_tokens)
@@ -511,13 +525,13 @@ def publicar_informe(vault: Path, slug: str, max_tokens=1500) -> dict:
         raise ValueError("Corregí los errores de /curso-check antes de regenerar el informe: " + "; ".join(resultado["errores"]))
     indice = cargar_yaml(texto(raiz, "indice.yaml"))
     docs = {d["id"]: d for d in indice["documentos"]}
-    lineas = [f"# Informe de {slug}", "", "Borrador curado para revisión del usuario. Página PDF base 1; rangos inclusivos.",
+    lineas = [f"# Informe de {slug}", "", f"Borrador curado para revisión del usuario. Página PDF base 1 (en una grabación, tramo de {TRAMO // 60} minutos); rangos inclusivos.",
               "", "## Validación", "", f"- Estructura: {'válida' if resultado['ok'] else 'con errores'}.",
               f"- Listo para estudio sin avisos: {'sí' if resultado['listo_estudio'] else 'no'}."]
     lineas += [f"- {a}" for a in resultado["errores"] + resultado["avisos"]]
     lineas += ["", "## Tema → material", "", "| Unidad | Tema | Bibliografía (páginas PDF) | Ejercicios | Evaluaciones |", "|---|---|---|---|---|"]
     for t in indice["temas"]:
-        bib = "; ".join(f"{r['doc']} · {r['seccion']} · " + cita(f"cursos/{slug}/{docs[r['doc']]['archivo']}", r["paginas"][0]) + f"–{r['paginas'][1]}" for r in t.get("bibliografia", []) if r.get("doc") in docs and isinstance(r.get("paginas"), list) and len(r["paginas"]) == 2)
+        bib = "; ".join(f"{r['doc']} · {r['seccion']} · " + rango_citado(slug, docs[r["doc"]], r["paginas"]) for r in t.get("bibliografia", []) if r.get("doc") in docs and isinstance(r.get("paginas"), list) and len(r["paginas"]) == 2)
         refs = ["; ".join(r["doc"] + ": " + ", ".join(r.get("items", [])) for r in t.get(k, [])) or "Pendiente de asignar" for k in ["ejercicios", "evaluaciones"]]
         celdas = [str(t["unidad"]), t["nombre"], bib or "Sin material", *refs]
         lineas.append("| " + " | ".join(x.replace("|", "\\|").replace("\n", " ") for x in celdas) + " |")
@@ -528,8 +542,10 @@ def publicar_informe(vault: Path, slug: str, max_tokens=1500) -> dict:
     for d in docs.values():
         qs = leer_json(raiz, f"_procesado/{d['id']}/calidad.json", {"paginas": {}})["paginas"]
         rutas = Counter(q.get("ruta", "pendiente") for q in qs.values())
-        lineas += [f"### {d['titulo']}", "", f"- {d['paginas']} páginas totales; {len(qs)} con registro; {d['paginas'] - len(qs)} sin preparar.",
-                   "- Rutas sobre el PDF completo: " + ", ".join(f"{k}: {rutas[k]} ({100 * rutas[k] / d['paginas']:.1f} %)" for k in ["digital", "ocr", "vision", "manual", "pendiente"]) + ".", ""]
+        audio = es_grabacion(d["archivo"])
+        lineas += [f"### {d['titulo']}", "", f"- {d['paginas']} {f'tramos de {TRAMO // 60} minutos' if audio else 'páginas'} totales; {len(qs)} con registro; {d['paginas'] - len(qs)} sin preparar.",
+                   f"- Rutas sobre {'la grabación completa' if audio else 'el PDF completo'}: " + ", ".join(f"{k}: {rutas[k]} ({100 * rutas[k] / d['paginas']:.1f} %)"
+                   for k in (["transcripcion", "manual", "pendiente"] if audio else ["digital", "ocr", "vision", "manual", "pendiente"])) + ".", ""]
         for p, q in qs.items():
             if q.get("pendiente"):
                 lineas.append(f"- Dudosa: {cita(f'cursos/{slug}/{d['archivo']}', int(p))} — {'; '.join(q.get('avisos', []))}")
@@ -547,10 +563,32 @@ def publicar_informe(vault: Path, slug: str, max_tokens=1500) -> dict:
     return resultado
 
 
+def inventario(vault: Path) -> dict:
+    """Lo que hay en _entrada/ para armar o ampliar un curso, cada archivo con su SHA-256: los PDFs con sus páginas y las
+    grabaciones con su duración y sus tramos de cinco minutos, que son las «páginas» del índice (DA51)."""
+    entrada = ruta_segura(vault, "_entrada")
+    archivos = []
+    for f in sorted(entrada.iterdir()) if entrada.is_dir() else []:
+        if not f.is_file() or f.is_symlink() or (f.suffix.lower() != ".pdf" and not es_grabacion(f)):
+            continue
+        fila = {"archivo": f"_entrada/{f.name}", "sha256": sha256(f)}
+        try:
+            if es_grabacion(f):
+                segundos = duracion(f)
+                fila.update(clase="grabacion", duracion=hora(segundos), paginas=cantidad_tramos(segundos))
+            else:
+                with pymupdf.open(f) as pdf:
+                    fila.update(clase="pdf", paginas=len(pdf), protegido=pdf.needs_pass)
+        except (OSError, ValueError, RuntimeError) as error:
+            fila["error"] = str(error)
+        archivos.append(fila)
+    return {"archivos": archivos, "tramo_minutos": TRAMO // 60}
+
+
 def main():
     p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument("accion", choices=["validar", "revisar", "aplicar", "informe", "manifiesto", "cruzar"])
-    p.add_argument("--curso", required=True)
+    p.add_argument("accion", choices=["validar", "revisar", "aplicar", "informe", "manifiesto", "cruzar", "inventario"])
+    p.add_argument("--curso", help="todas las acciones menos inventario")
     p.add_argument("--vault", type=Path, default=Path.cwd())
     p.add_argument("--propuesta", type=Path)
     p.add_argument("--base")
@@ -560,6 +598,11 @@ def main():
     alcance.add_argument("--pendientes", action="store_true", help="manifiesto: sólo las páginas referidas sin transcripción (predeterminado)")
     args = p.parse_args()
     vault = args.vault.resolve()
+    if args.accion == "inventario":
+        print(json.dumps(inventario(vault), ensure_ascii=False, indent=2))
+        return 0
+    if not args.curso:
+        p.error("Indicá --curso.")
     config = cargar_config()
     limite = config["max_tokens_curso_md"]
     if args.accion in {"revisar", "aplicar"}:

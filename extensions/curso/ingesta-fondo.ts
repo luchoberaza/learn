@@ -5,7 +5,7 @@ import { vaultDir } from "../../scripts/lib/pi-sdk.mjs";
 import { vivo } from "./preparacion.ts";
 
 // La ingesta base que lanza la skill por bash (ingestar.py iniciar): barra sobre el editor y, al terminar, un turno del agente para seguir el armado.
-type Estado = { estado: string; pid?: number; solicitadas?: number; procesadas?: number; pendientes?: number; documento?: string | null; pagina?: number | null; error?: string; aviso?: string };
+type Estado = { estado: string; pid?: number; solicitadas?: number; procesadas?: number; pendientes?: number; documento?: string | null; pagina?: number | null; detalle?: string; error?: string; aviso?: string };
 type Inicio = { tipo: "inicio"; curso: string; salida: string };
 
 const FINALES = new Set(["completada", "completada_con_pendientes", "interrumpida", "error"]);
@@ -30,7 +30,8 @@ function cursoDe(vault: string, salida: string) {
 
 export function linea(curso: string, e: Estado) {
   const total = e.solicitadas || 0, hechas = Math.min(e.procesadas || 0, total), lleno = total ? Math.round(hechas / total * BARRA) : 0;
-  const donde = e.documento ? ` · ${e.documento}${e.pagina ? ` p. ${e.pagina}` : ""}` : "";
+  // Lo que tarda minutos y no es una página (bajar el modelo, transcribir un tramo de una grabación, DA51) viene en detalle.
+  const donde = e.detalle ? ` · ${e.detalle}` : e.documento ? ` · ${e.documento}${e.pagina ? ` p. ${e.pagina}` : ""}` : "";
   return `⏳ Ingesta de ${curso}  [${"█".repeat(lleno)}${"░".repeat(BARRA - lleno)}]  ${hechas}/${total} páginas · ${total ? Math.floor(hechas / total * 100) : 0}%${donde}`;
 }
 

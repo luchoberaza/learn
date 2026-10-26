@@ -5,9 +5,14 @@
 
 export type Enlace =
   | { tipo: "cita"; destino: string; curso: string; archivo: string; pagina: number; alias?: string }
+  // Un momento de una grabación de clase (DA51): «cursos/redes/fuentes/bibliografia/clase-3.mp4#t=725».
+  | { tipo: "momento"; destino: string; curso: string; archivo: string; segundo: number; alias?: string }
   | { tipo: "imagen"; destino: string; alias?: string }
   | { tipo: "pdf"; destino: string; pagina?: number; alias?: string }
   | { tipo: "nota"; destino: string; alias?: string };
+
+// Un video o audio de clase (DA51), que el curso cuenta en tramos de 5 minutos y cita con #t=.
+export const esGrabacion = (archivo: string) => /\.(mp4|mkv|webm|mov|m4v|mp3|m4a|wav|ogg|opus|flac|aac)$/i.test(archivo);
 
 // El contenido de un enlace de Obsidian, sin los corchetes: «cursos/redes/fuentes/bibliografia/kurose.pdf#page=54|Kurose».
 export function analizarEnlace(contenido: string): Enlace {
@@ -16,6 +21,8 @@ export function analizarEnlace(contenido: string): Enlace {
   const limpio = destino.trim();
   const cita = /^cursos\/([a-z0-9-]+)\/(fuentes\/.+\.pdf)#page=(\d+)$/i.exec(limpio);
   if (cita) return { tipo: "cita", destino: limpio, curso: cita[1], archivo: cita[2], pagina: Number(cita[3]), alias };
+  const grabada = /^cursos\/([a-z0-9-]+)\/(fuentes\/.+)#t=(\d+)$/i.exec(limpio);
+  if (grabada && esGrabacion(grabada[2])) return { tipo: "momento", destino: limpio, curso: grabada[1], archivo: grabada[2], segundo: Number(grabada[3]), alias };
   if (/\.(png|jpe?g|gif|webp|svg)$/i.test(limpio)) return { tipo: "imagen", destino: limpio, alias };
   const pdf = /^(.+\.pdf)(?:#page=(\d+))?$/i.exec(limpio);
   if (pdf) return { tipo: "pdf", destino: pdf[1], pagina: pdf[2] ? Number(pdf[2]) : undefined, alias };
@@ -23,7 +30,12 @@ export function analizarEnlace(contenido: string): Enlace {
 }
 
 // «kurose-ross-7.pdf» → «kurose ross 7», para nombrar una cita cuando el curso no dio el título.
-export const nombreDeArchivo = (ruta: string) => (ruta.split("/").pop() ?? ruta).replace(/\.pdf$/i, "").replace(/[-_]+/g, " ").trim();
+export const nombreDeArchivo = (ruta: string) => (ruta.split("/").pop() ?? ruta).replace(/\.[a-z0-9]{2,4}$/i, "").replace(/[-_]+/g, " ").trim();
+// 725 → «12:05»; 3725 → «1:02:05».
+export const hora = (segundos: number) => {
+  const s = Math.floor(segundos), mm = String(Math.floor(s % 3600 / 60)), ss = String(s % 60).padStart(2, "0");
+  return s >= 3600 ? `${Math.floor(s / 3600)}:${mm.padStart(2, "0")}:${ss}` : `${mm}:${ss}`;
+};
 
 // ---------- Plan del tema ----------
 
