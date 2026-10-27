@@ -28,7 +28,7 @@ La primera prueba de punta a punta con el modelo real (`gpt-6.1-sol`, una clase 
 
 **Grabaciones de clase (2026-10-26, propuesta en el mismo PR):** un video o audio de clase es material del curso, transcripto en local con faster-whisper en tramos de cinco minutos que el tutor cita al segundo y la app reproduce en su propia ventana. Con DA51, sin modelo ni red: suite Node 298 tests (Windows 276 en verde y 22 salteadas; Linux 285 y 13), Python 175 (Windows 169 OK y 6 salteadas; Linux 171 y 4), y la app con 40 tests y 11 de punta a punta en las dos. Con el modelo real, una grabación de 41 minutos se transcribió sin placa de video. Ver DA51.
 
-**Un tutor que no da nada por sabido (2026-10-26, en el mismo PR):** el diagnóstico vuelve a ser el de `teach`, sin tope, y arranca con la lista de lo que el alumno ya vio. Cada pregunta llega con la explicación que verifica: en una clase real el tutor la escribía en su razonamiento, que el alumno no ve. Un tema se encara como siempre, desde cero o para fortalecer lo flojo, y el alumno elige la mezcla de múltiple opción y desarrollo. Con DA52, sin modelo ni red: suite Node 317 tests (Windows 295 en verde y 22 salteadas; Linux 304 y 13) y la app con 45 tests y 12 de punta a punta en las dos; la suite Python no cambió. Con el modelo real, cinco clases con un alumno simulado sin bases. Pendiente: probarlo con `openai-codex`. Ver DA52.
+**Un tutor que no da nada por sabido (2026-10-26, en el mismo PR):** el diagnóstico vuelve a ser el de `teach`, sin tope, y arranca con la lista de lo que el alumno ya vio. Cada pregunta llega con la explicación que verifica: en una clase real el tutor la escribía en su razonamiento, que el alumno no ve. Un tema se encara como siempre, desde cero o para fortalecer lo flojo, y el alumno elige la mezcla de múltiple opción y desarrollo. Con DA52, sin modelo ni red: suite Node 317 tests (Windows 295 en verde y 22 salteadas; Linux 304 y 13) y la app con 45 tests y 12 de punta a punta en las dos; la suite Python no cambió. Con el modelo real, cinco clases con un alumno simulado sin bases. Ver DA52.
 
 ## D0.1 — Conservar el upstream y fijar los subagentes
 
@@ -911,7 +911,7 @@ Propuesta de luchoberaza en el mismo PR. Las grabaciones de las clases pasan a s
   - La pregunta de desarrollo no admite foto: los ejercicios largos siguen en el chat.
   - La guardia mide cantidad, no calidad: 120 caracteres que no explican nada la pasan.
   - Si el reintento llega sin explicación, la pregunta pasa igual.
-  - Probado con Claude Sonnet 5.5; con `openai-codex` (la cuenta del autor) todavía no.
+  - Con el modelo real se probó Claude Sonnet 5.5.
 - **Verifica:**
   - `tests/estudio-modos.test.mjs`:
     - «el modo va al final de /estudiar, también «desde cero» en dos palabras, y el resto es el tema»;

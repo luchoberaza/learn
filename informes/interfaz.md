@@ -199,7 +199,6 @@ Sin modelo ni red: el proveedor falso de pi-ai con guion hace de tutor. Windows 
 - **Subagentes:** decidir un fork fijado de `pi-interactive-subagents` o un PR a su autor, para no depender del parche local (DA45).
 - **Probar en Omarchy mismo** (Hyprland, Wayland). Linux se probó en Ubuntu sobre WSL.
 - **Medir DA50 con un libro real.** Los tiempos de la ingesta se midieron con PDFs sintéticos. La preparación con el modelo de visión sigue de a una página.
-- **DA52 con `openai-codex`:** el tutor que no da nada por sabido, la explicación antes de cada pregunta y la mezcla se probaron con Claude Sonnet 5.5, en cinco clases reales con un alumno simulado. Falta una clase con la cuenta del dueño.
 - **Grabaciones con placa NVIDIA (DA51):** el camino con CUDA no se probó, porque ninguna máquina de prueba tiene una. Sin placa, una grabación de 41 minutos llevó 23.
 - **Instaladores sin firma.** El AppImage pide `--no-sandbox` en distros que restringen los espacios de nombres (Ubuntu 24.04); en Arch no.
 - **`.pi/settings.json`** sigue con la entrada de ponytail del dueño. En una máquina sin ese paquete, pi intenta clonarlo al arrancar. Se propone moverla a su configuración personal; no se tocó.
