@@ -28,6 +28,7 @@ contextBridge.exposeInMainWorld("learn", {
   temporal: (nombre: string, base64: string) => ipcRenderer.invoke("archivos:temporal", nombre, base64),
   configLocal: (cambios?: Record<string, string | undefined>) => ipcRenderer.invoke("archivos:config-local", cambios),
   notaLibre: (tema: string) => ipcRenderer.invoke("archivos:nota-libre", tema),
+  eliminarCurso: (slug: string) => ipcRenderer.invoke("archivos:eliminar-curso", slug),
   abrirExterno: (url: string) => ipcRenderer.invoke("app:abrir-externo", url),
   abrirEnVault: (relativa: string) => ipcRenderer.invoke("app:abrir-en-vault", relativa),
   mostrarEnCarpeta: (relativa: string) => ipcRenderer.invoke("app:mostrar-en-carpeta", relativa),

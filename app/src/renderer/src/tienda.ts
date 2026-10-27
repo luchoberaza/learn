@@ -407,6 +407,28 @@ export async function importarSesion(ruta: string) {
   if (r && !r.cancelado) { avisar("Sesión importada."); navegar({ pantalla: "clase" }); }
 }
 
+// Eliminar un curso (DA53): el host dice si algo lo está usando; la confirmación cuenta qué se va y que queda en la papelera.
+export async function eliminarCurso(slug: string) {
+  const info = await pedir<{ notas: number; bloqueo?: string }>("curso-a-eliminar", { slug });
+  if (!info) return;
+  if (info.bloqueo) return avisar(info.bloqueo, "advertencia");
+  const c = leer().cursos.find(x => x.slug === slug), nombre = c?.nombre ?? slug;
+  const temas = c?.temas.filter(t => t.estado !== "sin_empezar").length ?? 0, docs = c?.documentos.length ?? 0;
+  const contenido = [
+    info.notas ? (info.notas === 1 ? "una nota de clase" : `${info.notas} notas de clase`) : "",
+    temas ? (temas === 1 ? "el progreso de un tema" : `el progreso de ${temas} temas`) : "",
+    docs ? (docs === 1 ? "la copia del único documento del material" : `las copias de los ${docs} documentos del material`) : "",
+  ].filter(Boolean);
+  const mensaje = `Va a la papelera la carpeta cursos/${slug}${contenido.length ? `, con:\n${contenido.map(x => `· ${x}`).join("\n")}` : "."}\n\nLos PDFs de _entrada/ no se tocan. Si te arrepentís, restaurá la carpeta desde la papelera.`;
+  if (!(await confirmarApp(`¿Eliminar ${nombre}?`, mensaje, "Eliminar el curso", "Cancelar", true))) return;
+  try { await window.learn.eliminarCurso(slug); } catch (e) { return error(e); }
+  // Volver atrás no puede llevar a una pantalla del curso que ya no está.
+  const delCurso = (r: Ruta) => ("slug" in r && r.slug === slug) || (r.pantalla === "nota" && r.ruta.startsWith(`cursos/${slug}/`));
+  cambiar(e => ({ ruta: { pantalla: "inicio" }, historial: e.historial.filter(r => !delCurso(r)) }));
+  await Promise.all([refrescarCursos(), refrescarInicio()]);
+  avisar(`Se eliminó ${nombre}. Quedó en la papelera, por si querés recuperarlo.`);
+}
+
 // ---------- Panel de página ----------
 
 export async function abrirPagina(args: { cita?: string; curso?: string; doc?: string; pagina?: number; origen: "cita" | "ver_pagina" | "tema" | "material" | "panel" }) {
@@ -432,13 +454,14 @@ export async function abrirPdf(pedido: { cita?: string; curso?: string; doc?: st
 
 // ---------- Diálogos propios de la app (no de pi) ----------
 
-type Confirmacion = { titulo: string; mensaje: string; si: string; no: string; resolver: (v: boolean) => void };
+// peligro: el botón de aceptar va en rojo y el foco arranca en cancelar, para que un Enter no borre nada.
+type Confirmacion = { titulo: string; mensaje: string; si: string; no: string; peligro: boolean; resolver: (v: boolean) => void };
 let confirmacionActual: Confirmacion | undefined;
 const oyentesConfirmacion = new Set<() => void>();
-export function confirmarApp(titulo: string, mensaje: string, si = "Sí", no = "Cancelar"): Promise<boolean> {
+export function confirmarApp(titulo: string, mensaje: string, si = "Sí", no = "Cancelar", peligro = false): Promise<boolean> {
   return new Promise(resolver => {
     confirmacionActual?.resolver(false);
-    confirmacionActual = { titulo, mensaje, si, no, resolver: v => { confirmacionActual = undefined; for (const f of oyentesConfirmacion) f(); resolver(v); } };
+    confirmacionActual = { titulo, mensaje, si, no, peligro, resolver: v => { confirmacionActual = undefined; for (const f of oyentesConfirmacion) f(); resolver(v); } };
     for (const f of oyentesConfirmacion) f();
   });
 }

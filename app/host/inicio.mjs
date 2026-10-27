@@ -307,6 +307,9 @@ async function arrancar() {
     instancias: () => clasesAbiertasPorOtros(vault),
     cursos: () => cursos.todos(),
     curso: ({ slug }) => cursos.resumen(slug),
+    // DA53: si se puede eliminar y qué se pierde; a la papelera lo manda el proceso principal.
+    "curso-a-eliminar": ({ slug }) => cursos.paraEliminar(slug, estadoSesion().curso?.curso),
+    "curso-eliminado": ({ slug }) => { cursos.olvidar(slug); return {}; },
     pagina: args => paginas.pedir(args),
     lectura: args => paginas.lectura(args),
     "imagen-render": ({ ruta }) => {

@@ -1,7 +1,7 @@
 // Curso (§9.2): el índice, el material, las notas de clase y el estado (validación, ingesta e informe).
 import { useEffect, useState } from "react";
 import { cuando, esGrabacion } from "../../../lib/texto.ts";
-import { abrirGrabacion, abrirPagina, abrirPdf, enviar, estudiar, navegar, pedir, refrescarCursos, usarTienda } from "../tienda";
+import { abrirGrabacion, abrirPagina, abrirPdf, eliminarCurso, enviar, estudiar, navegar, pedir, refrescarCursos, usarTienda } from "../tienda";
 import type { NotaResumen } from "../tipos";
 import { IndiceCurso } from "./Inicio";
 import { Prosa } from "./Prosa";
@@ -134,6 +134,7 @@ export function Curso({ slug, pestana: inicial }: { slug: string; pestana?: Pest
         <div className="acciones">
           {c.sugerido && <button className="boton" onClick={() => navegar({ pantalla: "tema", slug, id: c.sugerido! })}>Seguir por {c.temas.find(t => t.id === c.sugerido)?.nombre}</button>}
           <button className="fantasma" onClick={() => navegar({ pantalla: "crear-curso", slug })}>Agregar material</button>
+          <button className="fantasma peligro" onClick={() => void eliminarCurso(slug)}>Eliminar el curso</button>
         </div>
       </header>
       {c.error && <p className="aviso-bloque error">{c.error}</p>}

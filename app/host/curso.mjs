@@ -5,8 +5,11 @@
 import { execFile } from "node:child_process";
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
+import { clasesAbiertasPorOtros, procesoVivo } from "./instancia.mjs";
 
 const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+// Como VIEJO de preparacion.ts: un candado de preparación más viejo quedó de un pi que se cortó.
+const PREPARACION_VIEJA = 6 * 3600_000;
 
 export function crearCursos({ vault, piDir, pythonDelVenv, material, simulacro, progreso }) {
   const cache = new Map();
@@ -106,5 +109,23 @@ export function crearCursos({ vault, piDir, pythonDelVenv, material, simulacro, 
     return salida;
   }
 
-  return { listarSlugs, cargar, resumen, todos, olvidar: slug => cache.delete(slug) };
+  // Antes de eliminar un curso (DA53): cuántas notas de clase se van con él y si algo lo está usando. No se elimina con
+  // una clase abierta (en la app o en otro pi), con la ingesta leyendo los PDFs ni con la preparación de un tema escribiendo.
+  function paraEliminar(slug, claseActual) {
+    if (!SLUG.test(String(slug))) throw new Error("Curso inválido.");
+    const raiz = join(vault, "cursos", slug);
+    if (!existsSync(raiz)) throw new Error("Ese curso ya no está en el vault.");
+    const leer = f => { try { return JSON.parse(readFileSync(join(raiz, f), "utf8")); } catch { return undefined; } };
+    const ingesta = leer("_procesado/estado-ingesta.json"), candado = leer("_procesado/.preparacion.lock");
+    const bloqueo = claseActual === slug ? "Tenés una clase abierta de este curso: cerrala con /fin antes de eliminarlo."
+      : clasesAbiertasPorOtros(vault).some(c => c.curso === slug) ? "Hay una clase abierta de este curso en otra ventana de pi (por ejemplo, pi-learn en la terminal): cerrala con /fin antes de eliminarlo."
+      : ["iniciando", "en_curso"].includes(ingesta?.estado) && procesoVivo(ingesta.pid) ? "Se están leyendo los PDFs de este curso: esperá a que termine la ingesta."
+      : candado && procesoVivo(candado.pid) && Date.now() - candado.inicio < PREPARACION_VIEJA ? "pi está preparando un tema de este curso: esperá a que termine."
+      : undefined;
+    const sesiones = join(raiz, "sesiones");
+    const notas = existsSync(sesiones) ? readdirSync(sesiones).filter(n => n.endsWith(".md")).length : 0;
+    return { slug, notas, bloqueo };
+  }
+
+  return { listarSlugs, cargar, resumen, todos, paraEliminar, olvidar: slug => cache.delete(slug) };
 }

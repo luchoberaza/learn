@@ -47,6 +47,7 @@ a { color: var(--cite); }
 .boton { display: inline-flex; align-items: center; gap: 8px; background: var(--accent); color: var(--onaccent); font-weight: 600; font-size: 14.5px; padding: 9px 18px; border-radius: 8px; white-space: nowrap; }
 .boton:hover:not(:disabled) { filter: brightness(1.06); }
 .boton.chico { font-size: 13.5px; padding: 6px 13px; }
+.boton.peligro { background: var(--bad); }
 .fantasma { display: inline-flex; align-items: center; gap: 7px; border: 1px solid var(--line); color: var(--text); border-radius: 8px; padding: 6px 13px; font-size: 13.5px; white-space: nowrap; }
 .fantasma:hover:not(:disabled) { border-color: var(--deco); color: var(--strong); }
 .fantasma.peligro { color: var(--bad); }

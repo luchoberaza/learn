@@ -30,6 +30,8 @@ La primera prueba de punta a punta con el modelo real (`gpt-6.1-sol`, una clase 
 
 **Un tutor que no da nada por sabido (2026-10-26, en el mismo PR):** el diagnóstico vuelve a ser el de `teach`, sin tope, y arranca con la lista de lo que el alumno ya vio. Cada pregunta llega con la explicación que verifica: en una clase real el tutor la escribía en su razonamiento, que el alumno no ve. Un tema se encara como siempre, desde cero o para fortalecer lo flojo, y el alumno elige la mezcla de múltiple opción y desarrollo. Con DA52, sin modelo ni red: suite Node 317 tests (Windows 295 en verde y 22 salteadas; Linux 304 y 13) y la app con 45 tests y 12 de punta a punta en las dos; la suite Python no cambió. Con el modelo real, cinco clases con un alumno simulado sin bases. Ver DA52.
 
+**Eliminar un curso (2026-10-27, en el mismo PR):** en la app, desde la pantalla del curso. Va a la papelera del sistema, de donde se restaura, y no se elimina con una clase abierta, la ingesta o la preparación de un tema corriendo. Con DA53, una prueba de host y una de punta a punta nuevas, que pasan en Windows y en Linux, igual que la papelera real de cada uno. Ver DA53.
+
 ## D0.1 — Conservar el upstream y fijar los subagentes
 
 - `.pi/` es el clon del fork `santi-esquerre/learn`, rama `cursos`.
@@ -932,3 +934,40 @@ Propuesta de luchoberaza en el mismo PR. Las grabaciones de las clases pasan a s
     - Sin `clase` ni guardia: la explicación quedaba en el razonamiento.
     - Con la guardia sola: aparecieron explicaciones largas, que presentan cada término antes de usarlo («un router (una estación intermedia que lo reenvía)»), pero el modelo reintentaba sin texto (hasta 10 frenos en una clase) y terminaba preguntando por el chat.
     - Con `clase`: cada pregunta de verificación llegó con su explicación o su corrección visible («Corrección: a medias. Lo que escribiste…») y la guardia frenó una sola vez.
+
+## Eliminar un curso — 2026-10-27
+
+Propuesta de luchoberaza en el mismo PR. Un curso se elimina desde la app.
+
+### DA53 — Un curso se elimina desde su pantalla y va a la papelera del sistema
+
+- **Contexto:** ni la terminal ni la app tenían cómo quitar un curso. Había que borrar `cursos/<slug>/` a mano, y quedaban su manifiesto y su propuesta en `_procesado/` de la raíz. El alumno pidió que la opción aparezca al entrar al curso.
+- **Decisión:**
+  - **Dónde:** «Eliminar el curso», en rojo, en la cabecera de la pantalla del curso, junto a «Agregar material». Sólo en la app: la terminal queda igual.
+  - **A la papelera:** `cursos/<slug>/` entero (las copias del material, `_procesado/`, las notas de clase, el progreso y el índice) va a la papelera del sistema con `shell.trashItem` de Electron, y con él `_procesado/manifiesto-<slug>.json` y `_procesado/propuesta-<slug>.json`. Los PDFs de `_entrada/` no se tocan. Antes se cierran las ventanas de PDF y de grabación de ese curso.
+  - **Cuándo no:** el host (`paraEliminar`, en `app/host/curso.mjs`) no deja eliminar un curso con:
+    - una clase abierta del curso en la app;
+    - una clase abierta del curso en otro pi (su `.sesion-activa.json`, con el proceso vivo);
+    - la ingesta leyendo sus PDFs (`estado-ingesta.json` en curso, con el proceso vivo);
+    - la preparación de un tema escribiendo (`.preparacion.lock` vigente, con el mismo criterio de antigüedad que `preparacion.ts`).
+
+    Lo dice en un aviso, sin abrir la confirmación. El proceso principal vuelve a preguntarlo justo antes de eliminar.
+  - **La confirmación** cuenta qué se va: las notas de clase, el progreso de los temas empezados y las copias del material. El botón de aceptar va en rojo y el foco arranca en «Cancelar», así que un Enter no elimina nada (`confirmarApp(…, peligro)`).
+  - **Después:**
+    - se vuelve a Inicio, y «Volver» ya no lleva a las pantallas del curso;
+    - «Seguir donde quedaste» saltea las clases de un curso que ya no está y toma la anterior;
+    - una sesión de ese curso sigue en «Todas las sesiones»; si se abre, `sesion.ts` avisa que no pudo restaurar el curso.
+- **Por qué:** la papelera hace reversible un error sin que learn tenga una papelera propia. Frenar mientras corre la clase, la ingesta o la preparación evita que un proceso siga escribiendo en una carpeta que ya no está.
+- **Límites:**
+  - Sin papelera en el sistema (un Linux sin escritorio), no se elimina: el aviso lo dice y el curso queda como estaba.
+  - Una propuesta guardada con otro nombre queda en `_procesado/`. El manifiesto y la propuesta van a la papelera por separado, y sólo hacen falta para volver a ingerir o ampliar el curso, que los escriben de nuevo.
+  - El consumo del curso queda en `consumo.jsonl`: ya se gastó.
+- **Verifica:**
+  - `app/host/test/eliminar.test.mjs`: «cuenta las notas de clase y no deja con una clase abierta, la ingesta o la preparación corriendo». Un proceso muerto o un candado de más de 6 horas no frenan; un nombre inválido o un curso que no está, sí.
+  - `app/e2e/eliminar.test.mjs`, sobre una copia del curso de demostración, con la papelera en una carpeta temporal:
+    - con la clase abierta en la app y con otra en otro pi, avisa y no elimina;
+    - la confirmación cuenta las notas y los documentos, arranca en «Cancelar» y Enter cancela;
+    - al aceptar, el curso, su manifiesto y su propuesta van a la papelera, el curso sale de la barra lateral y se vuelve a Inicio;
+    - «Seguir donde quedaste» retoma la clase anterior, de otro curso. Sin el arreglo, la prueba falla.
+  - La papelera real, en Windows (la Papelera de reciclaje) y en Linux (`~/.local/share/Trash`), con una copia descartable del curso.
+  - `app/e2e/app.test.mjs`, «una clase entera…», pasa por la confirmación de «Terminar la clase» y por «Volvé a…» en Inicio.

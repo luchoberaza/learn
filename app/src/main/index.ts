@@ -1,6 +1,6 @@
 // Proceso principal: la ventana, el host de pi y lo que la interfaz no puede hacer sola (diálogos, archivos, instalar).
 import { app, BrowserWindow, clipboard, dialog, ipcMain, nativeTheme, shell } from "electron";
-import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { copyFileSync, cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, extname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -136,6 +136,23 @@ ipcMain.handle("archivos:config-local", (_e, cambios?: Record<string, string | u
   for (const [k, v] of Object.entries(cambios)) if (["modelo_vision", "modelo_researcher", "modelo_principal", "modelo_transcripcion", "carpeta_modelos", "ruta_tesseract", "preguntas"].includes(k)) { if (v) nuevo[k] = v; else delete nuevo[k]; }
   writeFileSync(archivo, `${JSON.stringify(nuevo, null, 2)}\n`);
   return { base, local: nuevo };
+});
+// Eliminar un curso (DA53): va a la papelera, para poder restaurarlo, con su manifiesto y su propuesta de _procesado/.
+// Antes, el host dice si algo lo está usando. En las pruebas de punta a punta la papelera es una carpeta temporal.
+async function aPapelera(ruta: string) {
+  const prueba = process.env.PI_LEARN_E2E_PAPELERA;
+  if (!prueba) return shell.trashItem(ruta);
+  cpSync(ruta, join(prueba, basename(ruta)), { recursive: true });
+  rmSync(ruta, { recursive: true });
+}
+ipcMain.handle("archivos:eliminar-curso", async (_e, slug: string) => {
+  const { bloqueo } = await host.pedir("curso-a-eliminar", { slug }) as { bloqueo?: string };
+  if (bloqueo) throw new Error(bloqueo);
+  visores.cerrarCurso(slug); reproductores?.cerrarCurso(slug);
+  try { await aPapelera(enVault(`cursos/${slug}`)); }
+  catch (e) { throw new Error(`No se pudo mandar el curso a la papelera (${(e as Error).message}); quedó como estaba.`); }
+  for (const f of [`_procesado/manifiesto-${slug}.json`, `_procesado/propuesta-${slug}.json`]) if (existsSync(enVault(f))) await aPapelera(enVault(f)).catch(() => {});
+  await host.pedir("curso-eliminado", { slug }).catch(() => {});
 });
 // Una nota vacía para una clase de tema libre (teach fuera de un curso), que md-log va a llenar.
 ipcMain.handle("archivos:nota-libre", (_e, tema: string) => {

@@ -247,6 +247,7 @@ Cualquier otro texto en inglés es un defecto: anotalo junto con la nota de la c
 | `pi-learn`, `pi-learn -c`, `pi-learn --resume` | abrir, seguir la última sesión, elegir una sesión | abrir la app; Inicio, «Seguir la clase»; «Todas las sesiones» |
 | `/curso-nuevo <slug>` | crear un curso desde `_entrada/` | «Crear curso», abajo a la izquierda |
 | `/curso-agregar <slug> [archivos…]` | sumar material a un curso | «Agregar material» en el curso |
+| (sólo en la app) | eliminar un curso; va a la papelera del sistema | «Eliminar el curso» en el curso |
 | `/curso-check <slug>` | validar el curso y ver la preparación de cada tema | pestaña Estado del curso, «Validar el curso» |
 | `/curso-estado <slug>` | ver cómo va la indexación | pestaña Estado; la barra de avance a la izquierda |
 | `/cursos` | listar cursos | la barra de la izquierda |

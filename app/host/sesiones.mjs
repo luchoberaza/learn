@@ -1,5 +1,7 @@
 // Sesiones de pi del vault: la lista para «Retomar» y lo que necesita «Seguir donde quedaste».
 // Una clase abierta es una sesión cuya última entrada `curso` no es null (no se cerró con /fin), como la restaura sesion.ts.
+import { existsSync } from "node:fs";
+import { join } from "node:path";
 
 const RECIENTES = 25;
 
@@ -47,7 +49,8 @@ export function crearSesiones({ sdk, vault }) {
     for (const s of (await listar()).slice(0, RECIENTES)) {
       let d;
       try { d = detalle(s.ruta); } catch { continue; }
-      if (!d.curso || d.curso.adHoc) continue;
+      // Una clase de un curso eliminado (DA53) ya no tiene dónde seguir.
+      if (!d.curso || d.curso.adHoc || !existsSync(join(vault, "cursos", d.curso.curso, "indice.yaml"))) continue;
       return { ...d, modificada: s.modificada, accion: d.abierta ? "retomar" : "estudiar" };
     }
     return undefined;

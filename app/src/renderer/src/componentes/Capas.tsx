@@ -127,7 +127,7 @@ function Confirmacion() {
   return (
     <Dialogo titulo={c.titulo} alCerrar={() => c.resolver(false)}>
       <p className="dialogo-texto">{c.mensaje}</p>
-      <div className="acciones fin"><button className="fantasma" onClick={() => c.resolver(false)}>{c.no}</button><button className="boton" autoFocus onClick={() => c.resolver(true)}>{c.si}</button></div>
+      <div className="acciones fin"><button className="fantasma" autoFocus={c.peligro} onClick={() => c.resolver(false)}>{c.no}</button><button className={c.peligro ? "boton peligro" : "boton"} autoFocus={!c.peligro} onClick={() => c.resolver(true)}>{c.si}</button></div>
     </Dialogo>
   );
 }

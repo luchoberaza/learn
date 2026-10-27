@@ -1,6 +1,6 @@
 # Interfaz de escritorio y Windows
 
-**Propuesta de luchoberaza para revisar en el PR.** La app vive en `app/`, el núcleo corre también en Windows y la terminal (`pi-learn`) queda igual. Las decisiones están en `DECISIONES.md` (DA39–DA52). Sin commits del lado del autor: el dueño del repo decide.
+**Propuesta de luchoberaza para revisar en el PR.** La app vive en `app/`, el núcleo corre también en Windows y la terminal (`pi-learn`) queda igual. Las decisiones están en `DECISIONES.md` (DA39–DA53). Sin commits del lado del autor: el dueño del repo decide.
 
 ## Qué trae
 
@@ -13,6 +13,7 @@
   - **Temporizador de foco** que nunca corta la clase.
   - **Paleta** (Ctrl+K) con todos los comandos de learn, de las skills y de pi.
   - **Más pantallas:** «Preparar la computadora» (el doctor con un botón por faltante), Crear curso y Agregar material, Tema libre, lector de notas y Ajustes.
+  - **Eliminar un curso** desde su pantalla: va a la papelera del sistema, de donde se restaura, y no se elimina con una clase abierta, la ingesta o la preparación corriendo (DA53).
   - **Subagentes** en paneles propios, sin tmux.
   - **Medidor de consumo:** en la barra lateral, lo que queda en la cuenta del modelo de la clase (dólares del plan, % de la ventana de la suscripción o pedidos gratis del día) y cuántas consultas alcanzan; un clic para cambiar de modelo, y un aviso con otro modelo cuando se está por acabar. En Ajustes → Consumo, el plan de cada cuenta, lo gastado por día y por modelo, y cuánto rinde cada modelo. Los modelos gratis (DeepSeek o Qwen por OpenRouter, NVIDIA y otros) se cuentan en pedidos y tokens (DA48).
 - **El modelo principal de cada máquina**, que ya no vuelve al del repo en cada sesión nueva, también en la terminal (DA49).
@@ -170,7 +171,8 @@ Sin modelo ni red: el proveedor falso de pi-ai con guion hace de tutor. Windows 
 - un subagente real en su panel;
 - el buscador del curso con un alias;
 - el medidor de consumo: lo que queda según el plan, la lista de modelos, la clase sumada al registro y al uso por modelo, y el plan cambiado desde Ajustes;
-- Cómo estudio y los modos (DA52): la mezcla guardada en `curso.config.local.json` sin tocar lo demás, «Desde cero» y «Fortalecer lo flojo» en el tema, y una clase desde cero con una pregunta de desarrollo. La respuesta esperada no se ve antes de responder, queda en la transcripción y en la nota, y el tutor falso comprueba que le llegan el modo, la mezcla y el conteo.
+- Cómo estudio y los modos (DA52): la mezcla guardada en `curso.config.local.json` sin tocar lo demás, «Desde cero» y «Fortalecer lo flojo» en el tema, y una clase desde cero con una pregunta de desarrollo. La respuesta esperada no se ve antes de responder, queda en la transcripción y en la nota, y el tutor falso comprueba que le llegan el modo, la mezcla y el conteo;
+- eliminar un curso (DA53): frena con una clase abierta en la app o en otro pi; la confirmación cuenta qué se va y arranca en «Cancelar»; el curso va a la papelera con su manifiesto y su propuesta, y «Seguir donde quedaste» retoma la clase anterior. Se agregó después de la tabla de arriba, que no se volvió a correr entera; esta prueba y la de la clase entera pasan en las dos, y la papelera real de cada sistema se probó aparte.
 
 **Errores encontrados al verificar, y corregidos:**
 

@@ -94,6 +94,8 @@ export function crearVisores(host: Host, aqui: string, principal: () => BrowserW
 
   return {
     cerrarTodas() { for (const { ventana } of abiertas.values()) if (!ventana.isDestroyed()) ventana.close(); abiertas.clear(); },
+    // Las de un curso que se elimina (DA53).
+    cerrarCurso(slug: string) { for (const [id, { ventana }] of abiertas) if (id.startsWith(`${slug}/`)) { if (!ventana.isDestroyed()) ventana.close(); abiertas.delete(id); } },
     // Noche, Día o el del sistema, como la ventana principal (el tema se cambia en Ajustes).
     tema(tema: string) { for (const { ventana } of abiertas.values()) if (!ventana.isDestroyed()) ventana.webContents.send("visor:tema", tema); },
   };

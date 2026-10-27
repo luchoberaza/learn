@@ -129,6 +129,7 @@ export interface ApiLearn {
   temporal(nombre: string, base64: string): Promise<string>;
   configLocal(cambios?: Record<string, string | undefined>): Promise<{ base: Record<string, unknown>; local: Record<string, string> }>;
   notaLibre(tema: string): Promise<string>;
+  eliminarCurso(slug: string): Promise<void>;
   abrirExterno(url: string): Promise<void>;
   abrirEnVault(relativa: string): Promise<string>;
   mostrarEnCarpeta(relativa: string): Promise<void>;

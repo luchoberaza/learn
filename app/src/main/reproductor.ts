@@ -104,6 +104,8 @@ export function crearReproductores(aqui: string, principal: () => BrowserWindow 
 
   return {
     cerrarTodas() { for (const { ventana } of abiertas.values()) if (!ventana.isDestroyed()) ventana.close(); abiertas.clear(); },
+    // Las de un curso que se elimina (DA53).
+    cerrarCurso(slug: string) { for (const [id, { ventana }] of abiertas) if (id.startsWith(`${slug}/`)) { if (!ventana.isDestroyed()) ventana.close(); abiertas.delete(id); } },
     tema(tema: string) { for (const { ventana } of abiertas.values()) if (!ventana.isDestroyed()) ventana.webContents.send("reproductor:tema", tema); },
   };
 }
