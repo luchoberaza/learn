@@ -154,6 +154,11 @@ details.herramienta .salida { margin: 6px 0 0 20px; }
 .quiz .boton { margin-top: 14px; }
 .otra { margin-top: 10px; }
 .otra .campo, .respuesta-libre .campo { font-size: 15px; }
+/* Pregunta de desarrollo (DA52): lo que escribió el alumno y, después, la respuesta esperada. */
+.quiz.desarrollo .respuesta-libre textarea { min-height: 120px; font-family: var(--leer); font-size: 16px; }
+.tu-respuesta { font-family: var(--leer); font-size: 16px; line-height: 1.6; color: var(--strong); white-space: pre-wrap; background: var(--wash); border-radius: 7px; padding: 9px 12px; margin: 2px 0 4px; }
+.tu-respuesta.nose { font-family: var(--ui); font-size: 14.5px; color: var(--muted); background: none; padding: 0; }
+.veredicto.esperada > b { color: var(--muted); }
 .pregunta-resuelta { border-color: var(--line); }
 .pregunta-resuelta .respuesta { display: inline-block; color: var(--accent); font-weight: 600; margin-right: 12px; }
 .pregunta-resuelta .qtexto { font-size: 16px; }

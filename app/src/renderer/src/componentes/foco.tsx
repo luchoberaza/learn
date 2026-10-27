@@ -32,7 +32,7 @@ setInterval(() => {
   const r = estado.reloj;
   if (!r || r.estado === "detenido") return;
   const e = leer();
-  const preguntaAbierta = e.pedidos.some(p => !p.cerrado && (p.clase === "quiz" || p.clase === "ask"));
+  const preguntaAbierta = e.pedidos.some(p => !p.cerrado && (p.clase === "quiz" || p.clase === "desarrollo" || p.clase === "ask"));
   procesar(F.tic(r, ajustes(), Date.now(), { preguntaAbierta, simulacro: !!e.sesion.simulacro }));
 }, 1000);
 

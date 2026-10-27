@@ -10,7 +10,8 @@ interface Item { id: string; paginas: number[]; enunciado: string; solucion?: { 
 export interface DatosCurso { curso: string; nombre?: string; contrato: string; documentos: Documento[]; temas: Tema[]; items: Record<string, Item[]>;
   progreso: { temas: Record<string, { estado?: string; borde?: unknown; proximo_paso?: string; objetivo?: string; plan?: string; ejercicios?: unknown; reservado?: unknown }>; historial?: unknown[] };
   avisos: string[]; validacion?: { errores: string[]; avisos: string[]; pendientes: unknown[] } }
-export interface Activo { curso: string; tema: string; log: string; adHoc?: Tema }
+// modo: cómo se encara el tema en esta clase (DA52); sin él, «Seguir donde quedé».
+export interface Activo { curso: string; tema: string; log: string; adHoc?: Tema; modo?: "desde-cero" | "fortalecer" }
 export type Ref = { doc: string; id: string };
 // Rutas relativas del vault siempre con /: así se guardan en el progreso y en las entradas de la sesión, y así las comparan las extensiones.
 export const aBarra = (ruta: string) => ruta.split(sep).join("/");

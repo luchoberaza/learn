@@ -138,3 +138,7 @@
 .tabla-consumo td small { display: block; color: var(--muted); font-size: 12px; }
 .tabla-consumo tr.actual td:first-child { color: var(--strong); font-weight: 600; }
 .tabla-consumo td:last-child, .tabla-consumo th:last-child { text-align: right; padding-right: 0; }
+
+/* Otras formas de encarar un tema (DA52), debajo del botón principal. */
+.modos-tema { display: grid; gap: 8px; margin: 0 0 34px; }
+.modo-tema { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; font-size: 13.5px; }

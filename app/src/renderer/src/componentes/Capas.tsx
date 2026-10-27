@@ -74,7 +74,7 @@ function ultimoDiff(items: Item[]) {
   return undefined;
 }
 
-function DialogoPedido({ p }: { p: Exclude<Pedido, { clase: "quiz" | "ask" }> }) {
+function DialogoPedido({ p }: { p: Exclude<Pedido, { clase: "quiz" | "desarrollo" | "ask" }> }) {
   const [valor, setValor] = useState(p.clase === "editor" ? p.prefill ?? "" : "");
   const items = usarTienda(e => e.items);
   const cancelar = () => void responder(p.id, p.clase === "confirm" ? false : undefined);
@@ -366,7 +366,7 @@ function PantallaPi() {
 
 export function Capas() {
   const pedidos = usarTienda(e => e.pedidos);
-  const dialogo = pedidos.find(p => p.clase !== "quiz" && p.clase !== "ask") as Exclude<Pedido, { clase: "quiz" | "ask" }> | undefined;
+  const dialogo = pedidos.find(p => p.clase !== "quiz" && p.clase !== "desarrollo" && p.clase !== "ask") as Exclude<Pedido, { clase: "quiz" | "desarrollo" | "ask" }> | undefined;
   return (
     <>
       {dialogo && <DialogoPedido key={dialogo.id} p={dialogo} />}

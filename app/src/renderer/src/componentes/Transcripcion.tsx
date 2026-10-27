@@ -1,7 +1,7 @@
 // Cada cosa que pasa en la clase, dibujada según lo que es. Las tools del curso son una línea en español (nunca sus
 // argumentos ni resultados); las generales, una línea plegable con el comando y su salida, como en pi.
 import { memo, useEffect, useState } from "react";
-import type { Item, ItemPregunta, ItemQuiz } from "../tipos";
+import type { Item, ItemDesarrollo, ItemPregunta, ItemQuiz } from "../tipos";
 import { abrirPagina, enviar } from "../tienda";
 import { imagenRender, Prosa } from "./Prosa";
 import { analizarEnlace } from "../../../lib/texto.ts";
@@ -40,6 +40,11 @@ function Herramienta({ item }: { item: Extract<Item, { tipo: "herramienta" }> })
   );
 }
 
+// La explicación que trajo la pregunta (DA52): el alumno la lee como texto del tutor, justo antes de la pregunta.
+export function ExplicacionPrevia({ texto }: { texto?: string }) {
+  return texto ? <div className="tutor explicacion-previa"><Prosa texto={texto} terminado /></div> : null;
+}
+
 export function QuizResuelto({ item }: { item: ItemQuiz }) {
   if (item.estado !== "respondido" || !item.resultado) {
     return (
@@ -52,6 +57,8 @@ export function QuizResuelto({ item }: { item: ItemQuiz }) {
   }
   const r = item.resultado;
   return (
+    <>
+    <ExplicacionPrevia texto={item.explicacionPrevia} />
     <div className="quiz">
       <p className="qmeta">{item.modo === "multi-select" ? "Para comprobar, varias respuestas" : "Para comprobar"}</p>
       <p className="qtexto">{item.pregunta}</p>
@@ -66,6 +73,40 @@ export function QuizResuelto({ item }: { item: ItemQuiz }) {
       {r.nota && <p className="tu-nota">Tu nota: {r.nota}</p>}
       <div className="veredicto"><b className={r.correcto ? "bien" : "mal"}>{r.correcto ? "Bien." : r.noSe ? "Está bien no saber." : "No era esa."}</b>{r.explicacion && <Prosa texto={r.explicacion} margen={false} clase="veredicto-texto" />}</div>
     </div>
+    </>
+  );
+}
+
+// Lo que escribió el alumno (o «No sé») y la respuesta esperada, en la tarjeta viva y en la transcripción.
+export function RespuestaEscrita({ r }: { r: { noSe: boolean; texto?: string; esperada?: string } }) {
+  return (
+    <>
+      {r.noSe ? <p className="tu-respuesta nose">Respondiste: No sé</p> : <p className="tu-respuesta">{r.texto}</p>}
+      {r.esperada && <div className="veredicto esperada"><b>Respuesta esperada.</b><Prosa texto={r.esperada} margen={false} clase="veredicto-texto" /></div>}
+    </>
+  );
+}
+
+export function DesarrolloResuelto({ item }: { item: ItemDesarrollo }) {
+  if (item.estado !== "respondido" || !item.resultado) {
+    return (
+      <div className="quiz cerrado">
+        <p className="qmeta">{item.estado === "descartado" ? "Pregunta descartada" : "Pregunta cerrada sin respuesta"}</p>
+        <p className="qtexto">{item.pregunta}</p>
+        {item.mensaje && <p className="ayuda">{item.mensaje}</p>}
+      </div>
+    );
+  }
+  return (
+    <>
+    <ExplicacionPrevia texto={item.explicacionPrevia} />
+    <div className="quiz desarrollo">
+      <p className="qmeta">Para comprobar, con tus palabras</p>
+      <p className="qtexto">{item.pregunta}</p>
+      {item.contexto && <p className="qcontexto">{item.contexto}</p>}
+      <RespuestaEscrita r={item.resultado} />
+    </div>
+    </>
   );
 }
 
@@ -110,6 +151,7 @@ export const ItemTranscripcion = memo(function ItemTranscripcion({ item, ultimo 
     case "tutor": return <div className="tutor"><Prosa texto={item.texto} terminado={!item.enCurso} /></div>;
     case "herramienta": return <Herramienta item={item} />;
     case "quiz": return <QuizResuelto item={item} />;
+    case "desarrollo": return <DesarrolloResuelto item={item} />;
     case "pregunta": return <PreguntaResuelta item={item} />;
     case "sistema": return item.clase === "diff" ? <div className="sistema"><p className="apagado">Cambios propuestos al curso</p><Diferencias texto={item.texto} /></div> : <div className="sistema"><pre>{item.texto}</pre></div>;
     case "pagina": return <PaginaMostrada item={item} />;

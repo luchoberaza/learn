@@ -6,7 +6,7 @@ import { mmss } from "../../../lib/foco.ts";
 import { cambiar, confirmarApp, copiarUltimo, enviar, navegar, nuevaSesion, pedir, usarTienda, avisar } from "../tienda";
 import type { ResumenCurso } from "../tipos";
 import { ItemTranscripcion } from "./Transcripcion";
-import { TarjetaPregunta, TarjetaQuiz } from "./Tarjetas";
+import { TarjetaDesarrollo, TarjetaPregunta, TarjetaQuiz } from "./Tarjetas";
 import { Compositor } from "./Compositor";
 import { AvisoFoco, IndicadorFoco, LineaFoco } from "./foco";
 import { Menu } from "./Iconos";
@@ -98,7 +98,7 @@ function Trabajando() {
   const reintento = usarTienda(e => e.estados.reintento);
   const escribiendo = usarTienda(e => { const u = e.items[e.items.length - 1]; return u?.tipo === "tutor" && u.enCurso; });
   // Con una pregunta abierta el tutor espera al alumno: no está «trabajando».
-  const esperandote = usarTienda(e => e.pedidos.some(p => !p.cerrado && (p.clase === "quiz" || p.clase === "ask")));
+  const esperandote = usarTienda(e => e.pedidos.some(p => !p.cerrado && (p.clase === "quiz" || p.clase === "desarrollo" || p.clase === "ask")));
   const texto = reintento ?? compactando ?? (trabajando && !escribiendo && !esperandote ? (pensando ? "El tutor está pensando…" : etiqueta && etiqueta !== "Trabajando…" ? etiqueta : "El tutor está trabajando…") : undefined);
   if (!texto) return null;
   return <p className="trabajando" aria-live="polite"><span className="puntitos" aria-hidden><i /><i /><i /></span>{texto}</p>;
@@ -125,8 +125,8 @@ export function Clase() {
   const lectura = useRef<HTMLDivElement>(null);
   const pegado = useRef(true);
   const [abajo, setAbajo] = useState(true);
-  const enLinea = pedidos.filter(p => p.clase === "quiz" || p.clase === "ask");
-  const abierta = enLinea.find(p => !p.cerrado && !(p.clase === "quiz" && p.correccion));
+  const enLinea = pedidos.filter(p => p.clase === "quiz" || p.clase === "desarrollo" || p.clase === "ask");
+  const abierta = enLinea.find(p => !p.cerrado && !((p.clase === "quiz" || p.clase === "desarrollo") && p.correccion));
 
   // Se queda abajo mientras llega texto, salvo que el alumno haya subido a releer.
   const alDesplazar = () => {
@@ -150,13 +150,13 @@ export function Clase() {
           <Plan curso={curso} />
           {items.length === 0 && !enLinea.length && <Vacia />}
           {items.map((it, i) => <div className="bloque" key={`${it.tipo}-${it.id}`}><ItemTranscripcion item={it} ultimo={i === items.length - 1} /></div>)}
-          {enLinea.map(p => <div className="bloque" key={`pedido-${p.id}`}>{p.clase === "quiz" ? <TarjetaQuiz p={p} /> : p.clase === "ask" ? <TarjetaPregunta p={p} /> : null}</div>)}
+          {enLinea.map(p => <div className="bloque" key={`pedido-${p.id}`}>{p.clase === "quiz" ? <TarjetaQuiz p={p} /> : p.clase === "desarrollo" ? <TarjetaDesarrollo p={p} /> : p.clase === "ask" ? <TarjetaPregunta p={p} /> : null}</div>)}
           <Trabajando />
         </div>
       </div>
       {!abajo && <button className="ir-al-final fantasma" onClick={() => { const el = lectura.current; if (el) { pegado.current = true; el.scrollTo({ top: el.scrollHeight, behavior: "smooth" }); } }}>Ir al final</button>}
       <AvisoFoco />
-      <Compositor bloqueado={abierta ? (abierta.clase === "quiz" ? "Respondé la pregunta de arriba, o tocá «Prefiero responder con mis palabras»." : "Respondé arriba, o tocá «Prefiero responder con mis palabras».") : undefined} />
+      <Compositor bloqueado={abierta ? (abierta.clase === "quiz" ? "Respondé la pregunta de arriba, o tocá «Prefiero responder con mis palabras»." : abierta.clase === "desarrollo" ? "Escribí tu respuesta arriba, o tocá «Prefiero responder en el chat»." : "Respondé arriba, o tocá «Prefiero responder con mis palabras».") : undefined} />
     </main>
   );
 }

@@ -48,6 +48,8 @@ async function arrancar() {
   const opcional = async ruta => { try { return await importar(join(piDir, ruta)); } catch { return undefined; } };
   const [simulacro, progreso] = [await opcional("extensions/curso/simulacro.ts"), await opcional("extensions/curso/progreso.ts")];
   const libConsumo = await opcional("scripts/lib/consumo.mjs");
+  // Modos de estudio y mezcla de preguntas (DA52): un .pi anterior no los tiene y la app no los ofrece.
+  const estudio = await opcional("extensions/comun/estudio.ts");
 
   // Confianza del proyecto, como el aviso de pi la primera vez; queda guardada con su mecanismo (trust.json).
   const confianza = new sdk.ProjectTrustStore(piSdk.agentDir);
@@ -371,6 +373,11 @@ async function arrancar() {
     "ajustes-pi": ({ cambios }) => ajustesPi(cambios),
     "estadisticas-sesion": () => ({ ...estadoSesion(), estadisticas: s().getSessionStats(), contexto: s().getContextUsage() }),
     comandos: () => listarComandos(),
+    estudio: () => estudio && {
+      modos: estudio.MODOS.map(({ id, nombre, descripcion }) => ({ id, nombre, descripcion })),
+      mezclas: estudio.MEZCLAS.map(({ id, nombre, descripcion }) => ({ id, nombre, descripcion })),
+      preguntas: estudio.mezcla(piSdk.leerConfigLocal(piDir).preguntas).id,
+    },
     completar: ({ comando, prefijo }) => completar(comando, prefijo),
     modelos,
     "elegir-modelo": async ({ proveedor, id }) => { const m = s().modelRuntime.getModel(proveedor, id); if (!m) throw new Error("Modelo no encontrado."); await s().setModel(m); return estadoSesion(); },

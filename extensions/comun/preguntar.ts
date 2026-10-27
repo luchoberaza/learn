@@ -14,6 +14,8 @@ export interface PedidoQuiz {
 	opciones: { indice: number; label: string; description?: string }[];
 	correctas: number[];
 	explicacion?: string;
+	// La explicación que la pregunta verifica (DA52): se muestra antes de la pregunta, como texto del tutor.
+	clase?: string;
 }
 
 export interface PedidoAsk {
@@ -25,13 +27,25 @@ export interface PedidoAsk {
 	etiquetaOtra: string;
 }
 
+// pregunta_desarrollo (DA52): se responde escribiendo. La respuesta esperada se muestra recién después de responder.
+export interface PedidoDesarrollo {
+	tipo: "desarrollo";
+	pregunta: string;
+	contexto?: string;
+	esperada: string;
+	clase?: string;
+}
+
 // noSe: eligió «No sé»; elegidas: índices de opciones (vacío con noSe); nota: el campo opcional, si escribió algo.
 export interface RespuestaQuiz { noSe: boolean; elegidas: number[]; nota?: string }
 export type RespuestaAsk = { tipo: "option"; indice: number } | { tipo: "other"; texto: string } | { tipo: "text"; texto: string };
+// texto: lo que escribió (vacío con noSe).
+export interface RespuestaDesarrollo { noSe: boolean; texto?: string }
 
 type Preguntar = {
 	(pedido: PedidoQuiz, signal?: AbortSignal): Promise<RespuestaQuiz | null>;
 	(pedido: PedidoAsk, signal?: AbortSignal): Promise<RespuestaAsk[] | null>;
+	(pedido: PedidoDesarrollo, signal?: AbortSignal): Promise<RespuestaDesarrollo | null>;
 };
 
 // La función de la interfaz gráfica, o undefined si no la hay (terminal, RPC, pruebas sin app).

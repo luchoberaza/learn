@@ -2,7 +2,7 @@ import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-a
 import { mkdirSync, openSync, closeSync, readdirSync, readFileSync, renameSync, rmSync, statfsSync, statSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, join, relative, resolve, sep } from "node:path";
-import { piDir, vaultDir, pythonDelVenv, leerConfig } from "../../scripts/lib/pi-sdk.mjs";
+import { piDir, vaultDir, pythonDelVenv, leerConfig, leerConfigLocal, guardarConfigLocal } from "../../scripts/lib/pi-sdk.mjs";
 import { normalizar } from "../../scripts/ingesta/bm25.ts";
 import { aBarra, buscarMaterial, cita, copiaEnPagina, documento, dossier, esGrabacion, esSlug, hora, leer, leerItems, leerPaginas, ordenarTemas, paginasReservadas, reservados,
   resolverTemas, rutaSegura, TRAMO, type Activo, type DatosCurso, type Ref, type Tema } from "./material.ts";
@@ -10,10 +10,16 @@ import { aBarra, buscarMaterial, cita, copiaEnPagina, documento, dossier, esGrab
 import { verificacionPrevia } from "./researcher.ts";
 import { elegir } from "../comun/elegir.ts";
 import { cortarTurno } from "../comun/corte.ts";
+import { MEZCLAS, MODOS, lineaConteo, mezcla, modoDeArgs, seccionClase } from "../comun/estudio.ts";
 
 type Config = { max_tokens_dossier: number; max_tokens_curso_md: number };
 // Tools del estudio; read queda para las fotos del alumno, que pi 1.4.0 pega como ruta de texto (interactive-mode.js:2477-2483).
-const ESTUDIO = ["quiz", "ask_user_question", "buscar_material", "leer_paginas", "leer_items", "ver_pagina", "registrar_progreso", "leer_sesion_anterior", "investigar_tema", "read"];
+const ESTUDIO = ["quiz", "pregunta_desarrollo", "ask_user_question", "buscar_material", "leer_paginas", "leer_items", "ver_pagina", "registrar_progreso", "leer_sesion_anterior", "investigar_tema", "read"];
+// Las preguntas con respuesta correcta, que cuentan para la mezcla (DA52); con ask_user_question, las que abren un popup.
+const CON_RESPUESTA = ["quiz", "pregunta_desarrollo"];
+const POPUPS = [...CON_RESPUESTA, "ask_user_question"];
+// Una clase de tema libre (la skill teach fuera de un curso) también sigue la mezcla de preguntas.
+const esTeach = (e: any) => e?.type === "message" && e.message?.role === "user" && JSON.stringify(e.message.content ?? "").includes('<skill name=\\"teach\\"');
 const COPIA = "Material desde la última carga";
 // pi.exec devuelve code 0 cuando mata al proceso por tiempo (exec.js:63): manda killed. Un traceback no es un mensaje para el alumno.
 export function fallaPython(r: { stderr: string; killed: boolean }) {
@@ -22,7 +28,7 @@ export function fallaPython(r: { stderr: string; killed: boolean }) {
     : causa && !/^(Traceback|[\w.]+(Error|Exception)\b)/.test(causa) ? causa : "El entorno de ingesta (Python) falló: corré .pi/scripts/doctor y reintentá.";
 }
 // Una sesión real tiene alguna respuesta del alumno: un mensaje propio (no las órdenes que antes se anotaban como suyas) o un quiz o pregunta respondidos.
-const conRespuestas = (t: string) => /^> \[!quote\] VOS\n\n(?!Empecemos con «|Terminemos (la|esta) sesión)|^> \[!(success|failure)\] Quiz|^> \[!question\] Quiz — No sé|^> \[!example\] Respuesta\n> (?!\(sin respuesta\))/m.test(t)
+const conRespuestas = (t: string) => /^> \[!quote\] VOS\n\n(?!Empecemos con «|Terminemos (la|esta) sesión)|^> \[!(success|failure)\] Quiz|^> \[!question\] (Quiz|Desarrollo) — No sé|^> \[!example\] (Respuesta|Desarrollo — tu respuesta)\n> (?!\(sin respuesta\))/m.test(t)
   && !/Prueba técnica|Ensayo técnico|SINTÉTICO/.test(t);
 const cerrado = (d: DatosCurso, log: string) => (d.progreso.historial || []).some(h => typeof h === "object" && h !== null && "log" in h && basename(String(h.log)) === basename(log) && (!("cierre" in h) || h.cierre !== false));
 const vivo = (pid: unknown) => { try { return Number.isInteger(pid) && (pid as number) > 0 && process.kill(pid as number, 0); } catch (e) { return (e as NodeJS.ErrnoException).code === "EPERM"; } };
@@ -127,6 +133,7 @@ export function registrarSesion(pi: ExtensionAPI, vault = vaultDir, recursos = p
     try {
       const a = estado as Activo & { nota?: string };
       if (!esSlug(a.curso) || !esSlug(a.tema) || [a.log, a.nota ?? a.log].some(l => typeof l !== "string" || !l.startsWith(`cursos/${a.curso}/sesiones/`) || !l.endsWith(".md"))) throw new Error("Estado de curso inválido.");
+      if (a.modo !== undefined && a.modo !== "desde-cero" && a.modo !== "fortalecer") delete a.modo;
       for (const l of [a.log, a.nota ?? a.log]) rutaSegura(vault, l);
       const d = await cargar(a.curso, false, undefined, 30000);
       for (const aviso of d.avisos.filter(a => a.startsWith("Progreso") || a.startsWith(COPIA))) ctx.ui.notify(aviso, "warning");
@@ -151,12 +158,16 @@ export function registrarSesion(pi: ExtensionAPI, vault = vaultDir, recursos = p
   }
   pi.on("session_start", (_event, ctx) => restaurar(ctx, true));
   pi.on("session_tree", (_event, ctx) => restaurar(ctx, false));
+  // La mezcla se lee en cada turno: /preguntas o Ajustes en la app valen desde la pregunta siguiente.
+  const preferencia = () => { try { return leerConfigLocal(recursos).preguntas; } catch { return undefined; } };
   pi.on("before_agent_start", (event, ctx) => {
     if (!activo) {
-      for (const clave of ["teach", "modo_curso", "curso"]) delete event.systemPromptOptions.sections[clave];
+      for (const clave of ["teach", "modo_curso", "curso", "clase"]) delete event.systemPromptOptions.sections[clave];
+      if (ctx?.sessionManager.getBranch().some(esTeach)) event.systemPromptOptions.sections.clase = seccionClase(undefined, preferencia());
       return;
     }
-    Object.assign(event.systemPromptOptions.sections, { teach, modo_curso: modo, curso: resumen });
+    const clase = seccionClase(activo.modo, preferencia());
+    Object.assign(event.systemPromptOptions.sections, { teach, modo_curso: modo, curso: resumen, clase });
     // teach ya va como sección y read sólo abre fotos: ninguna skill se puede cargar durante el estudio.
     event.systemPromptOptions.skills = [];
     // pi activa las tools que se registran tarde (web, MCP, o al reanudar sin el set en el archivo de sesión): el set se reafirma en cada turno.
@@ -188,8 +199,23 @@ export function registrarSesion(pi: ExtensionAPI, vault = vaultDir, recursos = p
     if (!/\.(png|jpe?g|webp|gif)$/i.test(ruta) || ruta.startsWith(join(vault, "cursos") + sep)) return { block: true, reason: "Durante el estudio read sólo abre fotos del alumno; el material se lee con leer_paginas, leer_items o ver_pagina." };
   });
   let preguntas = 0;
-  pi.on("tool_execution_start", event => { if (["quiz", "ask_user_question"].includes(event.toolName)) preguntas++; });
-  pi.on("tool_execution_end", event => { if (["quiz", "ask_user_question"].includes(event.toolName)) preguntas = Math.max(0, preguntas - 1); });
+  pi.on("tool_execution_start", event => { if (POPUPS.includes(event.toolName)) preguntas++; });
+  pi.on("tool_execution_end", event => { if (POPUPS.includes(event.toolName)) preguntas = Math.max(0, preguntas - 1); });
+  // Cada pregunta respondida suma, sólo para el modelo, cuántas van en la clase y cuál toca según la mezcla (DA52). La
+  // clase empieza en la entrada del curso de este log o, en tema libre, en la última carga de teach.
+  pi.on("tool_result", (event, ctx) => {
+    if (!CON_RESPUESTA.includes(event.toolName) || (event.details as { status?: string } | undefined)?.status !== "answered") return;
+    const rama = ctx.sessionManager.getBranch();
+    const desde = activo ? rama.findIndex(e => e.type === "custom" && e.customType === "curso" && (e.data as { log?: string } | null)?.log === activo!.log) : rama.findLastIndex(esTeach);
+    if (desde < 0) return;
+    const cuenta = { quiz: 0, pregunta_desarrollo: 0 } as Record<string, number>;
+    for (const e of rama.slice(desde)) {
+      const m = e.type === "message" ? e.message as { role?: string; toolName?: string; toolCallId?: string; details?: { status?: string } } : undefined;
+      if (m?.role === "toolResult" && m.toolCallId !== event.toolCallId && m.toolName && m.toolName in cuenta && m.details?.status === "answered") cuenta[m.toolName]++;
+    }
+    cuenta[event.toolName]++;
+    return { content: [...event.content, { type: "text" as const, text: lineaConteo(preferencia(), cuenta.quiz, cuenta.pregunta_desarrollo) }] };
+  });
   // pi muestra el error del proveedor en inglés: se suma una línea con la causa probable y qué hacer.
   pi.on("agent_settled", (event, ctx) => {
     preguntas = 0;
@@ -219,7 +245,11 @@ export function registrarSesion(pi: ExtensionAPI, vault = vaultDir, recursos = p
         const mtime = statSync(copia).mtimeMs;
         let cached = cacheCompletar.get(curso);
         if (cached?.mtime !== mtime) { cached = { mtime, temas: (JSON.parse(readFileSync(copia, "utf8")) as DatosCurso).temas }; cacheCompletar.set(curso, cached); }
-        if (cached.temas.some(t => [t.id, t.nombre, ...(t.alias || [])].some(s => normalizar(s) === q))) return null;
+        const exacto = (texto: string) => cached!.temas.find(t => [t.id, t.nombre, ...(t.alias || [])].some(s => normalizar(s) === texto));
+        if (exacto(q) || exacto(modoDeArgs(q.split(" ")).resto.join(" "))) return null;
+        // Tras un tema exacto, el comienzo de un modo (DA52): «retardos d» sugiere desde-cero.
+        const corte = q.lastIndexOf(" "), tema = corte > 0 ? exacto(q.slice(0, corte)) : undefined, parcial = q.slice(corte + 1);
+        if (tema && parcial) return MODOS.filter(m => m.id !== "seguir" && m.id.startsWith(parcial)).map(m => ({ value: `${curso} ${tema.id} ${m.id}`, label: `${tema.nombre} · ${m.nombre}` }));
         return cached.temas.filter(t => [t.id, t.nombre, ...(t.alias || [])].some(s => normalizar(s).includes(q))).map(t => ({ value: `${curso} ${t.id}`, label: t.nombre }));
       } catch { return null; }
     },
@@ -230,8 +260,8 @@ export function registrarSesion(pi: ExtensionAPI, vault = vaultDir, recursos = p
         if (curso) palabras.shift();
         else if (lista.length === 1) curso = lista[0];
         else if (palabras.length) { ctx.ui.notify(lista.length ? `No hay un curso «${palabras[0]}»: elegí uno de ${lista.join(", ")}.` : "No hay cursos preparados; usá /curso-nuevo.", "warning"); return; }
-        if (!curso) { ctx.ui.notify("Uso: /estudiar <curso> [tema]", "warning"); return; }
-        const consulta = palabras.join(" "), modelo = ctx.model;
+        if (!curso) { ctx.ui.notify("Uso: /estudiar <curso> [tema] [desde-cero|fortalecer]", "warning"); return; }
+        const { modo: modoClase, resto } = modoDeArgs(palabras), consulta = resto.join(" "), modelo = ctx.model;
         if (!modelo) { ctx.ui.notify("No hay un modelo elegido: elegí uno con /model y repetí /estudiar.", "error"); return; }
         // hasConfiguredAuth lee un snapshot que puede estar viejo; como pi, se confirma con la resolución real (un error lo informa el turno).
         if (!ctx.modelRegistry.hasConfiguredAuth(modelo) && !(await ctx.modelRegistry.getProviderAuth(modelo.provider).catch(() => true))) {
@@ -285,7 +315,7 @@ export function registrarSesion(pi: ExtensionAPI, vault = vaultDir, recursos = p
           if (activo === viejo) { ctx.ui.notify(`No se confirmó el guardado: seguís en «${nombre}»; repetí /estudiar o elegí «Cambiar sin guardar».`, "warning"); return; }
           d = await cargar(curso, true);
         } else if (viejo) noOfrecer(viejo.curso, viejo.log.slice(`cursos/${viejo.curso}/`.length));
-        const a: Activo = { curso, tema: tema.id, log: "", ...(tema.id === "ad-hoc" ? { adHoc: tema } : {}) }, previo = activo;
+        const a: Activo = { curso, tema: tema.id, log: "", ...(tema.id === "ad-hoc" ? { adHoc: tema } : {}), ...(modoClase !== "seguir" ? { modo: modoClase } : {}) }, previo = activo;
         pendiente = undefined;
         preparar(a, d);
         // La nota es deseable, no imprescindible: sin ella la clase sigue y no queda un .md vacío.
@@ -327,8 +357,36 @@ export function registrarSesion(pi: ExtensionAPI, vault = vaultDir, recursos = p
         ctx.ui.setStatus("curso", `📚 ${curso} › ${tema.nombre}`);
         if (sinNota) ctx.ui.notify(sinNota, "warning");
         const estudiado = d.progreso.temas[tema.id]?.estado;
-        ordenar(pi, `Empecemos con «${tema.nombre}» (${curso}). ${estudiado && estudiado !== "sin_empezar" ? "Abrí con una línea de dónde quedamos (borde y próximo paso del dossier) y enseguida la primera pregunta" : "Iniciá el probe con la primera pregunta, sin preámbulo"}, sin esperar una nueva orden del estudiante.`);
+        const arranque = a.modo === "desde-cero" ? "desde cero. Iniciá el probe desde la base con la primera pregunta, sin preámbulo"
+          : a.modo === "fortalecer" ? "para fortalecer lo flojo. Abrí con una línea de lo que quedó flojo según el dossier y enseguida la primera pregunta"
+          : estudiado && estudiado !== "sin_empezar" ? "Abrí con una línea de dónde quedamos (borde y próximo paso del dossier) y enseguida la primera pregunta"
+          : "Iniciá el probe sin preámbulo: la primera pregunta es la lista de lo que ya vio";
+        ordenar(pi, `Empecemos con «${tema.nombre}» (${curso})${a.modo ? `, ${arranque}` : `. ${arranque}`}, sin esperar una nueva orden del estudiante.`);
       } catch (e) { ctx.ui.notify(mensaje(e, "No se pudo activar el curso"), "error"); }
+    },
+  });
+  // La mezcla de preguntas (DA52) en la terminal; en la app, Ajustes → Cómo estudio. Vale desde la pregunta siguiente.
+  pi.registerCommand("preguntas", {
+    description: "Elegir cuántas preguntas van de múltiple opción y cuántas de desarrollo",
+    getArgumentCompletions(prefijo) {
+      const q = normalizar(prefijo.trim());
+      return MEZCLAS.some(m => m.id === q) ? null : MEZCLAS.filter(m => m.id.startsWith(q)).map(m => ({ value: m.id, label: `${m.nombre}: ${m.descripcion}` }));
+    },
+    async handler(args, ctx) {
+      const actual = mezcla(preferencia()), pedido = normalizar(args.trim());
+      let elegida = MEZCLAS.find(m => m.id === pedido || normalizar(m.nombre) === pedido);
+      if (!elegida && pedido) { ctx.ui.notify(`No hay una mezcla «${args.trim()}»: usá ${MEZCLAS.map(m => m.id).join(", ")}.`, "warning"); return; }
+      if (!elegida) {
+        if (!ctx.hasUI) { ctx.ui.notify(`Preguntas: ${actual.nombre}. Para cambiarla: /preguntas <${MEZCLAS.map(m => m.id).join("|")}>.`, "info"); return; }
+        const etiquetas = MEZCLAS.map(m => `${m.nombre}${m.id === actual.id ? " (la de ahora)" : ""}: ${m.descripcion}`);
+        const r = await elegir(ctx, "Preguntas: ¿cuántas de múltiple opción y cuántas de desarrollo?", etiquetas);
+        if (!r) return;
+        elegida = MEZCLAS[etiquetas.indexOf(r)];
+      }
+      // Automático es lo de siempre: no queda escrito.
+      try { guardarConfigLocal({ preguntas: elegida.id === "automatico" ? undefined : elegida.id }, recursos); }
+      catch (e) { ctx.ui.notify(mensaje(e, "No se guardó la preferencia"), "error"); return; }
+      ctx.ui.notify(`Preguntas: ${elegida.nombre}. Vale desde la próxima pregunta.`, "info");
     },
   });
   pi.registerCommand("cursos", {

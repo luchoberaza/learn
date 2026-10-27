@@ -1,8 +1,11 @@
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import { type ExtensionAPI, getMarkdownTheme } from "@mariozechner/pi-coding-agent";
 import {
+	Container,
 	Editor,
 	type EditorTheme,
 	Key,
+	Markdown,
+	Spacer,
 	Text,
 	matchesKey,
 	truncateToWidth,
@@ -81,6 +84,8 @@ interface QuizResultDetails {
 	note?: string; // optional free-text from the always-present note field (any answer)
 	explanation?: string;
 	message?: string;
+	interno?: boolean; // no se mostró: faltaba la explicación (DA52); sólo lo ve el modelo
+	clase?: string; // la explicación que se mostró antes de la pregunta (DA52)
 }
 
 const OptionSchema = Type.Object({
@@ -118,6 +123,18 @@ const QuizParams = Type.Object({
 		Type.Boolean({
 			description:
 				"Options are always randomly reordered before display. false is honored only when every option is a number (optionally with a unit, e.g. '1,2 ms'): they are then shown in ascending order.",
+		}),
+	),
+	momento: Type.Optional(
+		Type.Union([Type.Literal("diagnostico"), Type.Literal("verificacion")], {
+			description:
+				'"diagnostico" for a question of the initial diagnosis (probe), which may follow another question directly. Otherwise ("verificacion", the default) it checks something you explained, and that explanation must be in the visible text of your messages since the previous question: the learner never sees your reasoning or tool arguments. A verification question with no explanation since the previous one is not shown and comes back to you.',
+		}),
+	),
+	clase: Type.Optional(
+		Type.String({
+			description:
+				"The explanation this question checks, written for the learner and shown BEFORE the question (chat history, the app card and the note). Use it whenever you go straight to the question: the learner never sees your reasoning. Markdown and LaTeX allowed; never the answer to this question.",
 		}),
 	),
 });
@@ -310,6 +327,10 @@ function formatOptionRef(options: QuizOption[], index: number): string {
 	return `${index}. ${opt ? opt.label : "(desconocida)"}`;
 }
 
+// DA52: lo que el modelo lee justo antes de escribir. En una clase real, después de cada respuesta encadenaba otra pregunta
+// sin texto, con la explicación sólo en su razonamiento; en el diagnóstico, en cambio, se sigue preguntando.
+export const DESPUES_DE_RESPONDER = "Ahora, en el texto de tu mensaje (el alumno no ve tu razonamiento): qué estuvo bien o mal y la explicación que corresponda; recién después, otra pregunta.";
+
 function buildResult(
 	question: string,
 	context: string | undefined,
@@ -318,6 +339,7 @@ function buildResult(
 	response: QuizResponse,
 	correctIndices: number[],
 	explanation: string | undefined,
+	diagnostico = false,
 ) {
 	const { dontKnow, note, answers } = response;
 	const selectedIndices = answers.map((a) => a.index);
@@ -340,6 +362,7 @@ function buildResult(
 		if (note) text += `\nNota del alumno: ${note}`;
 	}
 	if (explanation) text += `\nExplicación: ${explanation}`;
+	if (!diagnostico) text += `\n${DESPUES_DE_RESPONDER}`;
 
 	return {
 		content: [{ type: "text" as const, text }],
@@ -923,9 +946,10 @@ async function preguntarQuiz(
 	correctIndices: number[],
 	explanation: string | undefined,
 	signal?: AbortSignal,
+	clase?: string,
 ): Promise<QuizResponse | null> {
 	const r = await app({
-		tipo: "quiz", pregunta: question, contexto: context, modo: mode, correctas: correctIndices, explicacion: explanation,
+		tipo: "quiz", pregunta: question, contexto: context, modo: mode, correctas: correctIndices, explicacion: explanation, ...(clase ? { clase } : {}),
 		opciones: options.map((o, i) => ({ indice: i + 1, label: o.label, ...(o.description ? { description: o.description } : {}) })),
 	}, signal);
 	if (!r) return null;
@@ -964,6 +988,195 @@ function withUILock<T>(fn: () => Promise<T>): Promise<T> {
 	return sharedUiLock.withLock(fn);
 }
 
+// DA52: el alumno no ve el razonamiento del modelo ni los argumentos de las tools. En una clase real el tutor escribía la
+// explicación en su razonamiento («Te doy una analogía…») y preguntaba como si la hubiera dado. Una pregunta de
+// verificación se muestra sólo si, desde la pregunta respondida anterior, el tutor escribió texto visible (también en el
+// mensaje que la hace). Las del diagnóstico (momento: "diagnostico") pueden ir seguidas; sin pregunta anterior no se exige.
+// Frena una sola vez seguida: en otra clase real el tutor reintentaba igual y terminaba preguntando por el chat.
+const PREGUNTAS = new Set(["quiz", "pregunta_desarrollo"]);
+const MINIMO_EXPLICACION = 120;
+// Devuelve cuánto texto visible hubo si no alcanza, o undefined si la pregunta se puede mostrar.
+export function faltaExplicacion(ctx: any, toolCallId: string, clase = ""): number | undefined {
+	let rama: any[];
+	try {
+		rama = ctx?.sessionManager?.getBranch?.() ?? [];
+	} catch {
+		return undefined;
+	}
+	let texto = clase.trim().length;
+	for (let i = rama.length - 1; i >= 0; i--) {
+		const m = rama[i]?.type === "message" ? rama[i].message : undefined;
+		if (m?.role === "assistant") {
+			for (const b of m.content ?? []) if (b?.type === "text" && typeof b.text === "string") texto += b.text.trim().length;
+		} else if (m?.role === "toolResult" && PREGUNTAS.has(m.toolName) && m.details?.interno) {
+			return undefined;
+		} else if (m?.role === "toolResult" && PREGUNTAS.has(m.toolName) && m.toolCallId !== toolCallId && m.details?.status === "answered") {
+			return texto < MINIMO_EXPLICACION ? texto : undefined;
+		}
+	}
+	return undefined;
+}
+const sinExplicacion = (caracteres: number) =>
+	`Pregunta no mostrada: desde la pregunta anterior escribiste ${caracteres} caracteres de texto visible, y el alumno no ve tu razonamiento ni los argumentos de las tools. Poné en el campo clase de esta misma herramienta la explicación de lo que esta pregunta verifica, con el ejemplo y qué estuvo bien o mal en su respuesta (se le muestra al alumno antes de la pregunta), o escribila como texto antes de llamarla. No la pases al chat ni le cuentes al alumno de este aviso. Si es una pregunta del diagnóstico, pasá momento: "diagnostico".`;
+
+// ────────────────────────────────────────────────────────────────────────────
+// pregunta_desarrollo — la que se responde escribiendo (DA52). Tiene una respuesta correcta, como el quiz, pero no se
+// corrige sola: el alumno escribe (o elige «No sé»), ve la respuesta esperada y el tutor lo corrige en su mensaje
+// siguiente. La respuesta esperada nunca se muestra ni se anota antes de responder.
+// ────────────────────────────────────────────────────────────────────────────
+
+interface DesarrolloDetails {
+	status: QuizStatus;
+	tipo: "desarrollo";
+	question: string;
+	context?: string;
+	answer?: string;
+	dontKnow?: boolean;
+	expected?: string;
+	message?: string;
+	interno?: boolean;
+	clase?: string;
+}
+
+const DesarrolloParams = Type.Object({
+	pregunta: Type.String({ description: "La pregunta, una sola por llamada. Se responde escribiendo." }),
+	detalles: Type.Optional(
+		Type.String({ description: "Condiciones del enunciado, debajo de la pregunta y ANTES de responder: nunca la respuesta, enlaces ni citas (se quitan; la cita va en respuesta_esperada)." }),
+	),
+	respuesta_esperada: Type.String({
+		description: "OBLIGATORIA. La respuesta completa que esperás, con lo que no puede faltar. Se muestra DESPUÉS de que el alumno responde y es contra lo que lo corregís.",
+	}),
+	momento: Type.Optional(
+		Type.Union([Type.Literal("diagnostico"), Type.Literal("verificacion")], {
+			description:
+				"«diagnostico» para una pregunta del diagnóstico inicial, que puede seguir a otra pregunta. Si no («verificacion», por defecto), verifica algo que explicaste, y esa explicación tiene que estar en el texto visible de tus mensajes desde la pregunta anterior: el alumno nunca ve tu razonamiento ni los argumentos de las tools. Sin explicación desde la anterior, la pregunta no se muestra y vuelve a vos.",
+		}),
+	),
+	clase: Type.Optional(
+		Type.String({
+			description:
+				"La explicación que esta pregunta verifica, escrita para el alumno: se muestra ANTES de la pregunta (en el historial, la tarjeta de la app y la nota). Usala siempre que vayas directo a la pregunta: el alumno nunca ve tu razonamiento. Admite Markdown y LaTeX; nunca la respuesta de esta pregunta.",
+		}),
+	),
+});
+
+type Desarrollo = { noSe: boolean; texto?: string };
+
+async function askDesarrollo(ctx: any, question: string, context: string | undefined, expected: string, signal?: AbortSignal): Promise<Desarrollo | null> {
+	return ctx.ui.custom<Desarrollo | null>((tui: any, theme: any, _kb: any, done: (result: Desarrollo | null) => void) => {
+		let phase: "escribir" | "feedback" = "escribir";
+		let focus: "editor" | "nose" = "editor";
+		let respuesta: Desarrollo | null = null;
+		const editor = new Editor(tui, createEditorTheme(theme));
+		editor.focused = true;
+		// Una respuesta ya mostrada con la esperada se conserva aunque corten el turno, como el quiz corregido.
+		const cortar = () => done(phase === "feedback" ? respuesta : null);
+		if (signal?.aborted) cortar();
+		else signal?.addEventListener("abort", cortar, { once: true });
+		const responder = (r: Desarrollo) => {
+			respuesta = r;
+			phase = "feedback";
+			editor.focused = false;
+			tui.requestRender();
+		};
+		// Enter manda lo escrito; vacío no cuenta como respuesta (para eso está «No sé»).
+		editor.onSubmit = (value: string) => {
+			if (value.trim()) responder({ noSe: false, texto: value.trim() });
+		};
+
+		function render(width: number): string[] {
+			const lines: string[] = [];
+			const add = (text: string) => lines.push(truncateToWidth(text, width));
+			pushHeader(lines, theme, width, question, context);
+			lines.push("");
+			if (phase === "feedback" && respuesta) {
+				if (respuesta.noSe) add(theme.fg("warning", " · Respondiste: No sé"));
+				else {
+					add(theme.fg("muted", " Tu respuesta:"));
+					addWrapped(lines, theme.fg("text", respuesta.texto ?? ""), width, "   ");
+				}
+				lines.push("");
+				add(theme.fg("muted", " Respuesta esperada:"));
+				addWrapped(lines, theme.fg("text", textoPlano(expected)), width, "   ");
+				lines.push("");
+				add(theme.fg("dim", " El tutor te corrige ahora. Enter o Esc para seguir"));
+			} else {
+				for (const line of editor.render(Math.max(1, width - 2))) add(` ${line}`);
+				lines.push("");
+				const enNose = focus === "nose";
+				add(`${enNose ? theme.fg("accent", "> ") : "  "}${enNose ? theme.fg("accent", DONT_KNOW_LABEL) : theme.fg("dim", DONT_KNOW_LABEL)}`);
+				lines.push("");
+				add(theme.fg("dim", enNose ? " Enter: No sé • Tab volver a escribir • Esc cancelar" : " Escribí tu respuesta • Enter enviar • Ctrl+J nueva línea • Tab «No sé» • Esc cancelar"));
+			}
+			add(theme.fg("accent", "─".repeat(width)));
+			return lines;
+		}
+
+		return {
+			render,
+			invalidate: () => editor.invalidate(),
+			handleInput(data: string) {
+				if (phase === "feedback") {
+					if (matchesKey(data, Key.enter) || matchesKey(data, Key.escape)) done(respuesta);
+					return;
+				}
+				if (matchesKey(data, Key.escape)) return done(null);
+				if (matchesKey(data, Key.tab)) {
+					focus = focus === "editor" ? "nose" : "editor";
+					editor.focused = focus === "editor";
+					tui.requestRender();
+					return;
+				}
+				if (focus === "nose") {
+					if (matchesKey(data, Key.enter)) responder({ noSe: true });
+					return;
+				}
+				editor.handleInput(data);
+				tui.requestRender();
+			},
+			dispose: () => signal?.removeEventListener("abort", cortar),
+		};
+	});
+}
+
+// La app dibuja la tarjeta y muestra la respuesta esperada recién después de responder (app/host/interfaz.mjs).
+async function preguntarDesarrollo(
+	app: NonNullable<ReturnType<typeof preguntarConApp>>,
+	question: string,
+	context: string | undefined,
+	expected: string,
+	signal?: AbortSignal,
+	clase?: string,
+): Promise<Desarrollo | null> {
+	const r = await app({ tipo: "desarrollo", pregunta: question, contexto: context, esperada: expected, ...(clase ? { clase } : {}) }, signal);
+	if (!r) return null;
+	if (r.noSe) return { noSe: true };
+	const texto = typeof r.texto === "string" ? r.texto.trim() : "";
+	return texto ? { noSe: false, texto } : null;
+}
+
+// En la terminal la explicación de la pregunta queda en el historial, con formato, justo arriba de la pregunta (DA52).
+// Llega a medias mientras el modelo escribe: se dibuja lo que haya. Sin tema de la terminal (pruebas), va como texto.
+function conClase(clase: unknown, linea: Text) {
+	if (typeof clase !== "string" || !clase.trim()) return linea;
+	const c = new Container();
+	try {
+		// El tema de pi se resuelve al dibujar: se prueba acá, para no romper el dibujo de la llamada.
+		const md = new Markdown(clase.trim(), 0, 0, getMarkdownTheme());
+		md.render(80);
+		c.addChild(md);
+	} catch {
+		c.addChild(new Text(clase.trim(), 0, 0));
+	}
+	c.addChild(new Spacer(1));
+	c.addChild(linea);
+	return c;
+}
+
+function resultadoDesarrollo(status: QuizStatus, base: Pick<DesarrolloDetails, "question" | "context" | "clase">, texto: string, extra: Partial<DesarrolloDetails> = {}) {
+	return { content: [{ type: "text" as const, text: texto }], details: { status, tipo: "desarrollo", ...base, ...extra } as DesarrolloDetails };
+}
+
 export default function quiz(pi: ExtensionAPI) {
 	pi.registerTool({
 		name: "quiz",
@@ -987,6 +1200,7 @@ export default function quiz(pi: ExtensionAPI) {
 			"Set multiSelect: true only when more than one option is correct.",
 			"Options are always shuffled before display, so don't worry about which position you list the correct answer in; shuffle: false only puts all-numeric options in ascending order. Don't use 'All/None of the above' options.",
 			"To probe nuance, ask several quick quiz questions and adapt each one based on the previous answers, rather than writing one giant question.",
+			'The learner sees only the visible text of your messages, never your reasoning nor tool arguments. Every explanation a question checks (motivation, the idea, the example, the connection) goes in the clase field of that question, shown right before it, or in the visible text of your message; the explanation field appears only after answering and does not replace teaching. Pass momento: "diagnostico" only for questions of the initial diagnosis.',
 			"Don't leak the answer through formatting: keep option phrasing/length even and don't hint which is correct.",
 		],
 		parameters: QuizParams,
@@ -996,6 +1210,14 @@ export default function quiz(pi: ExtensionAPI) {
 			const context = sinEnlaces(textoPlano(params.details?.trim() ?? "")) || undefined;
 			const explanation = params.explanation.trim();
 			const mode: QuizMode = params.multiSelect ? "multi-select" : "single-select";
+			const clase = typeof params.clase === "string" && params.clase.trim() ? params.clase.trim() : undefined;
+			const escrito = params.momento === "diagnostico" ? undefined : faltaExplicacion(ctx, _toolCallId, clase);
+			if (escrito !== undefined) {
+				return {
+					content: [{ type: "text" as const, text: sinExplicacion(escrito) }],
+					details: { ...buildStructuredResult("unavailable", question, mode, [], [], undefined, undefined, context), interno: true },
+				};
+			}
 
 			let options: QuizOption[];
 			try {
@@ -1032,7 +1254,7 @@ export default function quiz(pi: ExtensionAPI) {
 			// user has answered and must not leak the answer.
 			onUpdate?.({
 				content: [{ type: "text", text: "Esperando respuesta…" }],
-				details: { question, context, options: options.map((o, i) => ({ index: i + 1, label: o.label })) },
+				details: { question, context, options: options.map((o, i) => ({ index: i + 1, label: o.label })), ...(clase ? { clase } : {}) },
 			});
 
 			const { indices: correctIndices, error: correctError } = resolveCorrect(
@@ -1066,14 +1288,12 @@ export default function quiz(pi: ExtensionAPI) {
 				// Con la app de escritorio la pregunta se dibuja allá; en la terminal, el popup de siempre.
 				const app = preguntarConApp(ctx);
 				const response = app
-					? await preguntarQuiz(app, question, context, mode, options, correctIndices, explanation, signal)
+					? await preguntarQuiz(app, question, context, mode, options, correctIndices, explanation, signal, clase)
 					: mode === "single-select"
 						? await askSingleChoice(ctx, question, context, options, correctIndices, explanation, signal)
 						: await askMultiChoice(ctx, question, context, options, correctIndices, explanation, signal);
-				if (!response) {
-					return cancelledResult(question, mode, correctIndices, context);
-				}
-				return buildResult(question, context, mode, options, response, correctIndices, explanation);
+				const r = response ? buildResult(question, context, mode, options, response, correctIndices, explanation, params.momento === "diagnostico") : cancelledResult(question, mode, correctIndices, context);
+				return clase ? { ...r, details: { ...r.details, clase } } : r;
 			});
 		}),
 
@@ -1094,7 +1314,7 @@ export default function quiz(pi: ExtensionAPI) {
 			if (n > 0) {
 				text += theme.fg("dim", ` (${n} ${n === 1 ? "opción" : "opciones"})`);
 			}
-			return new Text(text, 0, 0);
+			return conClase(args.clase, new Text(text, 0, 0));
 		},
 
 		renderResult(result, _options, theme) {
@@ -1109,6 +1329,7 @@ export default function quiz(pi: ExtensionAPI) {
 			if (details.status === "cancelled") {
 				return new Text(theme.fg("warning", details.message || "Cancelado"), 0, 0);
 			}
+			if (details.interno) return new Text(theme.fg("dim", "(la pregunta vuelve después de la explicación)"), 0, 0);
 			if (details.status === "unavailable") {
 				return new Text(theme.fg("warning", details.message || "Quiz no disponible"), 0, 0);
 			}
@@ -1166,6 +1387,73 @@ export default function quiz(pi: ExtensionAPI) {
 				lines.push(theme.fg("muted", textoPlano(details.explanation)));
 			}
 
+			return new Text(lines.join("\n"), 0, 0);
+		},
+	});
+
+	pi.registerTool({
+		name: "pregunta_desarrollo",
+		label: "pregunta de desarrollo",
+		description:
+			"Hacé una pregunta CON respuesta correcta que el alumno responde escribiendo con sus palabras, en vez de elegir entre opciones. Igual que quiz, sirve para el diagnóstico y para verificar o repasar lo enseñado; agrega un «No sé» automático. Después de que responde ve la respuesta esperada, y a vos te llega lo que escribió para que lo corrijas. La pregunta y los detalles son texto plano con Unicode (1,2 ms; 8×10⁶ bit/s; d_prop), nunca LaTeX; LaTeX sólo en respuesta_esperada.",
+		promptSnippet: "Usá pregunta_desarrollo para una pregunta con respuesta correcta que se responde escribiendo (respuesta_esperada obligatoria). Para elegir entre opciones, quiz.",
+		promptGuidelines: [
+			"pregunta_desarrollo y quiz tienen respuesta correcta; ask_user_question no. Elegí entre quiz y pregunta_desarrollo según la mezcla de preguntas de la clase, si la hay.",
+			"Una pregunta acotada, que se conteste en pocas líneas: definir con sus palabras, explicar por qué, aplicar a un caso no mostrado, calcular y decir el resultado con su unidad. Para un ejercicio largo con cuentas o dibujos, pedilo en el chat, donde puede mandar foto.",
+			"respuesta_esperada es OBLIGATORIA y completa: lo que no puede faltar para que esté bien. Nunca la adelantes en pregunta ni en detalles.",
+			"Después de responder, corregí en tu mensaje siguiente: decí si está bien, a medias o mal; qué está bien, citando su frase; qué falta o qué está mal y de qué concepto o nodo viene. Aceptá otras formas de decir lo mismo y no exijas las palabras exactas de respuesta_esperada.",
+			"«No sé» es un hueco real, no un error: enseñalo. Nunca agregues vos un «No sé»: lo pone la herramienta.",
+			"El alumno sólo ve el texto visible de tus mensajes, nunca tu razonamiento ni los argumentos de las tools: la explicación que la pregunta verifica va en clase, que se muestra justo antes, o en el texto de tu mensaje. momento: «diagnostico» sólo en el diagnóstico inicial.",
+		],
+		parameters: DesarrolloParams,
+
+		execute: cortable(pi, async (_toolCallId, params, signal, onUpdate, ctx) => {
+			const clase = typeof params.clase === "string" && params.clase.trim() ? params.clase.trim() : undefined;
+			const base = { question: sinEnlaces(textoPlano(params.pregunta ?? "")).trim(), context: sinEnlaces(textoPlano(params.detalles?.trim() ?? "")) || undefined, ...(clase ? { clase } : {}) };
+			const expected = typeof params.respuesta_esperada === "string" ? params.respuesta_esperada.trim() : "";
+			if (!base.question || !expected) {
+				return {
+					...resultadoDesarrollo("unavailable", base, "", { message: "Pregunta descartada; ya viene otra." }),
+					content: [{ type: "text" as const, text: "pregunta_desarrollo: hacen falta pregunta y respuesta_esperada; volvé a llamarla con las dos." }],
+				};
+			}
+			const escrito = params.momento === "diagnostico" ? undefined : faltaExplicacion(ctx, _toolCallId, clase);
+			if (escrito !== undefined) {
+				return { content: [{ type: "text" as const, text: sinExplicacion(escrito) }], details: { status: "unavailable", tipo: "desarrollo", ...base, interno: true } as DesarrolloDetails };
+			}
+			// md-log anota la pregunta con lo que ve el alumno, sin la respuesta esperada.
+			onUpdate?.({ content: [{ type: "text", text: "Esperando respuesta…" }], details: { tipo: "desarrollo", ...base } });
+			const cancelada = () => resultadoDesarrollo("cancelled", base, "Pregunta de desarrollo cancelada sin respuesta.", { message: "Pregunta cancelada sin respuesta." });
+			if (signal?.aborted) return cancelada();
+			if (!ctx.hasUI) return resultadoDesarrollo("unavailable", base, "pregunta_desarrollo: hace falta la interfaz interactiva.", { message: "pregunta_desarrollo: hace falta la interfaz interactiva." });
+
+			return withUILock(async () => {
+				const app = preguntarConApp(ctx);
+				const r = app ? await preguntarDesarrollo(app, base.question, base.context, expected, signal, clase) : await askDesarrollo(ctx, base.question, base.context, expected, signal);
+				if (!r) return cancelada();
+				const esperada = `\nRespuesta esperada: ${expected}`;
+				if (r.noSe) {
+					return resultadoDesarrollo("answered", base, `El alumno eligió «No sé»: no intentó responder (es un hueco real, no un error).${esperada}${params.momento === "diagnostico" ? "" : `\n${DESPUES_DE_RESPONDER}`}`, { dontKnow: true, expected });
+				}
+				return resultadoDesarrollo("answered", base,
+					`El alumno respondió escribiendo:\n«${r.texto}»${esperada}\nCorregilo en el texto de tu mensaje siguiente (el alumno no ve tu razonamiento): bien, a medias o mal; qué está bien, qué falta y de qué nodo viene el error. Recién después, otra pregunta.`,
+					{ answer: r.texto, dontKnow: false, expected });
+			});
+		}),
+
+		renderCall(args, theme) {
+			// Nunca respuesta_esperada: llega antes de que el alumno responda. Los args llegan a medias durante el streaming.
+			const texto = sinEnlaces(textoPlano(typeof args.pregunta === "string" ? args.pregunta : ""));
+			return conClase(args.clase, new Text(theme.fg("toolTitle", theme.bold("desarrollo ")) + theme.fg("muted", texto), 0, 0));
+		},
+
+		renderResult(result, _options, theme) {
+			const d = result.details as DesarrolloDetails | undefined;
+			if (!d?.status) return new Text(theme.fg("dim", "Esperando respuesta…"), 0, 0);
+			if (d.interno) return new Text(theme.fg("dim", "(la pregunta vuelve después de la explicación)"), 0, 0);
+			if (d.status !== "answered") return new Text(theme.fg("warning", d.message || "Cancelada"), 0, 0);
+			const lines = [d.dontKnow ? theme.fg("warning", "No sé") : theme.fg("text", `Tu respuesta: ${d.answer ?? ""}`)];
+			if (d.expected) lines.push(theme.fg("muted", `Respuesta esperada: ${textoPlano(d.expected)}`));
 			return new Text(lines.join("\n"), 0, 0);
 		},
 	});

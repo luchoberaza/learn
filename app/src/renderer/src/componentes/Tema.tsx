@@ -1,6 +1,9 @@
 // Tema (§9.2): objetivo acordado, plan, borde (lo que domina y lo que falla), próximo paso, ejercicios y si hay
-// simulacro reservado (sin decir cuál). Desde acá se empieza o se retoma la clase.
+// simulacro reservado (sin decir cuál). Desde acá se empieza o se retoma la clase, también desde cero o para
+// fortalecer lo flojo (DA52).
+import { useEffect, useState } from "react";
 import { marcarPlan, nodosDelPlan, ESTADOS, type EstadoTema } from "../../../lib/texto.ts";
+import type { OpcionEstudio } from "../tipos";
 
 // «2026-10-25» es una fecha local, no medianoche UTC (que en Uruguay o Argentina cae el día anterior).
 const fechaLocal = (s: string) => { const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s); return m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), 12) : new Date(s); };
@@ -8,12 +11,15 @@ function diaRelativo(d: Date) {
   const hoy = new Date(), dias = Math.round((new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate()).getTime() - new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime()) / 86400000);
   return dias === 0 ? "hoy" : dias === 1 ? "ayer" : `el ${d.toLocaleDateString("es-AR", { day: "numeric", month: "long" })}`;
 }
-import { abrirPagina, estudiar, navegar, seguirClase, usarTienda } from "../tienda";
+import { abrirPagina, estudiar, navegar, opcionesEstudio, seguirClase, usarTienda } from "../tienda";
 
 export function Tema({ slug, id }: { slug: string; id: string }) {
   const c = usarTienda(e => e.cursos.find(x => x.slug === slug));
   const activo = usarTienda(e => e.sesion.curso);
   const seguir = usarTienda(e => e.seguir);
+  const listo = usarTienda(e => e.arranque === "listo");
+  const [modos, setModos] = useState<OpcionEstudio[]>([]);
+  useEffect(() => { if (listo) void opcionesEstudio().then(o => setModos(o?.modos ?? [])); }, [listo]);
   const t = c?.temas.find(x => x.id === id);
   if (!c || !t) return <main className="pantalla"><p className="vacio">No se encontró el tema.</p></main>;
   const p = t.progreso;
@@ -22,6 +28,8 @@ export function Tema({ slug, id }: { slug: string; id: string }) {
   const nombres = Object.fromEntries(c.temas.map(x => [x.id, x.nombre]));
   const nodos = marcarPlan(nodosDelPlan(p.plan), [...p.domina, ...p.conceptosFirmes]);
   const empezado = t.estado !== "sin_empezar";
+  // Fortalecer lo flojo sólo con algo guardado que falle; con la clase de este tema abierta no se ofrecen.
+  const otrosModos = enClase ? [] : modos.filter(m => m.id === "desde-cero" || (m.id === "fortalecer" && (p.falla.length > 0 || p.errores.length > 0)));
   return (
     <main className="pantalla pagina-lectura">
       <p className="miga-pantalla"><button className="enlace" onClick={() => navegar({ pantalla: "curso", slug })}>{c.nombre}</button></p>
@@ -32,7 +40,7 @@ export function Tema({ slug, id }: { slug: string; id: string }) {
         <p className="aviso-bloque">Conviene tener firme antes {t.prerequisitosFaltan.map(x => nombres[x] ?? x).join(" y ")}. Podés estudiarlo igual: el tutor arranca viendo qué sabés.</p>
       )}
 
-      <div className="acciones" style={{ margin: "6px 0 34px" }}>
+      <div className="acciones" style={{ margin: otrosModos.length ? "6px 0 14px" : "6px 0 34px" }}>
         {enClase ? <button className="boton" onClick={() => navegar({ pantalla: "clase" })}>Volver a la clase</button>
           : abierta ? <button className="boton" onClick={() => void seguirClase(abierta)}>Seguir la clase</button>
           : <button className="boton" onClick={() => void estudiar(slug, id)}>{empezado ? "Estudiar este tema" : "Empezar la clase"}</button>}
@@ -40,6 +48,12 @@ export function Tema({ slug, id }: { slug: string; id: string }) {
           ? <span className="apagado">{enClase ? "Hay un simulacro reservado: rendilo desde la barra de la clase." : "Hay un simulacro reservado para cuando lo termines."}</span>
           : <span className="apagado">Sin simulacro reservado: no quedan parciales sin usar de este tema.</span>}
       </div>
+
+      {otrosModos.length > 0 && (
+        <div className="modos-tema">
+          {otrosModos.map(m => <div key={m.id} className="modo-tema"><button className="fantasma" onClick={() => void estudiar(slug, id, m.id)}>{m.nombre}</button><span className="apagado">{m.descripcion}</span></div>)}
+        </div>
+      )}
 
       {p.proximoPaso && <section className="seccion-tema"><h2 className="serif">Próximo paso</h2><p className="proximo">{p.proximoPaso}</p></section>}
       {p.objetivo && <section className="seccion-tema"><h2 className="serif">Objetivo acordado</h2><p>{p.objetivo}</p></section>}
@@ -77,7 +91,7 @@ export function Tema({ slug, id }: { slug: string; id: string }) {
           </ul>
         </section>
       )}
-      {!empezado && !p.objetivo && <p className="vacio" style={{ marginTop: 10 }}>Todavía no estudiaste este tema. En la primera clase el tutor te hace unas preguntas cortas, acuerda un objetivo con vos y arma el plan.</p>}
+      {!empezado && !p.objetivo && <p className="vacio" style={{ marginTop: 10 }}>Todavía no estudiaste este tema. En la primera clase el tutor ve primero qué sabés, sin dar nada por sabido; después acuerda un objetivo con vos y arma el plan.</p>}
     </main>
   );
 }

@@ -66,6 +66,7 @@ Más adelante:
 - **Un tema fuera del índice** (`/estudiar redes multicast`) se busca en la bibliografía:
   - si cae en un tema, lo abre;
   - si no, ofrece una **clase ad hoc**: no toca el índice ni el progreso y sólo deja su nota. Al cerrarla, el tutor ofrece sumar el tema al curso con `/curso-agregar`.
+- **Cómo encararlo**, al final: `desde-cero` repasa todo el tema desde las bases, aunque figure como sabido; `fortalecer` trabaja lo que te costó (los errores guardados y sus bases). Por ejemplo, `/estudiar redes retardos desde-cero`. Sin nada, sigue donde quedaste.
 
 Antes de arrancar, `/estudiar` comprueba credenciales y disco: con menos de 200 MB libres no arranca.
 
@@ -80,13 +81,15 @@ Si el tema ya lo estudiaste, el tutor arranca con una línea de dónde quedaron 
 
 ### Diagnóstico (probe)
 
-El tutor primero mide qué sabés, con preguntas del nivel y la notación de los parciales:
-- **tema nuevo:** hasta 4 preguntas;
-- **tema ya visto:** hasta 3, empezando por lo que te costaba.
+El tutor primero ve qué sabés, sin dar nada por sabido:
+1. **Una lista** con los conceptos base del tema: marcás los que ya viste. Lo que no marcás te lo enseña sin preguntártelo.
+2. **Preguntas** sobre lo que marcaste. Empieza por la base de cada parte del tema y sigue hasta encontrar, en cada una, algo que acertás y algo que no. Si acertás, la siguiente es bastante más difícil; si fallás, rodea el error para entender de dónde viene.
 
-Si acertás, sube la dificultad; si fallás, rodea el error para entender de dónde viene. **«No sé» no cuenta como error**: es una laguna y se enseña.
+No tiene un número fijo de preguntas, pero no repregunta lo que ya quedó claro. En un tema ya visto, sin la lista, arranca por lo que te costaba. **«No sé» no cuenta como error**: es una laguna y se enseña.
 
-**Si querés que te explique ya**, apretá Esc en la pregunta y escribí algo como «explicame qué es el retardo de propagación». El diagnóstico se corta y empieza a enseñar.
+**Si querés que te explique ya**, apretá Esc en la pregunta y escribí algo como «explicame qué es el retardo de propagación». El diagnóstico se corta y empieza a enseñar; lo que quedó sin medir lo comprueba al llegar a ese paso, en vez de darlo por sabido.
+
+**Desde cero** saltea la lista, repasa todos los pasos del tema y arma un objetivo y un plan nuevos. **Fortalecer lo flojo** pregunta primero por lo que figura como fallado, arma el plan sólo con eso y sus bases, y practica cada paso.
 
 ### Objetivo y plan
 
@@ -102,14 +105,16 @@ Objetivo y plan quedan guardados: al retomar el tema no se vuelven a pedir.
 Por cada nodo del plan: motivar → establecer → conectar → verificar con una pregunta.
 
 - **Todo sale del material del curso.** Antes de cada nodo, el tutor lee la página de la bibliografía que lo define y la cita como `[[libro.pdf#page=N]]`. Hacé clic en Obsidian y se abre el PDF en esa página.
+- **Ningún término sin presentar.** Antes de usar un término, un símbolo o la definición del libro, el tutor se fija si ya lo viste. Si no, te lo presenta primero, con un ejemplo y, si el tema se apoya en él, una pregunta.
+- **Cada pregunta llega con su explicación.** Lo que una pregunta comprueba aparece escrito justo antes de ella. Si el tutor intenta preguntar sin haber explicado, la pregunta no aparece hasta que lo explica.
 - **Lo que no sale del material** va marcado «fuera del material del curso» o «sin respaldo en el material».
 - **Manda la notación de la cátedra.** Si el libro escribe distinto, el tutor lo traduce una vez y sigue con la de la cátedra.
 - **«Mostrame esa página»** hace que el tutor la muestre con `ver_pagina`. La página también queda embebida en la nota.
 - Al cerrar un nodo con fórmula aparece una tabla «lo que hicimos ↔ nombre y fórmula del material».
 
-### Las preguntas (quiz)
+### Las preguntas
 
-Ventana con 3 opciones más «No sé»:
+Hay dos tipos. **De múltiple opción**: una ventana con 3 opciones más «No sé».
 
 | Tecla | Hace |
 |---|---|
@@ -119,6 +124,13 @@ Ventana con 3 opciones más «No sé»:
 | Esc | cancelar la pregunta: el tutor espera lo que escribas |
 
 Después de responder ves ✓ o ✗, la correcta y la explicación con su cita. Si fallaste, el tutor te dice qué creencia lleva a la opción que elegiste.
+
+**De desarrollo**: una caja para escribir la respuesta con tus palabras, más «No sé». Enter la manda, Ctrl+J abre otro renglón, Tab va a «No sé» y Esc cancela. Después de responder ves la respuesta esperada; al seguir, el tutor te corrige: si está bien, a medias o mal, qué está bien, qué falta y de dónde viene el error. No te pide las palabras exactas.
+
+**Cuántas de cada tipo** lo elegís con `/preguntas` (en la app, Ajustes → Cómo estudio), y vale desde la próxima pregunta, también con la clase abierta:
+- **Automático** (el recomendado): múltiple opción al principio y más desarrollo a medida que dominás, como pide el examen;
+- **Sólo múltiple opción** o **Sólo desarrollo**;
+- **Más múltiple opción** (3 de cada 4), **Mitad y mitad** o **Más desarrollo** (3 de cada 4 de desarrollo).
 
 Cuando el tutor necesita que elijas algo (objetivo, plan, seguir o practicar), aparece una ventana parecida con botones. Esc equivale a «No».
 
@@ -173,6 +185,7 @@ No hay simulacro de varios temas ni del curso completo.
 | Terminar la clase | `/fin`. Guarda tu progreso con un resumen de toda la sesión, te muestra ese resumen y el próximo paso, y cierra la nota. Si hay una pregunta abierta en pantalla, Esc antes. |
 | Ver cómo vas | `/progreso` (o `/progreso redes`): estado de cada tema y qué estudiar después, según prerequisitos. |
 | Cambiar de tema | `/estudiar <otro tema>`. Te ofrece «Guardar y cambiar», «Cambiar sin guardar» o «Cancelar». |
+| Cambiar el tipo de preguntas | `/preguntas`, o `/preguntas mitad`. Vale desde la próxima pregunta. |
 | Retomar donde quedaste | Cerrá y abrí con `pi-learn -c` (la última sesión) o `pi-learn --resume` (elegís cuál; se llaman `<Curso> · <Tema>`). Desde pi, `/resume`. |
 | Achicar una clase larga | `/compact`. Resume en español con tema, borde, práctica y próximo paso, y la clase sigue. |
 
@@ -237,7 +250,8 @@ Cualquier otro texto en inglés es un defecto: anotalo junto con la nota de la c
 | `/curso-check <slug>` | validar el curso y ver la preparación de cada tema | pestaña Estado del curso, «Validar el curso» |
 | `/curso-estado <slug>` | ver cómo va la indexación | pestaña Estado; la barra de avance a la izquierda |
 | `/cursos` | listar cursos | la barra de la izquierda |
-| `/estudiar [curso] [tema]` | abrir una clase | tocar un tema y «Empezar la clase»; el buscador del curso acepta cualquier texto |
+| `/estudiar [curso] [tema] [desde-cero\|fortalecer]` | abrir una clase, también desde cero o para fortalecer lo flojo | tocar un tema y «Empezar la clase», «Desde cero» o «Fortalecer lo flojo»; el buscador del curso acepta cualquier texto |
+| `/preguntas [mezcla]` | elegir cuántas preguntas van de múltiple opción y cuántas de desarrollo | Ajustes → Cómo estudio |
 | `/simulacro` | rendir el ejercicio reservado del tema | botón Simulacro de la clase |
 | `/progreso [curso]` | ver el progreso y el próximo tema | la vista del curso y la del tema |
 | `/fin` | guardar y cerrar la clase | botón Terminar clase |

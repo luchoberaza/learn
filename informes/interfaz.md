@@ -1,6 +1,6 @@
 # Interfaz de escritorio y Windows
 
-**Propuesta de luchoberaza para revisar en el PR.** La app vive en `app/`, el núcleo corre también en Windows y la terminal (`pi-learn`) queda igual. Las decisiones están en `DECISIONES.md` (DA39–DA50). Sin commits del lado del autor: el dueño del repo decide.
+**Propuesta de luchoberaza para revisar en el PR.** La app vive en `app/`, el núcleo corre también en Windows y la terminal (`pi-learn`) queda igual. Las decisiones están en `DECISIONES.md` (DA39–DA52). Sin commits del lado del autor: el dueño del repo decide.
 
 ## Qué trae
 
@@ -16,6 +16,12 @@
   - **Subagentes** en paneles propios, sin tmux.
   - **Medidor de consumo:** en la barra lateral, lo que queda en la cuenta del modelo de la clase (dólares del plan, % de la ventana de la suscripción o pedidos gratis del día) y cuántas consultas alcanzan; un clic para cambiar de modelo, y un aviso con otro modelo cuando se está por acabar. En Ajustes → Consumo, el plan de cada cuenta, lo gastado por día y por modelo, y cuánto rinde cada modelo. Los modelos gratis (DeepSeek o Qwen por OpenRouter, NVIDIA y otros) se cuentan en pedidos y tokens (DA48).
 - **El modelo principal de cada máquina**, que ya no vuelve al del repo en cada sesión nueva, también en la terminal (DA49).
+- **Un tutor que no da nada por sabido** (DA52), también en la terminal:
+  - el diagnóstico vuelve a ser el de `teach`, sin tope, y arranca con una lista de lo que el alumno ya vio;
+  - antes de usar un término o una definición del libro, el tutor comprueba que el alumno lo tiene;
+  - cada pregunta llega con la explicación que verifica, escrita antes de ella: en una clase real el tutor la escribía en su razonamiento, que el alumno no ve;
+  - cada tema se puede encarar como siempre, desde cero o para fortalecer lo flojo;
+  - el alumno elige cuántas preguntas van de múltiple opción y cuántas de desarrollo, con una pregunta nueva que se responde escribiendo.
 - **La ingesta base, entre 3 y 4,5 veces más rápida:** procesa varias páginas a la vez según los hilos de cada máquina, deja media máquina libre y corre con prioridad baja. Los archivos que deja son idénticos a los de antes (DA50).
 - **El núcleo en Windows:**
   - bloqueos, procesos y rutas portables;
@@ -83,8 +89,11 @@ Capturas de las pruebas de punta a punta, con el curso de demostración y el tut
 |---|---|
 | `pi-learn`, `pi-learn -c`, `--resume`, `/resume` | abrir la app; Inicio, «Seguir la clase»; «Todas las sesiones» |
 | `/cursos`, `/estudiar [curso] [tema]`, selector de temas | barra lateral y vista del tema, en el orden de `ordenarTemas`; buscador del curso con cualquier texto (alias, BM25, ad hoc) |
+| `/estudiar … desde-cero`, `/estudiar … fortalecer` (DA52) | «Desde cero» y «Fortalecer lo flojo» en la vista del tema, con lo que hace cada uno; el segundo, sólo con algo guardado que falle |
+| `/preguntas` (DA52) | Ajustes → Cómo estudio |
 | cambio de tema con clase abierta, tema fuera del índice | los mismos diálogos de la extensión («Guardar y cambiar»…) |
 | quiz, `ask_user_question` (single, multi, «Otra», texto), Esc | tarjetas dentro del texto; «Prefiero responder con mis palabras» |
+| `pregunta_desarrollo` (DA52): escribir, «No sé», Esc | tarjeta con una caja para escribir, «No sé» y «Prefiero responder en el chat»; la respuesta esperada aparece recién al responder |
 | confirmaciones «Sí, … / No» | diálogo con las mismas opciones; cerrar vale como No |
 | fotos (Ctrl+V, ruta) | pegar, arrastrar o elegir; HEIC y BMP como ruta, como en la terminal |
 | `ver_pagina`, citas | página en la clase, notas al margen, panel fijable y el PDF entero en su ventana, sin las páginas reservadas |
@@ -112,6 +121,7 @@ La ventana no corre pi. Un proceso aparte (`app/host`) la corre con el Node del 
 
 - los argumentos ni los resultados de las tools del curso (salen sus líneas en español, de `etiquetas.ts`);
 - la correcta ni la explicación de un quiz antes de responder (la corrección la arma el host);
+- la respuesta esperada de una pregunta de desarrollo antes de responder;
 - los mensajes ocultos;
 - el razonamiento;
 - el `SKILL.md` de una skill cargada.
@@ -124,10 +134,10 @@ Sin modelo ni red: el proveedor falso de pi-ai con guion hace de tutor. Windows 
 
 | Suite | Windows | Linux |
 |---|---|---|
-| Node de learn (`tests/*.test.mjs`) | 298: 276 en verde, 0 en rojo, 22 salteadas con motivo | 298: 285 en verde, 0 en rojo, 13 salteadas con motivo |
+| Node de learn (`tests/*.test.mjs`) | 317: 295 en verde, 0 en rojo, 22 salteadas con motivo | 317: 304 en verde, 0 en rojo, 13 salteadas con motivo |
 | Python de learn (`tests/ingesta`) | 175: 169 OK, 6 salteadas | 175: 171 OK, 4 salteadas |
-| App: host y lógica (`npm test`) | 40 de 40 | 40 de 40 |
-| App: punta a punta con Electron (`npm run e2e`) | 11 de 11 | 11 de 11 |
+| App: host y lógica (`npm test`) | 45 de 45 | 45 de 45 |
+| App: punta a punta con Electron (`npm run e2e`) | 12 de 12 | 12 de 12 |
 | App empaquetada (instalador NSIS / AppImage) | abre con el medidor y la cuenta de Claude | abre una clase, el medidor y un PDF |
 
 **Con el modelo real** (Claude Sonnet 5.5, en Windows, el 2026-10-26). Tres clases en la app con un alumno virtual, con un registrador entre pi y Anthropic que anota lo que factura cada respuesta:
@@ -159,7 +169,8 @@ Sin modelo ni red: el proveedor falso de pi-ai con guion hace de tutor. Windows 
 - crear curso desde un PDF;
 - un subagente real en su panel;
 - el buscador del curso con un alias;
-- el medidor de consumo: lo que queda según el plan, la lista de modelos, la clase sumada al registro y al uso por modelo, y el plan cambiado desde Ajustes.
+- el medidor de consumo: lo que queda según el plan, la lista de modelos, la clase sumada al registro y al uso por modelo, y el plan cambiado desde Ajustes;
+- Cómo estudio y los modos (DA52): la mezcla guardada en `curso.config.local.json` sin tocar lo demás, «Desde cero» y «Fortalecer lo flojo» en el tema, y una clase desde cero con una pregunta de desarrollo. La respuesta esperada no se ve antes de responder, queda en la transcripción y en la nota, y el tutor falso comprueba que le llegan el modo, la mezcla y el conteo.
 
 **Errores encontrados al verificar, y corregidos:**
 
@@ -188,6 +199,7 @@ Sin modelo ni red: el proveedor falso de pi-ai con guion hace de tutor. Windows 
 - **Subagentes:** decidir un fork fijado de `pi-interactive-subagents` o un PR a su autor, para no depender del parche local (DA45).
 - **Probar en Omarchy mismo** (Hyprland, Wayland). Linux se probó en Ubuntu sobre WSL.
 - **Medir DA50 con un libro real.** Los tiempos de la ingesta se midieron con PDFs sintéticos. La preparación con el modelo de visión sigue de a una página.
+- **DA52 con `openai-codex`:** el tutor que no da nada por sabido, la explicación antes de cada pregunta y la mezcla se probaron con Claude Sonnet 5.5, en cinco clases reales con un alumno simulado. Falta una clase con la cuenta del dueño.
 - **Grabaciones con placa NVIDIA (DA51):** el camino con CUDA no se probó, porque ninguna máquina de prueba tiene una. Sin placa, una grabación de 41 minutos llevó 23.
 - **Instaladores sin firma.** El AppImage pide `--no-sandbox` en distros que restringen los espacios de nombres (Ubuntu 24.04); en Arch no.
 - **`.pi/settings.json`** sigue con la entrada de ponytail del dueño. En una máquina sin ese paquete, pi intenta clonarlo al arrancar. Se propone moverla a su configuración personal; no se tocó.

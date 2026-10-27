@@ -1,12 +1,14 @@
-// Quiz y preguntas del tutor dentro del texto (puente ctx.ui.preguntar). La correcta y la explicación llegan del host
-// recién después de responder; «Responder con mis palabras» cierra la tarjeta como cancelada, como Esc en la terminal.
+// Quiz, preguntas de desarrollo y preguntas del tutor dentro del texto (puente ctx.ui.preguntar). La correcta, la
+// explicación y la respuesta esperada llegan del host recién después de responder; «Responder con mis palabras» cierra
+// la tarjeta como cancelada, como Esc en la terminal.
 import { useEffect, useRef, useState } from "react";
 import type { Pedido } from "../tipos";
 import { responder } from "../tienda";
-import { LETRAS } from "./Transcripcion";
+import { ExplicacionPrevia, LETRAS, RespuestaEscrita } from "./Transcripcion";
 import { Prosa } from "./Prosa";
 
 type PedidoQuiz = Extract<Pedido, { clase: "quiz" }>;
+type PedidoDesarrollo = Extract<Pedido, { clase: "desarrollo" }>;
 type PedidoAsk = Extract<Pedido, { clase: "ask" }>;
 
 const escribiendo = (ev: KeyboardEvent) => {
@@ -52,6 +54,8 @@ export function TarjetaQuiz({ p }: { p: PedidoQuiz }) {
   useEffect(() => { caja.current?.scrollIntoView({ block: "nearest", behavior: "smooth" }); }, []);
 
   return (
+    <>
+    <ExplicacionPrevia texto={p.explicacionPrevia} />
     <div className="quiz vivo" ref={caja} role="group" aria-label="Pregunta del tutor">
       <p className="qmeta">{multi ? "Para comprobar, podés elegir varias" : "Para comprobar"}</p>
       <p className="qtexto">{p.pregunta}</p>
@@ -92,6 +96,57 @@ export function TarjetaQuiz({ p }: { p: PedidoQuiz }) {
         </>
       )}
     </div>
+    </>
+  );
+}
+
+// Se responde escribiendo (DA52). Después de responder se ve la respuesta esperada; al seguir, el tutor corrige.
+export function TarjetaDesarrollo({ p }: { p: PedidoDesarrollo }) {
+  const [texto, setTexto] = useState("");
+  const [enviado, setEnviado] = useState(false);
+  const seguir = useRef<HTMLButtonElement>(null);
+  const caja = useRef<HTMLDivElement>(null);
+  const c = p.correccion;
+  const contestar = (r: { noSe: boolean; texto?: string }) => { if (enviado) return; setEnviado(true); void responder(p.id, r); };
+
+  useEffect(() => {
+    if (!c) return;
+    const teclas = (ev: KeyboardEvent) => {
+      if (escribiendo(ev) || ev.ctrlKey || ev.metaKey || ev.altKey || document.querySelector(".velo")) return;
+      if (ev.key === "Enter" && !p.cerrado) { ev.preventDefault(); void responder(p.id, { seguir: true }); }
+    };
+    window.addEventListener("keydown", teclas);
+    return () => window.removeEventListener("keydown", teclas);
+  });
+  useEffect(() => { if (c) seguir.current?.focus({ preventScroll: true }); }, [c]);
+  useEffect(() => { caja.current?.scrollIntoView({ block: "nearest", behavior: "smooth" }); }, []);
+
+  return (
+    <>
+    <ExplicacionPrevia texto={p.explicacionPrevia} />
+    <div className="quiz desarrollo vivo" ref={caja} role="group" aria-label="Pregunta del tutor">
+      <p className="qmeta">Para comprobar, con tus palabras</p>
+      <p className="qtexto">{p.pregunta}</p>
+      {p.contexto && <p className="qcontexto">{p.contexto}</p>}
+      {!c ? (
+        <div className="respuesta-libre">
+          <textarea className="campo" value={texto} onChange={e => setTexto(e.target.value)} placeholder="Escribí tu respuesta" autoFocus disabled={enviado} maxLength={20000}
+            onKeyDown={e => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey) && texto.trim()) { e.preventDefault(); contestar({ noSe: false, texto }); } }} />
+          <div className="qacciones">
+            <button className="boton chico" disabled={!texto.trim() || enviado} onClick={() => contestar({ noSe: false, texto })}>Responder</button>
+            <button className="enlace" disabled={enviado} onClick={() => contestar({ noSe: true })}>No sé</button>
+            <button className="enlace" disabled={enviado} onClick={() => void responder(p.id, null)}>Prefiero responder en el chat</button>
+          </div>
+          <p className="qayuda">Ctrl+Enter también responde. Después vas a ver la respuesta esperada.</p>
+        </div>
+      ) : (
+        <>
+          <RespuestaEscrita r={c} />
+          {!p.cerrado && <><button ref={seguir} className="boton chico" onClick={() => void responder(p.id, { seguir: true })}>Seguir</button><p className="qayuda">Al seguir, el tutor corrige tu respuesta.</p></>}
+        </>
+      )}
+    </div>
+    </>
   );
 }
 

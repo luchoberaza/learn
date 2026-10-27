@@ -1,6 +1,7 @@
 // La uiContext que el host le da a pi: lo que en la terminal dibuja pi-tui, acá viaja a la app como pedidos y avisos.
-// preguntar (extensions/comun/preguntar.ts) dibuja quiz y ask_user_question en la app. La corrección del quiz la hace
-// el host: la app recibe la correcta y la explicación recién cuando el alumno respondió.
+// preguntar (extensions/comun/preguntar.ts) dibuja quiz, pregunta_desarrollo y ask_user_question en la app. La corrección
+// del quiz la hace el host: la app recibe la correcta y la explicación recién cuando el alumno respondió, y la respuesta
+// esperada de una pregunta de desarrollo, recién cuando la contestó.
 import { randomUUID } from "node:crypto";
 
 const conjunto = xs => [...new Set(xs)].sort((a, b) => a - b).join(",");
@@ -8,7 +9,7 @@ const conjunto = xs => [...new Set(xs)].sort((a, b) => a - b).join(",");
 export function crearInterfaz({ enviar }) {
   const pendientes = new Map();
   // Ids de las tools de preguntas que arrancaron y todavía no tienen tarjeta: la tarjeta toma el id de su tool.
-  const qaEnEspera = { quiz: [], ask_user_question: [] };
+  const qaEnEspera = { quiz: [], ask_user_question: [], pregunta_desarrollo: [] };
 
   function pedir(tipo, datos, { signal, timeout, porDefecto, id = randomUUID(), alResponder } = {}) {
     if (signal?.aborted) return Promise.resolve(porDefecto);
@@ -44,8 +45,27 @@ export function crearInterfaz({ enviar }) {
   }
 
   async function preguntar(pedido, signal) {
-    const clave = pedido.tipo === "quiz" ? "quiz" : "ask_user_question";
+    const clave = pedido.tipo === "quiz" ? "quiz" : pedido.tipo === "desarrollo" ? "pregunta_desarrollo" : "ask_user_question";
     const id = qaEnEspera[clave].shift() ?? randomUUID();
+    if (pedido.tipo === "desarrollo") {
+      // Primero lo que escribe (o «No sé»), después la respuesta esperada en pantalla; la tool termina cuando sigue.
+      let respuesta;
+      return pedir("desarrollo", { pregunta: pedido.pregunta, contexto: pedido.contexto, ...(pedido.clase ? { explicacionPrevia: pedido.clase } : {}) }, {
+        signal, id, porDefecto: null,
+        alResponder: r => {
+          const p = pendientes.get(id);
+          if (!respuesta) {
+            const texto = typeof r?.texto === "string" ? r.texto.trim().slice(0, 20000) : "";
+            if (!r || typeof r !== "object" || (!r.noSe && !texto)) return p.terminar(null); // cancelar
+            respuesta = r.noSe ? { noSe: true } : { noSe: false, texto };
+            p.alCortar = () => respuesta;
+            enviar({ tipo: "correccion", id, noSe: respuesta.noSe, ...(respuesta.texto ? { texto: respuesta.texto } : {}), esperada: pedido.esperada });
+            return;
+          }
+          p.terminar(respuesta);
+        },
+      });
+    }
     if (pedido.tipo !== "quiz") {
       const r = await pedir("ask", { pregunta: pedido.pregunta, contexto: pedido.contexto, modo: pedido.modo, opciones: pedido.opciones, etiquetaOtra: pedido.etiquetaOtra },
         { signal, id, porDefecto: null });
@@ -53,7 +73,7 @@ export function crearInterfaz({ enviar }) {
     }
     // Quiz: primero la respuesta, después la corrección en pantalla; la tool termina cuando el alumno sigue.
     let respuesta;
-    return pedir("quiz", { pregunta: pedido.pregunta, contexto: pedido.contexto, modo: pedido.modo, opciones: pedido.opciones.map(o => ({ indice: o.indice, label: o.label, ...(o.description ? { description: o.description } : {}) })) }, {
+    return pedir("quiz", { pregunta: pedido.pregunta, contexto: pedido.contexto, ...(pedido.clase ? { explicacionPrevia: pedido.clase } : {}), modo: pedido.modo, opciones: pedido.opciones.map(o => ({ indice: o.indice, label: o.label, ...(o.description ? { description: o.description } : {}) })) }, {
       signal, id, porDefecto: null,
       alResponder: r => {
         const p = pendientes.get(id);

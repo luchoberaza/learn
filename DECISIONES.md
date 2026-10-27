@@ -28,6 +28,8 @@ La primera prueba de punta a punta con el modelo real (`gpt-6.1-sol`, una clase 
 
 **Grabaciones de clase (2026-10-26, propuesta en el mismo PR):** un video o audio de clase es material del curso, transcripto en local con faster-whisper en tramos de cinco minutos que el tutor cita al segundo y la app reproduce en su propia ventana. Con DA51, sin modelo ni red: suite Node 298 tests (Windows 276 en verde y 22 salteadas; Linux 285 y 13), Python 175 (Windows 169 OK y 6 salteadas; Linux 171 y 4), y la app con 40 tests y 11 de punta a punta en las dos. Con el modelo real, una grabación de 41 minutos se transcribió sin placa de video. Ver DA51.
 
+**Un tutor que no da nada por sabido (2026-10-26, en el mismo PR):** el diagnóstico vuelve a ser el de `teach`, sin tope, y arranca con la lista de lo que el alumno ya vio. Cada pregunta llega con la explicación que verifica: en una clase real el tutor la escribía en su razonamiento, que el alumno no ve. Un tema se encara como siempre, desde cero o para fortalecer lo flojo, y el alumno elige la mezcla de múltiple opción y desarrollo. Con DA52, sin modelo ni red: suite Node 317 tests (Windows 295 en verde y 22 salteadas; Linux 304 y 13) y la app con 45 tests y 12 de punta a punta en las dos; la suite Python no cambió. Con el modelo real, cinco clases con un alumno simulado sin bases. Pendiente: probarlo con `openai-codex`. Ver DA52.
+
 ## D0.1 — Conservar el upstream y fijar los subagentes
 
 - `.pi/` es el clon del fork `santi-esquerre/learn`, rama `cursos`.
@@ -321,6 +323,8 @@ La próxima activación detecta el último log del tema sin cierre final; coinci
 
 ## D7.3 — Confirmar el borde, no reiniciar el probe
 
+*Superada en parte por DA52: con borde previo el probe empieza por lo que fallaba, sin tope de preguntas.*
+
 Modo-curso pide confirmar domina/falla previos con hasta tres preguntas conceptuales en total; si los contradice la nueva evidencia, se amplía el mapeo. El dossier prioriza borde/próximo paso frente a listas de intentos. La sugerencia omite dominados y exige prerequisitos dominados; orden de preferencia: en curso, repasar, temas nuevos accesibles. No se agrega un planificador de repasos.
 
 Ensayo real final: _procesado/fase7/prueba-1792672775843/resultado.json. Dos sesiones nuevas de la fixture prueba-progreso con Sol, tres preguntas en cada una. El sistema recibió el borde de la primera; se cotejó en el JSONL de la segunda y las preguntas lo confirmaron en tres, con igual borde registrado. Dos /fin guardaron y conservaron el resumen antes de desvincular. Respuestas programadas: primer quiz correcto y siguientes no sé; sólo describen al alumno virtual aislado. No certifican el nivel del usuario, una clase completa, práctica evaluada ni el piloto humano. Researcher/visión se excluyeron de este smoke porque ya tienen ensayos propios.
@@ -389,6 +393,8 @@ node --test .pi/tests/*.test.mjs
 - **Verifica:** `ls _procesado/archivo-pruebas/redes/` muestra `LEEME.md`, `sesiones/` y `verificaciones/`; `cursos/redes/sesiones/` sólo conserva `adjuntos/`.
 
 ### DA7 — Pedagogía en `modo-curso.md`, que prevalece sobre teach (usuario, decisión 6)
+
+*Superada en parte por DA52: el probe vuelve a no tener tope, arranca con la lista de lo que el alumno ya vio y las raíces del plan son las que el alumno tiene; el corte por pedido de explicación queda.*
 
 - **Contexto:** la auditoría dejó al usuario el tope del probe, la aprobación del plan, el puntaje, la reserva de ítems y el simulacro (H12, H35, H56, H20; AUDITORIA §5). La precedencia entre teach y modo-curso era ambigua: un pedido de explicación esperó 3 min 46 s detrás del probe y del plan (H12), y al retomar se repetían objetivo y plan (H56).
 - **Decisión:** (a) un pedido explícito de explicación corta el probe, que tiene tope de 4 preguntas en un tema nuevo; (b) el plan se aprueba con `ask_user_question` y, al retomar con objetivo y plan guardados, no se vuelven a pedir; (c) la corrección da «≈ x/N» por pregunta, con el descuento de cada inciso (DA31), sólo cuando hay escala oficial; (d) un ítem reservado por tema y `/simulacro` (DA27); (e) por ahora no hay práctica por bloque: la práctica tipo evaluación va al final del tema.
@@ -839,3 +845,90 @@ Propuesta de luchoberaza en el mismo PR. Las grabaciones de las clases pasan a s
   - `tests/grabaciones.test.mjs`: la cita al segundo, `leer_paginas` con el enlace de cada párrafo y lo que falta, el dossier, las etiquetas, la barra y las anclas del researcher.
   - `app/src/lib/texto.test.mjs`: «el momento de una grabación se reconoce aparte de una página».
   - `app/e2e/grabacion.test.mjs`: la cita abre la grabación en su segundo, se puede adelantar (rangos de bytes), otra cita reusa la ventana, `learn-medio://` no sirve un permiso ajeno y la ventana se cierra con la principal.
+
+### DA52 — El tutor no da nada por sabido, el tema se encara de tres formas y el alumno elige la mezcla de preguntas
+
+- **Contexto:** el autor del curso notó que el tutor empeoró después de DA7. Antes preguntaba mucho para ubicar al alumno; ahora a veces usa definiciones que el alumno no vio. El learn original (`amosblomqvist/learn`, del que este repo es fork) no tiene tope en el probe: `teach` pide, en cada hebra que va a usar la lección, un piso (algo que acierta) y un techo (algo que falla) antes de planear, y confirmar cada raíz con el alumno.
+  - DA7 puso un tope de 4 preguntas en un tema nuevo (3 con borde previo), con el nivel de las evaluaciones desde la primera.
+  - DA7 aceptó «techo no localizado» y verificó las raíces del plan contra el material, no contra el alumno.
+  - F1 (`7935ca0`) sumó leer la definición del libro antes de cada nodo.
+  - Con eso el tutor no sabía qué bases tenía el alumno y enseñaba con el vocabulario del libro.
+  - Una clase real con Claude Sonnet 5.5 mostró una causa más, que viene de antes de DA52 (la clase real del 26-oct con el `modo-curso.md` anterior hace lo mismo).
+    - El tutor escribía la explicación en su razonamiento («Expliqué el concepto…», «Te doy una analogía con una canilla…») y preguntaba como si la hubiera dado.
+    - El alumno no ve el razonamiento: veía sólo preguntas seguidas y, después de responder, la explicación del quiz.
+    - La regla «nunca dos quizzes seguidos sin texto de clase en el medio» ya estaba y no alcanzó.
+  - Además, el alumno pidió repasar un tema de cero, trabajar sólo lo flojo y elegir cuántas preguntas son de múltiple opción y cuántas de desarrollo.
+- **Decisión:**
+  - **Probe sin tope** (`modo-curso.md`): el de `teach`.
+    - Arranca desde la base de cada hebra, no desde el nivel del parcial, y sigue hasta tener piso y techo en cada hebra que usa la clase.
+    - Sube fuerte tras un acierto y no repregunta lo que ya quedó claro.
+    - Para que no canse, primero un `ask_user_question` de selección múltiple, «¿Qué de esto ya viste?», con los conceptos base. Sólo se verifica lo marcado; lo no marcado se enseña sin preguntarlo.
+    - «Explicame» sigue cortando el probe (H12), pero lo que quedó sin medir se comprueba al llegar a su nodo.
+    - «Techo no localizado» vale sólo si el alumno acertó lo más difícil del tema.
+    - Con borde previo, el probe empieza por lo que fallaba.
+  - **Ningún término sin presentar:** antes de usar un término, un símbolo o una definición (también la del libro), el tutor comprueba que el alumno lo tiene: lo acertó en la clase, figura en «domina» o se lo enseñó. Si no, lo presenta primero, con un ejemplo y, si el tema se apoya en él, una pregunta. Las raíces del plan son lo que el probe mostró que el alumno tiene y que consta en el material.
+  - **Modos** (`extensions/comun/estudio.ts`): `/estudiar <curso> <tema> [desde-cero|fortalecer]`.
+    - **Desde cero:** sin la lista de lo que ya vio, probe desde la base y objetivo y plan nuevos. Se enseñan todos los nodos, también lo dominado; lo registrado no se borra.
+    - **Fortalecer lo flojo:** el probe y el plan van sobre lo que el progreso registra como falla, errores abiertos y ejercicios fallados, y sobre sus bases, con práctica en cada nodo y `falla_resuelta`. Sin fallas registradas, sigue como desde cero.
+    - El modo queda en el estado de la clase (sobrevive `pi -c`) y cambia la orden de arranque.
+    - En la app, la página del tema suma «Desde cero» y «Fortalecer lo flojo»; el segundo, sólo si hay algo guardado que falle.
+  - **Mezcla de preguntas:** automático (el predeterminado), sólo múltiple opción, más múltiple opción (3 de cada 4), mitad y mitad, más desarrollo (3 de cada 4 de desarrollo) o sólo desarrollo.
+    - Se guarda como `preguntas` en `curso.config.local.json`. Se elige con `/preguntas` en la terminal y en Ajustes → Cómo estudio en la app.
+    - Con una mezcla fija, cada pregunta respondida suma al resultado, sólo para el modelo, el conteo de la clase y cuál toca después. Con 3 de cada 4: opción, opción, opción, desarrollo.
+    - Automático usa múltiple opción en el probe y al verificar algo nuevo, y desarrollo cuando el alumno ya acertó ese concepto.
+    - La práctica con ítems de evaluación sigue en el chat.
+    - También vale en una clase de tema libre.
+  - **Sección «Esta clase»:** el modo y la mezcla van en una sección propia del prompt, que sólo cambia si cambian ellos.
+    - Así una mezcla nueva vale desde la pregunta siguiente sin romper la caché del prompt en cada turno.
+    - Las reglas de cada modo sólo van cuando se usa.
+  - **El alumno ve la explicación antes de cada pregunta:**
+    - `quiz` y `pregunta_desarrollo` suman `clase`: la explicación que la pregunta verifica, escrita para el alumno. Se muestra justo antes de la pregunta: en la terminal, en el historial y con formato; en la app, como texto del tutor con sus citas al margen; en la nota, como texto del tutor.
+    - **La guardia:** una pregunta de verificación se muestra sólo si, desde la pregunta respondida anterior, hay al menos 120 caracteres visibles entre el texto de los mensajes y su `clase`. Si no, vuelve al modelo con el motivo, sin que el alumno la vea (ni la app ni la nota).
+    - Frena una sola vez seguida: un reintento igual pasa, para que no haya bucles.
+    - Las del diagnóstico llevan `momento: "diagnostico"` y pueden ir seguidas.
+    - Después de cada respuesta de verificación, el resultado le recuerda al modelo que primero va la explicación.
+    - `modo-curso.md` lo dice: el alumno sólo ve el texto de los mensajes y `clase`, nunca el razonamiento ni los argumentos de las tools.
+  - **`pregunta_desarrollo`:** pregunta con respuesta correcta que se responde escribiendo, con «No sé».
+    - La respuesta esperada no se muestra ni se anota antes de responder; después se ve junto a lo escrito.
+    - El tutor corrige en su mensaje siguiente, sin exigir las palabras exactas.
+    - En la terminal es un popup, en la app una tarjeta y en la nota sus bloques.
+  - El tope de `modo-curso.md` pasa de 11,5 a 13,5 KiB; hoy mide 13 507 B.
+- **Por qué:**
+  - Sin el borde de cada hebra no se puede enseñar en la zona de desarrollo próximo, y una definición con términos que el alumno no tiene no se fija: son los dos principios de `teach`.
+  - Los programas que no avanzan hasta tener las bases rinden más, y más en los alumnos flojos (Kulik, Kulik y Bangert-Drowns, 1990, 108 evaluaciones).
+  - Lo que ayuda a un principiante le estorba a quien ya sabe (Kalyuga y otros, 2003): por eso los modos.
+  - Las dos formas de pregunta fijan lo aprendido, sin un ganador claro:
+    - la múltiple opción, si las opciones incorrectas son creíbles (Little y Bjork);
+    - la de desarrollo rinde menos mientras el alumno todavía falla mucho (van Wijk y otros, 2024);
+    - practicar en el formato del examen da una ventaja chica.
+    - De ahí el automático.
+  - La lista de lo que ya vio baja la cantidad de preguntas sin dar nada por sabido: lo marcado se comprueba y lo no marcado se enseña.
+  - Pedirle al modelo que escriba la explicación no alcanzó, ni con la guardia sola. El modelo sí completa bien los campos de las tools, así que la explicación viaja en la pregunta (`clase`).
+- **Límites:**
+  - Que la mezcla se cumpla depende del tutor, que recibe el conteo: el código no impide una pregunta del tipo que no toca.
+  - La lista se responde de memoria y puede sobreestimar: por eso lo marcado se verifica. Lo no marcado se enseña aunque el alumno lo supiera.
+  - Sin tope, el probe hace más preguntas que con DA7 y gasta más; «Explicame» lo corta.
+  - La pregunta de desarrollo no admite foto: los ejercicios largos siguen en el chat.
+  - La guardia mide cantidad, no calidad: 120 caracteres que no explican nada la pasan.
+  - Si el reintento llega sin explicación, la pregunta pasa igual.
+  - Probado con Claude Sonnet 5.5; con `openai-codex` (la cuenta del autor) todavía no.
+- **Verifica:**
+  - `tests/estudio-modos.test.mjs`:
+    - «el modo va al final de /estudiar, también «desde cero» en dos palabras, y el resto es el tema»;
+    - «con una mezcla fija la próxima pregunta sale del conteo; automático la deja al tutor»;
+    - «la sección «Esta clase» nombra el modo sólo si no es seguir, la mezcla y la primera pregunta»;
+    - «/estudiar … desde-cero: el modo queda en el estado de la clase, en la orden de arranque y en «Esta clase»»;
+    - «al retomar la sesión (pi -c) la clase conserva su modo; uno inválido se descarta»;
+    - «cada pregunta respondida suma el conteo de la clase para el modelo»;
+    - «tema libre (skill teach fuera de un curso): también lleva la mezcla de preguntas y su conteo, sin modo»;
+    - «/preguntas: elige en la terminal, acepta el id o el nombre, guarda y automático no queda escrito»;
+    - las tres de `pregunta_desarrollo` (terminal, «No sé» y app) y la de md-log.
+  - `tests/pedagogia-auditoria.test.mjs`: «modo-curso: prevalece sobre teach con sus conflictos explícitos y trae las reglas de la auditoría», con las reglas nuevas, sin el tope y con 13,5 KiB.
+  - `app/host/test/desarrollo.test.mjs`: el filtro y la interfaz no dejan pasar la respuesta esperada antes de responder.
+  - `app/e2e/estudio.test.mjs`: «Cómo estudio guarda la mezcla, el tema ofrece los modos y la clase desde cero pregunta para escribir». El tutor falso comprueba que el modo, la mezcla y el conteo le llegan, y la explicación de la pregunta se ve antes que ella.
+  - `tests/estudio-modos.test.mjs`, además: «guardia: una pregunta de verificación sin explicación visible desde la anterior no se muestra y vuelve al modelo» y «la explicación de la pregunta (clase) se dibuja en la terminal antes de la pregunta, viaja a la app y nunca lleva la respuesta».
+  - **Con el modelo real**, cinco clases nuevas de retardos en la app (Claude Sonnet 5.5, mezcla «Mitad y mitad») con un alumno simulado sin bases: marca un solo concepto de la lista, contesta «No sé» y escribe respuestas incompletas. Costaron entre 0,35 y 0,52 USD cada una.
+    - En todas, la clase arrancó con la lista, verificó sólo lo marcado, alternó múltiple opción y desarrollo según el conteo y no dio por cerrado un nodo con un «creo que lo entendí».
+    - Sin `clase` ni guardia: la explicación quedaba en el razonamiento.
+    - Con la guardia sola: aparecieron explicaciones largas, que presentan cada término antes de usarlo («un router (una estación intermedia que lo reenvía)»), pero el modelo reintentaba sin texto (hasta 10 frenos en una clase) y terminaba preguntando por el chat.
+    - Con `clase`: cada pregunta de verificación llegó con su explicación o su corrección visible («Corrección: a medias. Lo que escribiste…») y la guardia frenó una sola vez.

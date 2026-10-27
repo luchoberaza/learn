@@ -320,17 +320,30 @@ test("E9: el tiempo proporcional sale de curso.md", () => {
   assert.equal(tiempo("Sin duración declarada."), undefined);
 });
 
-// modo-curso.md se inyecta en cada turno: cada regla clave por una frase estable y un tope de tamaño.
+// modo-curso.md se inyecta en cada turno: cada regla clave por una frase estable y un tope de tamaño (DA52 lo subió de 11,5 a 13,5 KiB).
 test("modo-curso: prevalece sobre teach con sus conflictos explícitos y trae las reglas de la auditoría", () => {
   const m = readFileSync(join(piDir, "modo-curso.md"), "utf8"), plano = m.replace(/\s+/g, " ");
-  assert.ok(Buffer.byteLength(m) <= 11.5 * 1024, String(Buffer.byteLength(m)));
+  assert.ok(Buffer.byteLength(m) <= 13.5 * 1024, String(Buffer.byteLength(m)));
   const reglas = {
     "precedencia (H12)": "este protocolo prevalece sobre `teach` en todo lo que regula",
-    "LaTeX en popups (H46)": "LaTeX sólo en `explanation` y en el chat",
+    "LaTeX en popups (H46)": "LaTeX sólo en `explanation`, `respuesta_esperada` y en el chat",
     "sin subagentes (H44)": "durante el estudio no hay subagentes; se hace con `investigar_tema`",
     "objetivo propuesto (A4)": "se propone el del curso y sólo se entrevista si elige ajustar",
-    "turno nunca quieto (H11)": "Cada turno tuyo termina con un `quiz`, un `ask_user_question` o un pedido explícito",
-    "tope del probe (6a)": "tope de 4 preguntas en un tema nuevo; con borde previo, hasta 3 para confirmarlo",
+    "turno nunca quieto (H11)": "Cada turno tuyo termina con un `quiz`, una `pregunta_desarrollo`, un `ask_user_question` o un pedido explícito",
+    "probe sin tope (DA52)": "Probe sin tope",
+    "desde la base de cada hebra (DA52)": "Empezá por la base de cada hebra, no por el nivel del parcial",
+    "lista de lo que ya vio (DA52)": "«¿Qué de esto ya viste?»",
+    "lo no marcado se enseña sin preguntarlo (DA52)": "lo que no marca es laguna: enseñalo sin preguntarlo",
+    "con borde previo, lo que fallaba (D7.3)": "Con borde previo, en cambio, empezá por lo que fallaba",
+    "techo no localizado sólo arriba (DA52)": "«techo no localizado» sólo si acertó lo más difícil del tema",
+    "ningún término sin presentar (DA52)": "Ningún término sin presentar",
+    "raíces del alumno (DA52)": "raíces que el probe mostró que el alumno tiene",
+    "el corte no da por sabido (DA52)": "lo que quedó sin medir se comprueba al llegar a su nodo, nunca se da por sabido",
+    "Esta clase manda (DA52)": "«Esta clase» trae el modo y la mezcla de preguntas que eligió el alumno",
+    "el alumno no ve el razonamiento (DA52)": "El alumno sólo ve el texto de tus mensajes: ni tu razonamiento ni los argumentos de las tools",
+    "probe con momento diagnostico (DA52)": "con `momento: \"diagnostico\"`",
+    "explicación después de cada respuesta (DA52)": "Después de cada respuesta, antes de otra pregunta: la correcta",
+    "la explicación en clase de la pregunta (DA52)": "va en `clase` de la pregunta que la verifica, que se muestra justo antes",
     "pedido de explicación (H12, 6a)": "cortá el probe en ese momento",
     "cierre del probe (B7)": "un diagnóstico de una frase que decide socrático o expositivo",
     "piso y techo (B7)": "una línea por hebra con piso",
@@ -339,7 +352,7 @@ test("modo-curso: prevalece sobre teach con sus conflictos explícitos y trae la
     "el cierre del probe no repite el objetivo (6b)": "con ese borde y, si no hay objetivo acordado, el `ask_user_question` del objetivo",
     "bibliografía complementaria y vigencia (F1)": "Si del tema sólo hay bibliografía complementaria, usala diciendo que lo es",
     "sin páginas ni rúbricas inventadas": "no inventes páginas ni rúbricas",
-    "C5 (H48)": "nunca dos quizzes seguidos sin texto de clase en el medio",
+    "C5 (H48)": "nunca dos preguntas seguidas sin texto de clase en el medio",
     "figuras (H48)": "Nunca preguntes por una figura o tabla que el alumno no vio",
     "criterios antes (E5, H20)": "Antes del intento, al pedir cada parte o inciso: los criterios que vas a mirar",
     "contra qué (E6, H20)": "decí contra qué corregís",
@@ -362,5 +375,5 @@ test("modo-curso: prevalece sobre teach con sus conflictos explícitos y trae la
   // Ni subagent ni researcher como tool del estudio: sólo se nombran para decir que no hay.
   assert.doesNotMatch(m, /`(subagent|researcher)`/);
   for (const linea of m.split("\n").filter(l => /subagent/i.test(l))) assert.match(linea, /no hay subagentes/);
-  assert.doesNotMatch(plano, /cada bloque|Esperá aprobación|Seguí el proceso completo de `teach`/);
+  assert.doesNotMatch(plano, /cada bloque|Esperá aprobación|Seguí el proceso completo de `teach`|tope de \d preguntas|hasta 3 para confirmarlo/);
 });

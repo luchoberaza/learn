@@ -123,7 +123,8 @@ ipcMain.handle("archivos:temporal", (_e, nombre: string, base64: string) => {
   writeFileSync(ruta, Buffer.from(base64, "base64"));
   return ruta;
 });
-// curso.config.local.json: los modelos y el Tesseract de esta máquina, sin tocar el curso.config.json versionado.
+// curso.config.local.json: los modelos y el Tesseract de esta máquina y la mezcla de preguntas (DA52), sin tocar el
+// curso.config.json versionado.
 ipcMain.handle("archivos:config-local", (_e, cambios?: Record<string, string | undefined>) => {
   const archivo = enVault(".pi/curso.config.local.json");
   let actual: Record<string, string> = {};
@@ -132,7 +133,7 @@ ipcMain.handle("archivos:config-local", (_e, cambios?: Record<string, string | u
   try { base = JSON.parse(readFileSync(enVault(".pi/curso.config.json"), "utf8")); } catch { /* sin learn */ }
   if (!cambios) return { base, local: actual };
   const nuevo = { ...actual };
-  for (const [k, v] of Object.entries(cambios)) if (["modelo_vision", "modelo_researcher", "modelo_principal", "modelo_transcripcion", "carpeta_modelos", "ruta_tesseract"].includes(k)) { if (v) nuevo[k] = v; else delete nuevo[k]; }
+  for (const [k, v] of Object.entries(cambios)) if (["modelo_vision", "modelo_researcher", "modelo_principal", "modelo_transcripcion", "carpeta_modelos", "ruta_tesseract", "preguntas"].includes(k)) { if (v) nuevo[k] = v; else delete nuevo[k]; }
   writeFileSync(archivo, `${JSON.stringify(nuevo, null, 2)}\n`);
   return { base, local: nuevo };
 });

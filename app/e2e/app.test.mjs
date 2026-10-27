@@ -242,7 +242,7 @@ test("app: barrido de pantallas, sin botones sin nombre ni errores", { skip: sin
   await sinNombre("Crear curso");
   await capturar(win, "crear-curso");
   await win.getByRole("button", { name: "Ajustes", exact: true }).click();
-  for (const s of ["Apariencia", "Foco", "Modelos", "Consumo", "Cuentas", "Conversación", "Carpeta del vault", "Avanzado"]) {
+  for (const s of ["Apariencia", "Cómo estudio", "Foco", "Modelos", "Consumo", "Cuentas", "Conversación", "Carpeta del vault", "Avanzado"]) {
     await win.locator(".ajustes-nav").getByRole("button", { name: s }).click();
     await espera(500);
     await sinNombre(`Ajustes, ${s}`);

@@ -1,7 +1,7 @@
 // Estado de la interfaz: una sola tienda, alimentada por los mensajes del host y por las acciones de las pantallas.
 // Las pantallas leen campos con usarTienda(e => e.campo): cada campo cambia de referencia sólo cuando cambia.
 import { useSyncExternalStore } from "react";
-import type { Ajustes, Aviso, Comando, Consumo, EstadoSesion, Imagen, Item, Pagina, Pedido, ResumenCurso, Seguir, SesionGuardada } from "./tipos";
+import type { Ajustes, Aviso, Comando, Consumo, EstadoSesion, Estudio, Imagen, Item, Pagina, Pedido, ResumenCurso, Seguir, SesionGuardada } from "./tipos";
 import { alMensajeSubagente, restaurarSubagentes } from "./componentes/Subagentes";
 import { cuando, textoRinde } from "../../lib/consumo.ts";
 
@@ -147,8 +147,8 @@ function alMensaje(m: any) {
     case "pensando": return cambiar({ pensando: true });
     case "item": return cambiar(e => ({
       items: upsert(e.items, m.item),
-      // La tarjeta en vivo del quiz se reemplaza por el quiz ya corregido de la transcripción.
-      pedidos: m.item?.tipo === "quiz" ? e.pedidos.filter(p => p.id !== m.item.id) : e.pedidos,
+      // La tarjeta en vivo del quiz (o de desarrollo) se reemplaza por la ya corregida de la transcripción.
+      pedidos: m.item?.tipo === "quiz" || m.item?.tipo === "desarrollo" ? e.pedidos.filter(p => p.id !== m.item.id) : e.pedidos,
     }));
     case "item-cambio": return cambiar(e => {
       const previo = e.items.find(x => x.id === m.id);
@@ -178,12 +178,12 @@ function alMensaje(m: any) {
       return cambiar(e => ({ pedidos: [...e.pedidos.filter(x => x.id !== p.id), p as Pedido] }));
     }
     case "pedido-cerrado": return cambiar(e => ({
-      // Un quiz ya corregido queda a la vista hasta que llegue su resultado; lo demás se cierra.
-      pedidos: e.pedidos.flatMap(p => p.id !== m.id ? [p] : p.clase === "quiz" && p.correccion ? [{ ...p, cerrado: true }] : []),
+      // Un quiz ya corregido (o una de desarrollo ya respondida) queda a la vista hasta que llegue su resultado; lo demás se cierra.
+      pedidos: e.pedidos.flatMap(p => p.id !== m.id ? [p] : (p.clase === "quiz" || p.clase === "desarrollo") && p.correccion ? [{ ...p, cerrado: true }] : []),
     }));
     case "correccion": {
       const { tipo: _t, id, ...c } = m;
-      return cambiar(e => ({ pedidos: e.pedidos.map(p => p.id === id && p.clase === "quiz" ? { ...p, correccion: c } : p) }));
+      return cambiar(e => ({ pedidos: e.pedidos.map(p => p.id !== id ? p : p.clase === "quiz" ? { ...p, correccion: c } : p.clase === "desarrollo" ? { ...p, correccion: c } : p) }));
     }
     case "pantalla": return abrirPantallaPi(m.nombre, m.datos ?? {});
     case "pedido-salir": void window.learn.salir(); return;
@@ -335,7 +335,7 @@ export const cortar = () => pedir("cortar");
 // reemplazan por su resultado cuando termina la tool.
 export async function responder(id: string, respuesta: unknown) {
   const p = leer().pedidos.find(x => x.id === id);
-  if (p && p.clase !== "quiz" && p.clase !== "ask") cambiar(e => ({ pedidos: e.pedidos.filter(x => x.id !== id) }));
+  if (p && p.clase !== "quiz" && p.clase !== "desarrollo" && p.clase !== "ask") cambiar(e => ({ pedidos: e.pedidos.filter(x => x.id !== id) }));
   const r = await pedir<{ abierto: boolean }>("responder", { pedido: id, respuesta });
   if (r && !r.abierto) cambiar(e => ({ pedidos: e.pedidos.filter(x => x.id !== id) }));
 }
@@ -350,13 +350,23 @@ async function otraInstancia(slug: string): Promise<boolean> {
 }
 
 // Empezar o cambiar de tema, como /estudiar: en la misma sesión si hay una clase (la extensión pregunta «Guardar y
-// cambiar»); en una sesión nueva si la actual es otra conversación (tema libre, armado de un curso).
-export async function estudiar(slug: string, temaId: string) {
+// cambiar»); en una sesión nueva si la actual es otra conversación (tema libre, armado de un curso). modo: «desde-cero»
+// o «fortalecer» (DA52); sin él, seguir donde quedó.
+export async function estudiar(slug: string, temaId: string, modo?: string) {
   if (!(await otraInstancia(slug))) return;
   const e = leer();
   if (!e.sesion.curso && e.items.length) await pedir("nueva-sesion");
   navegar({ pantalla: "clase" });
-  await enviar(`/estudiar ${slug} ${temaId}`);
+  await enviar(`/estudiar ${slug} ${temaId}${modo && modo !== "seguir" ? ` ${modo}` : ""}`);
+}
+
+// Modos y mezclas de preguntas del .pi (undefined si es anterior a DA52) y la mezcla elegida en esta máquina.
+export async function opcionesEstudio(): Promise<Estudio | undefined> {
+  return (await pedir<Estudio | undefined>("estudio", {}, true)) ?? undefined;
+}
+// Automático es lo de siempre: no queda escrito, como con /preguntas en la terminal.
+export async function elegirPreguntas(id: string) {
+  await window.learn.configLocal({ preguntas: id === "automatico" ? undefined : id });
 }
 
 export async function seguirClase(s: Seguir) {

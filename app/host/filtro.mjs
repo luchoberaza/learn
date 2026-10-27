@@ -1,8 +1,11 @@
 // Qué ve la interfaz. Regla de oro (DA18 y «nunca la solución antes del intento»): nada sale del host salvo lo que se
 // arma acá, campo por campo. Nunca: args ni resultados de las tools del curso, la respuesta correcta o la explicación de
-// un quiz antes de que el alumno responda, mensajes ocultos (display:false) ni bloques de razonamiento.
+// un quiz antes de que el alumno responda, la respuesta esperada de una pregunta de desarrollo antes de que la
+// conteste, mensajes ocultos (display:false) ni bloques de razonamiento.
 
-const QA = new Set(["quiz", "ask_user_question"]);
+const QA = new Set(["quiz", "ask_user_question", "pregunta_desarrollo"]);
+// Sus argumentos traen la respuesta (correctAnswer, respuesta_esperada): nunca se guardan para la interfaz.
+const CON_RESPUESTA = new Set(["quiz", "pregunta_desarrollo"]);
 // Tools cuya llamada y salida se pueden mostrar plegadas, como en pi (fuera del curso, al armar un curso, subagentes).
 const LIMITE_SALIDA = 4000;
 
@@ -58,6 +61,14 @@ export function crearFiltro({ etiquetas }) {
       resultado: { elegidas: (d.answers ?? []).map(a => a.index), correctas: d.correctIndices ?? [], correcto: d.correct === true, noSe: d.dontKnow === true,
         ...(d.note ? { nota: d.note } : {}), ...(d.explanation ? { explicacion: d.explanation } : {}) } };
   }
+  // Una pregunta de desarrollo terminada (DA52): lo que escribió y la respuesta esperada, que ya vio al responder.
+  function resultadoDesarrollo(d) {
+    if (!d || typeof d !== "object" || d.status !== "answered") return { estado: d?.status === "unavailable" ? "descartado" : "cancelado", ...(d?.message ? { mensaje: d.message } : {}), ...(d?.motivo ? { motivo: d.motivo } : {}) };
+    return { estado: "respondido", resultado: { noSe: d.dontKnow === true, ...(typeof d.answer === "string" ? { texto: d.answer } : {}), ...(typeof d.expected === "string" ? { esperada: d.expected } : {}) } };
+  }
+  // La explicación de la pregunta (clase, DA52) la vio el alumno antes de responder: va con la pregunta.
+  const conClase = d => typeof d?.clase === "string" && d.clase ? { explicacionPrevia: d.clase } : {};
+  const itemDesarrollo = (id, d = {}) => ({ tipo: "desarrollo", id, pregunta: d.question ?? "", contexto: d.context, ...conClase(d), ...resultadoDesarrollo(d) });
   function resultadoPregunta(d) {
     if (!d || typeof d !== "object" || d.status !== "answered") return { estado: d?.status === "unavailable" ? "descartado" : "cancelado", ...(d?.motivo ? { motivo: d.motivo } : {}) };
     return { estado: "respondido", respuestas: (d.answers ?? []).map(a => a.type === "option" ? { tipo: "option", indice: a.index, label: a.label } : { tipo: a.type, texto: a.label }) };
@@ -78,14 +89,20 @@ export function crearFiltro({ etiquetas }) {
       } else if (m.role === "assistant") {
         const texto = (m.content ?? []).filter(b => b?.type === "text").map(b => b.text).join("\n\n").trim();
         if (texto) items.push({ tipo: "tutor", id: e.id, texto, enCurso: false });
-        for (const b of m.content ?? []) if (b?.type === "toolCall") llamadas.set(b.id, { nombre: b.name, args: QA.has(b.name) && b.name === "quiz" ? undefined : b.arguments });
+        for (const b of m.content ?? []) if (b?.type === "toolCall") llamadas.set(b.id, { nombre: b.name, args: CON_RESPUESTA.has(b.name) ? undefined : b.arguments });
         if (m.stopReason === "error" && m.errorMessage) items.push({ tipo: "error", id: `${e.id}-error`, texto: m.errorMessage });
       } else if (m.role === "toolResult") {
         const llamada = llamadas.get(m.toolCallId) ?? { nombre: m.toolName };
+        // Una pregunta que la guardia no mostró (faltaba la explicación, DA52) no existe para el alumno.
+        if (CON_RESPUESTA.has(m.toolName) && m.details?.interno) continue;
         if (m.toolName === "quiz") {
           const d = m.details ?? {};
           if (d.status === "unavailable" && !d.options) { items.push({ tipo: "aviso-linea", id: m.toolCallId, texto: d.message ?? "" }); continue; }
-          items.push({ tipo: "quiz", id: m.toolCallId, pregunta: d.question ?? "", contexto: d.context, modo: d.mode ?? "single-select", ...resultadoQuiz(d) });
+          items.push({ tipo: "quiz", id: m.toolCallId, pregunta: d.question ?? "", contexto: d.context, ...conClase(d), modo: d.mode ?? "single-select", ...resultadoQuiz(d) });
+        } else if (m.toolName === "pregunta_desarrollo") {
+          const d = m.details ?? {};
+          if (d.status === "unavailable" && !d.question) { items.push({ tipo: "aviso-linea", id: m.toolCallId, texto: d.message ?? "" }); continue; }
+          items.push(itemDesarrollo(m.toolCallId, d));
         } else if (m.toolName === "ask_user_question") {
           const d = m.details ?? {}, args = llamada.args ?? {};
           items.push({ tipo: "pregunta", id: m.toolCallId, pregunta: d.question ?? args.question ?? "", contexto: d.context, modo: d.mode ?? "single-select",
@@ -155,10 +172,16 @@ export function crearFiltro({ etiquetas }) {
       case "tool_execution_end": {
         const args = argsDe(ev);
         argumentos.delete(ev.toolCallId);
+        if (CON_RESPUESTA.has(ev.toolName) && ev.result?.details?.interno) return [{ tipo: "qa-fin", id: ev.toolCallId }];
         if (ev.toolName === "quiz") {
           const d = ev.result?.details ?? {};
           if (d.status === "unavailable" && !d.options) return [{ tipo: "item", item: { tipo: "aviso-linea", id: ev.toolCallId, texto: d.message ?? "" } }, { tipo: "qa-fin", id: ev.toolCallId }];
-          return [{ tipo: "item", item: { tipo: "quiz", id: ev.toolCallId, pregunta: d.question ?? "", contexto: d.context, modo: d.mode ?? "single-select", ...resultadoQuiz(d) } }, { tipo: "qa-fin", id: ev.toolCallId }];
+          return [{ tipo: "item", item: { tipo: "quiz", id: ev.toolCallId, pregunta: d.question ?? "", contexto: d.context, ...conClase(d), modo: d.mode ?? "single-select", ...resultadoQuiz(d) } }, { tipo: "qa-fin", id: ev.toolCallId }];
+        }
+        if (ev.toolName === "pregunta_desarrollo") {
+          const d = ev.result?.details ?? {};
+          if (d.status === "unavailable" && !d.question) return [{ tipo: "item", item: { tipo: "aviso-linea", id: ev.toolCallId, texto: d.message ?? "" } }, { tipo: "qa-fin", id: ev.toolCallId }];
+          return [{ tipo: "item", item: itemDesarrollo(ev.toolCallId, d) }, { tipo: "qa-fin", id: ev.toolCallId }];
         }
         if (ev.toolName === "ask_user_question") {
           const d = ev.result?.details ?? {};

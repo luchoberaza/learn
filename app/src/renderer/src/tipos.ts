@@ -8,6 +8,7 @@ export type Item =
   | { tipo: "herramienta"; id: string; nombre: string; curso: true; linea: string; estado: EstadoHerramienta; parcial?: string }
   | { tipo: "herramienta"; id: string; nombre: string; curso: false; linea: string; estado: EstadoHerramienta; detalle: { entrada: string; salida: string } }
   | ItemQuiz
+  | ItemDesarrollo
   | ItemPregunta
   | { tipo: "sistema"; id: string; clase: "info" | "diff"; texto: string }
   | { tipo: "pagina"; id: string; render: string; cita: string }
@@ -17,10 +18,16 @@ export type Item =
 export type EstadoHerramienta = "corriendo" | "hecha" | "error";
 
 export interface ItemQuiz {
-  tipo: "quiz"; id: string; pregunta: string; contexto?: string; modo: string;
+  tipo: "quiz"; id: string; pregunta: string; contexto?: string; explicacionPrevia?: string; modo: string;
   estado: "respondido" | "cancelado" | "descartado"; mensaje?: string; motivo?: string;
   opciones?: { indice: number; label: string }[];
   resultado?: { elegidas: number[]; correctas: number[]; correcto: boolean; noSe: boolean; nota?: string; explicacion?: string };
+}
+// Pregunta de desarrollo (DA52): lo que escribió el alumno y la respuesta esperada, que ve recién al responder.
+export interface ItemDesarrollo {
+  tipo: "desarrollo"; id: string; pregunta: string; contexto?: string; explicacionPrevia?: string;
+  estado: "respondido" | "cancelado" | "descartado"; mensaje?: string; motivo?: string;
+  resultado?: CorreccionDesarrollo;
 }
 export interface ItemPregunta {
   tipo: "pregunta"; id: string; pregunta: string; contexto?: string; modo: string;
@@ -30,13 +37,18 @@ export interface ItemPregunta {
 }
 
 export type Pedido =
-  | { id: string; clase: "quiz"; pregunta: string; contexto?: string; modo: "single-select" | "multi-select"; opciones: { indice: number; label: string; description?: string }[]; correccion?: Correccion; cerrado?: boolean }
+  | { id: string; clase: "quiz"; pregunta: string; contexto?: string; explicacionPrevia?: string; modo: "single-select" | "multi-select"; opciones: { indice: number; label: string; description?: string }[]; correccion?: Correccion; cerrado?: boolean }
+  | { id: string; clase: "desarrollo"; pregunta: string; contexto?: string; explicacionPrevia?: string; correccion?: CorreccionDesarrollo; cerrado?: boolean }
   | { id: string; clase: "ask"; pregunta: string; contexto?: string; modo: "text" | "single-select" | "multi-select"; opciones: { indice: number; label: string; value: string; description?: string }[]; etiquetaOtra: string; cerrado?: boolean }
   | { id: string; clase: "select"; titulo: string; opciones: string[]; cerrado?: boolean }
   | { id: string; clase: "confirm"; titulo: string; mensaje: string; cerrado?: boolean }
   | { id: string; clase: "input"; titulo: string; placeholder?: string; cerrado?: boolean }
   | { id: string; clase: "editor"; titulo: string; prefill?: string; cerrado?: boolean };
 export interface Correccion { correctas: number[]; correcto: boolean; noSe: boolean; elegidas: number[]; explicacion?: string; nota?: string }
+export interface CorreccionDesarrollo { noSe: boolean; texto?: string; esperada?: string }
+// Modos para encarar un tema y mezclas de preguntas (extensions/comun/estudio.ts, DA52).
+export interface OpcionEstudio { id: string; nombre: string; descripcion: string }
+export interface Estudio { modos: OpcionEstudio[]; mezclas: OpcionEstudio[]; preguntas: string }
 
 export interface EstadoSesion {
   archivo?: string; nombre?: string;

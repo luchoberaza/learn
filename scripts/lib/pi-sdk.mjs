@@ -1,5 +1,5 @@
 import { execFileSync, execSync } from "node:child_process";
-import { existsSync, readFileSync, realpathSync } from "node:fs";
+import { existsSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -23,12 +23,23 @@ export function pythonDelVenv(recursos = piDir) {
 export const PYTHON_TEXTO = WINDOWS ? ".pi/.venv/Scripts/python.exe" : ".pi/.venv/bin/python";
 
 // Claves que una máquina puede pisar sin tocar el curso.config.json versionado.
-export const CLAVES_LOCALES = ["vault", "ruta_tesseract", "modelo_vision", "modelo_researcher", "modelo_principal", "modelo_transcripcion", "carpeta_modelos"];
+// preguntas: la mezcla de múltiple opción y desarrollo que eligió el alumno (DA52).
+export const CLAVES_LOCALES = ["vault", "ruta_tesseract", "modelo_vision", "modelo_researcher", "modelo_principal", "modelo_transcripcion", "carpeta_modelos", "preguntas"];
 export function leerConfigLocal(recursos = piDir) {
   let local = {};
   try { local = JSON.parse(readFileSync(join(recursos, "curso.config.local.json"), "utf8")); } catch { return {}; }
   if (!local || typeof local !== "object" || Array.isArray(local)) return {};
   return Object.fromEntries(Object.entries(local).filter(([k, v]) => CLAVES_LOCALES.includes(k) && typeof v === "string" && v.trim()));
+}
+// Pisa sólo las claves que se pasan (undefined o "" la borra) y conserva el resto del archivo, como la app.
+export function guardarConfigLocal(cambios, recursos = piDir) {
+  const archivo = join(recursos, "curso.config.local.json");
+  let actual = {};
+  try { actual = JSON.parse(readFileSync(archivo, "utf8")); } catch { /* no había */ }
+  if (!actual || typeof actual !== "object" || Array.isArray(actual)) actual = {};
+  for (const [k, v] of Object.entries(cambios)) if (CLAVES_LOCALES.includes(k)) { if (v) actual[k] = v; else delete actual[k]; }
+  writeFileSync(archivo, `${JSON.stringify(actual, null, 2)}\n`);
+  return actual;
 }
 export function leerConfig(recursos = piDir) {
   return { ...JSON.parse(readFileSync(join(recursos, "curso.config.json"), "utf8")), ...leerConfigLocal(recursos) };

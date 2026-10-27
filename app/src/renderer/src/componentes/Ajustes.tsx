@@ -1,11 +1,13 @@
-// Ajustes (§9.8): apariencia, foco, modelos (el de la clase y los de visión y researcher de esta máquina), consumo,
-// cuentas, ajustes de pi que aplican fuera de la terminal, la carpeta del vault y lo avanzado.
+// Ajustes (§9.8): apariencia, cómo estudio (la mezcla de preguntas), foco, modelos (el de la clase y los de visión y
+// researcher de esta máquina), consumo, cuentas, ajustes de pi que aplican fuera de la terminal, la carpeta del vault
+// y lo avanzado.
 import { useEffect, useState } from "react";
-import { arrancar, avisar, cambiar, confirmarApp, elegirModelo, guardarAjustes, iniciarLogin, navegar, pedir, usarTienda } from "../tienda";
+import { arrancar, avisar, cambiar, confirmarApp, elegirModelo, elegirPreguntas, guardarAjustes, iniciarLogin, navegar, opcionesEstudio, pedir, usarTienda } from "../tienda";
+import type { Estudio } from "../tipos";
 import { ConsumoAjuste } from "./Consumo";
 
-type Seccion = "apariencia" | "foco" | "modelos" | "consumo" | "cuentas" | "pi" | "vault" | "avanzado";
-const SECCIONES: [Seccion, string][] = [["apariencia", "Apariencia"], ["foco", "Foco"], ["modelos", "Modelos"], ["consumo", "Consumo"], ["cuentas", "Cuentas"], ["pi", "Conversación"], ["vault", "Carpeta del vault"], ["avanzado", "Avanzado"]];
+type Seccion = "apariencia" | "estudio" | "foco" | "modelos" | "consumo" | "cuentas" | "pi" | "vault" | "avanzado";
+const SECCIONES: [Seccion, string][] = [["apariencia", "Apariencia"], ["estudio", "Cómo estudio"], ["foco", "Foco"], ["modelos", "Modelos"], ["consumo", "Consumo"], ["cuentas", "Cuentas"], ["pi", "Conversación"], ["vault", "Carpeta del vault"], ["avanzado", "Avanzado"]];
 
 function Apariencia() {
   const tema = usarTienda(e => e.ajustes?.tema ?? "sistema");
@@ -17,6 +19,40 @@ function Apariencia() {
           <label key={v} className="casilla"><input type="radio" name="tema" checked={tema === v} onChange={() => void guardarAjustes({ tema: v })} /><span>{t}<small>{d}</small></span></label>
         ))}
       </div>
+    </section>
+  );
+}
+
+// La mezcla de múltiple opción y desarrollo (DA52), la misma de /preguntas en la terminal: vale desde la pregunta siguiente.
+function ComoEstudio() {
+  const listo = usarTienda(e => e.arranque === "listo");
+  const [o, setO] = useState<Estudio | null>();
+  useEffect(() => { if (listo) void opcionesEstudio().then(r => setO(r ?? null)); }, [listo]);
+  const titulo = <h2 className="serif">Cómo estudio</h2>;
+  if (!listo) return <section className="ajuste">{titulo}<p className="vacio">Abrí learn para elegir cómo son las preguntas.</p></section>;
+  if (o === undefined) return <section className="ajuste">{titulo}<span className="giro" /></section>;
+  if (o === null) return <section className="ajuste">{titulo}<p className="aviso-bloque">El learn de este vault es anterior a la mezcla de preguntas: actualizalo para elegirla.</p></section>;
+  // Se marca enseguida y se guarda después; si no se pudo guardar, vuelve a la de antes.
+  const elegir = async (id: string) => {
+    const antes = o.preguntas;
+    setO({ ...o, preguntas: id });
+    try { await elegirPreguntas(id); }
+    catch (e) { setO({ ...o, preguntas: antes }); avisar(`No se guardó: ${e instanceof Error ? e.message : String(e)}`, "error"); }
+  };
+  return (
+    <section className="ajuste">
+      {titulo}
+      <h3 className="subtitulo-ajuste" style={{ marginTop: 0 }}>Tipo de preguntas</h3>
+      <p className="ayuda" style={{ marginBottom: 12 }}>Las de múltiple opción se responden eligiendo; las de desarrollo, escribiendo con tus palabras. Las dos ayudan a fijar lo que aprendés. El cambio vale desde la próxima pregunta, también con una clase abierta.</p>
+      <div className="opciones-radio">
+        {o.mezclas.map(m => (
+          <label key={m.id} className="casilla"><input type="radio" name="preguntas" checked={o.preguntas === m.id} onChange={() => void elegir(m.id)} /><span>{m.nombre}{m.id === "automatico" ? " (recomendado)" : ""}<small>{m.descripcion}</small></span></label>
+        ))}
+      </div>
+      <p className="ayuda">Queda en esta computadora (curso.config.local.json). En la terminal es /preguntas.</p>
+      <h3 className="subtitulo-ajuste">Cómo encarar un tema</h3>
+      <p className="ayuda" style={{ marginBottom: 8 }}>Se elige al empezar, en la página de cada tema:</p>
+      <ul className="lista">{o.modos.map(m => <li key={m.id}><span className="fuerte">{m.nombre}.</span> {m.descripcion}</li>)}</ul>
     </section>
   );
 }
@@ -224,6 +260,7 @@ export function Ajustes({ seccion }: { seccion?: string }) {
       </nav>
       <div className="ajustes-cuerpo">
         {activa === "apariencia" && <Apariencia />}
+        {activa === "estudio" && <ComoEstudio />}
         {activa === "foco" && <Foco />}
         {activa === "modelos" && <ModelosAjuste />}
         {activa === "consumo" && <ConsumoAjuste />}
