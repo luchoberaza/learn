@@ -99,16 +99,17 @@ label.etiqueta { display: block; font-size: 13.5px; color: var(--muted); margin-
 .indice li { display: flex; align-items: baseline; gap: 8px; padding: 7px 0; font-size: 14.5px; }
 .indice li > button { display: contents; cursor: pointer; }
 .indice li:hover .nombre { color: var(--strong); text-decoration: underline; text-decoration-color: var(--deco); text-underline-offset: 3px; }
-.indice .nombre { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 70%; }
+.indice .nombre { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 70%; flex-shrink: 0; }
 .indice .puntos { flex: 1; height: 2px; min-width: 20px; transform: translateY(-4px); background-image: radial-gradient(circle, var(--deco) 1px, transparent 1.3px); background-size: 7px 2px; background-repeat: repeat-x; }
-.indice .estado { color: var(--muted); font-size: 13px; white-space: nowrap; }
+/* El estado puede ser largo («después de A y B»): baja de renglón en vez de meterse en la columna de al lado. */
+.indice .estado { color: var(--muted); font-size: 13px; text-align: right; }
 .indice .estado.go { color: var(--accent); font-weight: 600; }
 .indice .estado.ok { color: var(--ok); }
 .indice .estado.rep { color: var(--warn); }
 .indice .unidad { font-size: 13px; color: var(--muted); padding: 14px 0 2px; }
 .indice .unidad:first-child { padding-top: 0; }
 
-.vacio { color: var(--muted); font-size: 14.5px; line-height: 1.6; max-width: 56ch; }
+.vacio { color: var(--muted); font-size: 14.5px; line-height: 1.6; }
 .vacio b { color: var(--strong); font-weight: 600; }
 .aviso-bloque { border-left: 2px solid var(--warn); padding: 4px 0 4px 14px; color: var(--text); font-size: 14px; line-height: 1.55; margin-bottom: 18px; }
 .aviso-bloque.error { border-color: var(--bad); }

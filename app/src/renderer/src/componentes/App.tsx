@@ -88,7 +88,7 @@ export function App() {
   return (
     <div className={`ventana ${panel ? "con-panel" : ""}`}>
       <Lateral />
-      <Pantalla />
+      <div className="marco-pantalla"><Pantalla /></div>
       {panel && <PanelPagina />}
       <PanelSubagentes />
       <Paleta />

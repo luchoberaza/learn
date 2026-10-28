@@ -1,10 +1,10 @@
 /* Inicio, curso, tema, notas, crear curso, ajustes y preparar. */
 
 .inicio { padding: 54px 64px 60px; display: grid; grid-template-columns: minmax(0, 1fr) 290px; gap: 30px 64px; align-content: start; }
-.retomar { grid-column: 1 / -1; max-width: 740px; margin-bottom: 8px; }
+.retomar { grid-column: 1 / -1; margin-bottom: 8px; }
 .cuando { font-size: 13.5px; color: var(--muted); margin-bottom: 12px; }
 .titular { font-weight: 500; font-size: 38px; line-height: 1.15; letter-spacing: -.6px; color: var(--strong); margin-bottom: 18px; }
-.ultima-frase { font-family: var(--leer); font-style: italic; font-size: 17px; line-height: 1.6; color: var(--text); border-left: 2px solid var(--accent); padding: 2px 0 2px 18px; margin-bottom: 24px; max-width: 62ch; }
+.ultima-frase { font-family: var(--leer); font-style: italic; font-size: 17px; line-height: 1.6; color: var(--text); border-left: 2px solid var(--accent); padding: 2px 0 2px 18px; margin-bottom: 24px; }
 .ultima-frase small { display: block; font-style: normal; font-family: var(--ui); font-size: 12.5px; color: var(--muted); margin-top: 6px; }
 .inicio-indices { display: grid; gap: 34px; align-content: start; min-width: 0; }
 .indice-curso h3, .semana h3, .recientes h3 { font-weight: 600; font-size: 17px; color: var(--strong); margin-bottom: 12px; }
@@ -30,7 +30,7 @@
 .documentos li { display: flex; align-items: baseline; gap: 14px; padding: 7px 0; border-bottom: 1px solid var(--line); font-size: 14.5px; }
 .documentos li .fuerte { flex: 1; min-width: 0; }
 .documentos li .apagado { font-size: 13px; white-space: nowrap; }
-.estado-curso section { margin-bottom: 34px; max-width: 720px; }
+.estado-curso section { margin-bottom: 34px; }
 .estado-curso h3 { font-size: 17px; font-weight: 600; color: var(--strong); margin-bottom: 8px; }
 .estado-curso p { font-size: 14.5px; line-height: 1.6; }
 .estado-curso .acciones { margin-top: 12px; }
@@ -62,7 +62,7 @@
 
 /* Nota. */
 .nota-prosa { font-size: 17px; }
-.nota .con-margen { grid-template-columns: minmax(0, 640px) 180px; }
+.nota { container-type: inline-size; }
 
 /* Crear curso. */
 .zona-soltar { border: 1.5px dashed var(--line); border-radius: 12px; padding: 26px; display: grid; justify-items: start; gap: 10px; }
@@ -78,7 +78,6 @@
 .ajustes-nav button:hover { color: var(--strong); background: var(--wash); }
 .ajustes-nav button.on { color: var(--strong); background: var(--wash); }
 .ajustes-cuerpo { padding: 52px 56px 80px; overflow-y: auto; }
-.ajuste { max-width: 620px; }
 .ajuste h2 { font-size: 22px; font-weight: 600; color: var(--strong); margin-bottom: 18px; }
 .subtitulo-ajuste { font-family: var(--leer); font-size: 17px; color: var(--strong); margin: 34px 0 6px; font-weight: 600; }
 .opciones-radio { display: grid; gap: 14px; }
@@ -107,25 +106,24 @@
 .chequeo.estado-info .marca-chequeo { color: var(--deco); }
 .consola { max-height: 300px; }
 
-@media (max-width: 1100px) {
+@container (max-width: 844px) {
   .inicio { grid-template-columns: minmax(0, 1fr); padding: 44px 40px; }
   .pagina-lectura, .pagina-ancha { padding: 40px 36px 70px; }
   .ajustes { grid-template-columns: 190px minmax(0, 1fr); }
   .ajustes-cuerpo { padding: 44px 32px 70px; }
 }
-.buscador-curso { display: flex; gap: 10px; margin-bottom: 22px; max-width: 880px; }
+.buscador-curso { display: flex; gap: 10px; margin-bottom: 22px; }
 .buscador-curso .campo { flex: 1; }
 
 /* ---------- Consumo (DA48) ---------- */
-.ajuste.ajuste-ancho { max-width: 860px; }
 .tarjeta-cuenta { border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; margin-bottom: 14px; }
 .tarjeta-cuenta h3 { font-family: var(--leer); font-size: 17px; color: var(--strong); margin-bottom: 6px; font-weight: 600; }
 .tarjeta-cuenta .consumo-texto { font-size: 15px; color: var(--strong); }
 .tarjeta-cuenta.nivel-mal .consumo-texto { color: var(--bad); }
-.tarjeta-cuenta .consumo-barra { height: 5px; max-width: 420px; margin: 8px 0 6px; }
+.tarjeta-cuenta .consumo-barra { height: 5px; margin: 8px 0 6px; }
 .tarjeta-cuenta .ayuda { margin-top: 4px; }
-.editor-plan { margin-top: 14px; max-width: 520px; }
-.dias-consumo { display: flex; align-items: flex-end; gap: 3px; height: 34px; margin: 10px 0 4px; max-width: 280px; }
+.editor-plan { margin-top: 14px; }
+.dias-consumo { display: flex; align-items: flex-end; gap: 3px; height: 34px; margin: 10px 0 4px; }
 .dias-consumo span { flex: 1; background: var(--deco); border-radius: 2px 2px 0 0; }
 .dias-consumo span.cero { background: var(--line); border-radius: 1px; }
 .tabla-envoltura { overflow-x: auto; }

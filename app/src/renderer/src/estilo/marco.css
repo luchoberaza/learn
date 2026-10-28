@@ -2,6 +2,9 @@
 
 .ventana { height: 100vh; display: grid; grid-template-columns: 256px minmax(0, 1fr); background: var(--bg); }
 .ventana.con-panel { grid-template-columns: 256px minmax(0, 1fr) minmax(340px, 34vw); }
+/* El lugar de la pantalla: los cortes (@container) miden lo que dejan la barra lateral y el panel de página, no la
+   ventana entera. Las pantallas no tienen ancho fijo: ocupan todo ese lugar. */
+.marco-pantalla { min-width: 0; min-height: 0; display: grid; grid-template: minmax(0, 1fr) / minmax(0, 1fr); container-type: inline-size; }
 
 /* ---------- barra lateral ---------- */
 .lateral { background: var(--side); border-right: 1px solid var(--line); display: flex; flex-direction: column; padding: 22px 0 14px; min-height: 0; }
@@ -37,9 +40,7 @@
 .pantalla { min-width: 0; min-height: 0; overflow-y: auto; }
 .pantalla.centrada { display: grid; place-items: center; padding: 40px; }
 .pagina-lectura { padding: 48px 64px 80px; }
-.pagina-lectura > * { max-width: 720px; }
 .pagina-ancha { padding: 48px 64px 80px; }
-.pagina-ancha > * { max-width: 880px; }
 .titulo-pantalla { font-family: var(--leer); font-weight: 500; font-size: 32px; line-height: 1.15; letter-spacing: -.5px; color: var(--strong); margin-bottom: 10px; }
 .subtitulo { font-weight: 600; font-size: 18px; color: var(--strong); margin-bottom: 12px; }
 .miga-pantalla { margin-bottom: 14px; }
@@ -48,7 +49,6 @@
 .cabecera { margin-bottom: 26px; }
 .cabecera .acciones { margin-top: 18px; }
 .paso { margin-bottom: 38px; }
-.formulario { max-width: 560px; }
 .campo.grande { font-size: 17px; padding: 12px 14px; font-family: var(--leer); }
 .fila-campo { display: flex; gap: 10px; align-items: center; margin-top: 14px; }
 .fila-campo .campo { flex: 1; }
