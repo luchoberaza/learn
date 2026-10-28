@@ -1,7 +1,10 @@
-// Barra lateral siempre visible (usuario): Inicio arriba, cursos y temas en el orden del índice, y abajo lo que corre
-// en segundo plano (preparación, verificación, ingesta) y el medidor de consumo del modelo de la clase.
+// Barra lateral: Inicio arriba, cursos y temas en el orden del índice, y abajo lo que corre en segundo plano
+// (preparación, verificación, ingesta) y el medidor de consumo del modelo de la clase. Se ensancha arrastrando su borde
+// y se pliega a una franja (DA54); visible de entrada, como pidió el usuario.
 import { fraccion, sinEmoji } from "../../../lib/texto.ts";
-import { cambiar, navegar, usarTienda } from "../tienda";
+import { cambiar, navegar, plegarLateral, usarTienda } from "../tienda";
+import { Buscar, Lateral as IconoLateral } from "./Iconos";
+import { Tirador } from "./Tirador";
 import type { ResumenTema } from "../tipos";
 import { usarFoco } from "./foco";
 import { abrirSubagentes, usarSubagentes } from "./Subagentes";
@@ -52,8 +55,23 @@ function FocoMini() {
   return <div className="foco-mini">{reloj.fase === "foco" ? "Foco" : "Descanso"} {mmss(restante)}{reloj.estado === "pausado" ? ", en pausa" : ""}</div>;
 }
 
+const NINGUNA = { pantalla: "ninguna" } as const;
+
+// Plegada: una franja con el botón para volver a mostrarla y la búsqueda; el latido avisa si el tutor trabaja.
+export function LateralPlegada() {
+  const trabajando = usarTienda(e => e.trabajando);
+  return (
+    <aside className="lateral plegada" aria-label="Navegación">
+      <button className="icono" onClick={() => plegarLateral(false)} aria-label="Mostrar la barra lateral" title="Mostrar la barra lateral (Ctrl B)"><IconoLateral /></button>
+      <button className="icono" onClick={() => cambiar({ paleta: true })} aria-label="Buscar o hacer algo" title="Buscar o hacer algo (Ctrl K)"><Buscar /></button>
+      {trabajando && <span className="latido" aria-label="el tutor está trabajando" title="El tutor está trabajando" />}
+    </aside>
+  );
+}
+
 export function Lateral() {
-  const ruta = usarTienda(e => e.ruta);
+  // Con un PDF a la vista no se marca ninguna pantalla: la ruta es la de la pantalla que quedó detrás.
+  const ruta = usarTienda(e => e.pestanas.some(p => p.id === e.activa && p.pdf) ? NINGUNA : e.ruta);
   const cursos = usarTienda(e => e.cursos);
   const sesion = usarTienda(e => e.sesion);
   const hayConversacion = usarTienda(e => e.items.length > 0 || e.pedidos.length > 0);
@@ -62,7 +80,10 @@ export function Lateral() {
   const conversacionSuelta = hayConversacion && !activo;
   return (
     <aside className="lateral" aria-label="Navegación">
-      <div className="marca"><div className="cinta" aria-hidden /><span>learn</span></div>
+      <Tirador cual="lateral" />
+      <div className="marca"><div className="cinta" aria-hidden /><span>learn</span>
+        <button className="icono plegar" onClick={() => plegarLateral(true)} aria-label="Plegar la barra lateral" title="Plegar la barra lateral (Ctrl B)"><IconoLateral /></button>
+      </div>
       <button className="buscar" onClick={() => cambiar({ paleta: true })}><span>Buscar o hacer algo</span><kbd>Ctrl K</kbd></button>
       <nav className="lateral-desplazable">
         <button className={`nav ${ruta.pantalla === "inicio" ? "on" : ""}`} onClick={() => navegar({ pantalla: "inicio" })}>Inicio</button>

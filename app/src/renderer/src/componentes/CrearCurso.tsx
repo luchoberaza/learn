@@ -2,7 +2,7 @@
 // conversación con las skills curso-nuevo y curso-agregar (preguntas en tarjetas, diff para aprobar, barra de ingesta).
 import { useEffect, useState } from "react";
 import { ES_SLUG, esGrabacion, slugDe } from "../../../lib/texto.ts";
-import { avisar, enviar, navegar, pedir, usarTienda } from "../tienda";
+import { avisar, enviar, navegar, nuevaConversacion, usarTienda } from "../tienda";
 
 const tam = (b: number) => b > 1e6 ? `${(b / 1e6).toFixed(1).replace(".", ",")} MB` : `${Math.max(1, Math.round(b / 1e3))} KB`;
 const comillas = (n: string) => /\s/.test(n) ? `"${n}"` : n;
@@ -43,7 +43,7 @@ export function CrearCurso({ slug: inicial }: { slug?: string }) {
     if (!puede || empezando) return;
     setEmpezando(true);
     try {
-      await pedir("nueva-sesion");
+      if (!(await nuevaConversacion())) return;
       navegar({ pantalla: "clase" });
       const extra = lista.length ? ` ${lista.map(comillas).join(" ")}` : "";
       await enviar(`/${agregar ? "curso-agregar" : "curso-nuevo"} ${slug}${extra}`);

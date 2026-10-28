@@ -19,6 +19,13 @@ export interface Ajustes {
   visor?: { ancho: number; alto: number };
   reproductor?: { ancho: number; alto: number };
   planes?: Record<string, Plan>;
+  // DA54: el ancho de la barra lateral y si está plegada, y el del panel de página (sin ellos, los de siempre).
+  lateral?: { ancho?: number; plegada?: boolean };
+  anchoPanel?: number;
+  // DA55: la escala de la interfaz, de 0,8 a 1,5, en todas las ventanas.
+  escala?: number;
+  // DA56: las pestañas de la ventana principal, de un vault; la interfaz sabe qué hay en cada una.
+  pestanas?: { vault: string; lista: unknown[]; activa: number };
 }
 export interface DiaFoco { minutos: number; bloques: number }
 export type HistorialFoco = Record<string, DiaFoco>;

@@ -2,7 +2,8 @@
 // un libro y tu semana de foco.
 import { cuando, estadoEnIndice, fechaLarga } from "../../../lib/texto.ts";
 import { fraseSemana, semana } from "../../../lib/foco.ts";
-import { abrirSesion, estudiar, navegar, seguirClase, usarTienda } from "../tienda";
+import { estudiar, navegar, seguirClase, usarTienda } from "../tienda";
+import { BotonPestanaNueva, retomarDesdeLista } from "./Pestanas";
 import type { ResumenCurso } from "../tipos";
 import { md } from "../lib/markdown";
 
@@ -112,10 +113,11 @@ function Recientes() {
       <ul>
         {lista.map(s => (
           <li key={s.ruta}>
-            <button onClick={() => void abrirSesion(s.ruta)}>
+            <button {...retomarDesdeLista(s.ruta)}>
               <span className="fuerte">{s.nombre ?? (s.primerMensaje.slice(0, 60) || "Sin nombre")}</span>
               <span className="apagado">{s.ruta === actual ? "abierta ahora" : cuando(new Date(s.modificada), hoy)}</span>
             </button>
+            <BotonPestanaNueva ruta={s.ruta} />
           </li>
         ))}
       </ul>

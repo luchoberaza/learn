@@ -1,14 +1,51 @@
 /* Ventana, barra lateral y pantallas genéricas. */
 
-.ventana { height: 100vh; display: grid; grid-template-columns: 256px minmax(0, 1fr); background: var(--bg); }
-.ventana.con-panel { grid-template-columns: 256px minmax(0, 1fr) minmax(340px, 34vw); }
+/* Los anchos de la barra lateral y del panel de página (DA54) llegan como variables desde App.tsx. El panel nunca pasa
+   del 60 % de la ventana ni deja la pantalla con menos de 360 px (como anchoPanel en lib/escala.ts). */
+.ventana {
+  --lat: 256px; --panel: max(340px, 34vw);
+  --ancho-panel: clamp(300px, var(--panel), max(300px, min(60vw, calc(100vw - var(--lat) - 360px))));
+  height: 100vh; display: grid; grid-template-columns: var(--lat) minmax(0, 1fr); background: var(--bg);
+}
+.ventana.con-panel { grid-template-columns: var(--lat) minmax(0, 1fr) var(--ancho-panel); }
+/* La barra de pestañas arriba y, debajo, la pantalla y los PDF abiertos en pestañas, uno encima del otro. */
+.zona { min-width: 0; min-height: 0; display: grid; grid-template-rows: auto minmax(0, 1fr); }
 /* El lugar de la pantalla: los cortes (@container) miden lo que dejan la barra lateral y el panel de página, no la
    ventana entera. Las pantallas no tienen ancho fijo: ocupan todo ese lugar. */
 .marco-pantalla { min-width: 0; min-height: 0; display: grid; grid-template: minmax(0, 1fr) / minmax(0, 1fr); container-type: inline-size; }
+.marco-pantalla > * { grid-area: 1 / 1; }
+.capa-pantalla, .pestana-pdf { min-width: 0; min-height: 0; display: grid; grid-template: minmax(0, 1fr) / minmax(0, 1fr); }
+/* Lo que no se ve queda montado y con su tamaño: al volver, la clase y el PDF siguen donde estaban. */
+.oculta { visibility: hidden; }
+.estado-pestana-pdf { display: grid; place-items: center; }
+
+/* ---------- pestañas (DA56) ---------- */
+.barra-pestanas { display: flex; align-items: flex-end; gap: 2px; min-width: 0; padding: 6px 8px 0; background: var(--side); border-bottom: 1px solid var(--line); overflow-x: auto; scrollbar-width: none; }
+.barra-pestanas::-webkit-scrollbar { display: none; }
+.pestana { position: relative; display: flex; align-items: center; flex: 0 1 210px; min-width: 84px; height: 33px; border: 1px solid transparent; border-bottom: 0; border-radius: 8px 8px 0 0; color: var(--muted); }
+.pestana:hover { color: var(--strong); background: var(--wash); }
+.pestana.activa { color: var(--strong); background: var(--bg); border-color: var(--line); margin-bottom: -1px; height: 34px; }
+.pestana.activa::before { content: ""; position: absolute; left: 10px; right: 10px; top: -1px; height: 2px; border-radius: 0 0 2px 2px; background: var(--accent); }
+.pestana.arrastrada { opacity: .5; }
+.pestana.marca-antes::after, .pestana.marca-despues::after { content: ""; position: absolute; top: 6px; bottom: 6px; width: 2px; border-radius: 1px; background: var(--focus); }
+.pestana.marca-antes::after { left: -2px; }
+.pestana.marca-despues::after { right: -2px; }
+.pestana-boton { flex: 1; min-width: 0; height: 100%; display: flex; align-items: center; gap: 7px; padding: 0 4px 0 12px; font-size: 13px; color: inherit; border-radius: 8px 8px 0 0; }
+.pestana-boton svg { width: 14px; height: 14px; flex-shrink: 0; color: var(--muted); }
+.pestana-titulo { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pestana-cerrar { display: grid; place-items: center; flex-shrink: 0; width: 22px; height: 22px; margin-right: 6px; border-radius: 5px; color: var(--muted); opacity: 0; }
+.pestana-cerrar svg { width: 13px; height: 13px; }
+.pestana:hover .pestana-cerrar, .pestana.activa .pestana-cerrar, .pestana-cerrar:focus-visible { opacity: 1; }
+.pestana-cerrar:hover { background: var(--wash-fuerte); color: var(--strong); }
+.pestana-nueva { flex-shrink: 0; align-self: center; width: 28px; height: 28px; margin: 0 0 3px 2px; }
 
 /* ---------- barra lateral ---------- */
-.lateral { background: var(--side); border-right: 1px solid var(--line); display: flex; flex-direction: column; padding: 22px 0 14px; min-height: 0; }
-.marca { display: flex; align-items: center; gap: 10px; padding: 0 22px 18px; }
+.lateral { position: relative; min-width: 0; background: var(--side); border-right: 1px solid var(--line); display: flex; flex-direction: column; padding: 22px 0 14px; min-height: 0; }
+/* Plegada (DA54): una franja con el botón para volver a mostrarla y la búsqueda. */
+.lateral.plegada { align-items: center; gap: 6px; padding: 12px 0; }
+.lateral.plegada .latido { margin-top: 8px; }
+.marca { display: flex; align-items: center; gap: 10px; padding: 0 12px 18px 22px; }
+.marca .plegar { margin-left: auto; width: 28px; height: 28px; }
 .cinta { width: 12px; height: 20px; background: var(--accent); clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 74%, 0 100%); flex-shrink: 0; }
 .marca span { font-family: var(--leer); font-weight: 600; font-size: 19px; color: var(--strong); letter-spacing: -.2px; }
 .buscar { display: flex; align-items: center; justify-content: space-between; margin: 0 12px 14px; padding: 7px 10px; border: 1px solid var(--line); border-radius: 7px; color: var(--muted); font-size: 13px; }
@@ -35,6 +72,16 @@
 .pie-lateral { padding: 12px 22px 0; border-top: 1px solid var(--line); display: flex; justify-content: space-between; font-size: 13px; }
 .pie-lateral button { color: var(--muted); }
 .pie-lateral button:hover, .pie-lateral button.on { color: var(--strong); }
+
+/* ---------- tirador de los bordes (DA54) ---------- */
+.tirador { position: absolute; top: 0; bottom: 0; width: 9px; z-index: 6; cursor: col-resize; touch-action: none; }
+.lateral > .tirador { right: -5px; }
+.panel-pagina > .tirador { left: -5px; }
+.tirador::after { content: ""; position: absolute; top: 0; bottom: 0; left: 4px; width: 1px; transition: background .12s; }
+.tirador:hover::after, .tirador.en-uso::after, .tirador:focus-visible::after { left: 3px; width: 3px; background: var(--focus); }
+.tirador:focus-visible { outline: none; }
+body.arrastrando { cursor: col-resize; user-select: none; }
+body.arrastrando * { cursor: col-resize !important; }
 
 /* ---------- pantallas ---------- */
 .pantalla { min-width: 0; min-height: 0; overflow-y: auto; }

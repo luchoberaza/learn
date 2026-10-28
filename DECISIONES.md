@@ -32,6 +32,8 @@ La primera prueba de punta a punta con el modelo real (`gpt-6.1-sol`, una clase 
 
 **Eliminar un curso (2026-10-27, en el mismo PR):** en la app, desde la pantalla del curso. Va a la papelera del sistema, de donde se restaura, y no se elimina con una clase abierta, la ingesta o la preparación de un tema corriendo. Con DA53, una prueba de host y una de punta a punta nuevas, que pasan en Windows y en Linux, igual que la papelera real de cada uno. Ver DA53.
 
+**Paneles, escala y pestañas (2026-10-28, en el mismo PR):** pedido del dueño del repo después de usar la app. La barra lateral se pliega y, como el panel de página, se ensancha arrastrando su borde; la interfaz se agranda o achica en Ajustes o con Ctrl + y Ctrl −; y la ventana tiene pestañas, como un navegador, con una conversación o un PDF en cada una. Al abrir un PDF se elige si va en una pestaña o en su ventana. Ver DA54–DA56.
+
 ## D0.1 — Conservar el upstream y fijar los subagentes
 
 - `.pi/` es el clon del fork `santi-esquerre/learn`, rama `cursos`.
@@ -971,3 +973,72 @@ Propuesta de luchoberaza en el mismo PR. Un curso se elimina desde la app.
     - «Seguir donde quedaste» retoma la clase anterior, de otro curso. Sin el arreglo, la prueba falla.
   - La papelera real, en Windows (la Papelera de reciclaje) y en Linux (`~/.local/share/Trash`), con una copia descartable del curso.
   - `app/e2e/app.test.mjs`, «una clase entera…», pasa por la confirmación de «Terminar la clase» y por «Volvé a…» en Inicio.
+
+## Paneles, escala y pestañas — 2026-10-28
+
+Pedido del dueño del repo, que probó la app, por medio de luchoberaza: «no podés ajustar el tamaño de los paneles ni cerrar la barra lateral», «debería tener una configuración para ajustar la escala de la interfaz, y que los paneles se puedan ajustar con el mouse» y «los PDF, estaría bueno que puedas abrir pestañas: que tengas las conversaciones o los PDF». Sobre el PDF, luchoberaza: «que tengas la opción, cuando le des clic a ver el PDF, de elegir pestaña o ventana».
+
+### DA54 — La barra lateral se pliega, y ella y el panel de página se ensanchan con el mouse
+
+- **Contexto:** la barra lateral medía siempre 256 px y no se podía cerrar: el usuario la había pedido siempre visible. El panel de página ocupaba el 34 % de la ventana, con un mínimo de 340 px. En una pantalla chica, o para leer la clase con el panel al lado, no había cómo repartir el lugar.
+- **Decisión:**
+  - **Plegar:** un botón arriba de la barra, junto a la marca, y Ctrl+B. Plegada queda una franja de 44 px con el botón para mostrarla, la búsqueda (Ctrl+K) y el latido si el tutor está trabajando. Sigue visible de entrada, como se había pedido.
+  - **Arrastrar:** el borde de la barra lateral (de 200 a 420 px) y el del panel de página (desde 300 px hasta el 60 % de la ventana, dejando al menos 360 px a la pantalla). Doble clic sobre el borde vuelve al ancho de siempre. Con el teclado, el borde se enfoca y las flechas lo mueven de a 16 px.
+  - **Mientras se arrastra** cambia sólo una variable CSS de la ventana, sin redibujar la app. Al soltar se guarda en los ajustes de la app (`lateral` y `anchoPanel`), junto con si la barra quedó plegada. Los cortes de las pantallas (`@container`) ya miden el lugar que queda, así que se acomodan solas.
+  - Los avisos y el cajón de los subagentes siguen esos anchos.
+- **Por qué:** cada uno reparte la pantalla según lo que esté haciendo, y lo encuentra igual al volver.
+- **Límites:** el panel de página tiene un solo ancho, no uno por documento.
+- **Verifica:** `app/src/lib/escala.test.mjs` (los topes de cada ancho) y `app/e2e/pestanas.test.mjs`:
+  - «barra lateral plegable y con el ancho a mano…»: Ctrl+B y el botón, el arrastre con su tope, el doble clic, las flechas y lo guardado;
+  - «PDF en una pestaña…»: el arrastre del panel de página.
+
+### DA55 — La escala de la interfaz se elige en Ajustes o con Ctrl + y Ctrl −
+
+- **Contexto:** el tamaño de letra y de los controles era fijo. Las combinaciones de zoom del menú de Electron cambiaban la escala sin guardarla, y al volver a abrir la app se perdía.
+- **Decisión:**
+  - **Ajustes → Apariencia → Tamaño de la interfaz:** 80, 90, 100, 110, 125 y 150 %, los pasos de un navegador. Ctrl + y Ctrl − pasan al siguiente o al anterior, y Ctrl 0 vuelve al 100 %.
+  - **En todas las ventanas:** la principal, las de PDF y las de grabación. El proceso principal la aplica cada vez que una ventana carga su página, y a todas cuando cambia (`setZoomFactor`).
+  - **En un PDF**, Ctrl + y Ctrl − siguen agrandando el documento, como en la ventana de PDF.
+  - **El menú de la app** queda sin los atajos de zoom de Electron, que cambiaban la escala sin guardarla, y sin el de cerrar la ventana, porque Ctrl+W ahora cierra la pestaña (DA56). Siguen recargar, herramientas de desarrollo y pantalla completa.
+  - Una escala guardada que no está en la lista se lleva a la más cercana (`app/src/lib/escala.ts`).
+- **Por qué:** con la escala del sistema operativo no alcanza: puede convenir la app más grande que el resto, o más chica en una pantalla chica.
+- **Verifica:** `app/src/lib/escala.test.mjs` y `app/e2e/pestanas.test.mjs`:
+  - «barra lateral plegable…» comprueba los pasos con Ctrl + y Ctrl −, Ctrl 0 y Ajustes, contra el zoom real de la ventana;
+  - «PDF en una pestaña…» comprueba que ahí Ctrl + agranda el documento y no la interfaz;
+  - «al abrir vuelven…» comprueba que la escala guardada vale desde el arranque.
+
+### DA56 — Pestañas: una conversación o un PDF en cada una; el PDF se abre en una pestaña o en su ventana
+
+- **Contexto:** la ventana mostraba una pantalla por vez y pi tiene una sola conversación abierta. Para pasar de una clase a otra había que ir a Sesiones, y un PDF sólo se abría en su propia ventana (DA47).
+- **Decisión:**
+  - **Una barra de pestañas** arriba del contenido, como la de un navegador.
+    - Cada pestaña tiene su pantalla y su historial, y la barra lateral navega en la pestaña activa. Con una sola pestaña, la app se usa como antes.
+    - El + y Ctrl+T abren una en Inicio. Ctrl+W y el clic del medio cierran. Ctrl+Tab (con Shift, hacia atrás) pasa de una a otra. Arrastrando una pestaña se cambia el orden.
+    - Cerrar una pestaña no borra su conversación: sigue en Sesiones. Si se cierra la última, queda una en Inicio.
+  - **Cada conversación vive en su pestaña** y pi sigue con una sola abierta, como hasta ahora. La pestaña recuerda el archivo de su sesión.
+    - Al volver a una pestaña con su clase, pi cambia a esa conversación (`abrir-sesion`, lo mismo que retomar desde Sesiones) y la clase se restaura como al retomarla.
+    - Si el tutor está respondiendo, antes se pregunta: «Cortar y cambiar» o «Esperar». Pasar a una pestaña de Inicio, del curso o de un PDF no corta nada: el tutor sigue escribiendo y su pestaña late.
+    - Lo que empieza una conversación en una pestaña que no tiene la abierta (estudiar un tema, Tema libre, Crear curso, sesión nueva) abre una nueva, y la de la otra pestaña queda intacta.
+    - Retomar una sesión que ya está en una pestaña lleva a esa pestaña. En Sesiones y en «Otras clases» de Inicio, un botón (o Ctrl+clic, o el clic del medio) la abre en una pestaña nueva.
+    - «Volver a la clase», desde la barra lateral o la paleta, lleva a la pestaña de la conversación.
+  - **El PDF entero:** «Abrir el PDF entero», en el panel de página y en *Curso → Material*, ofrece «En una pestaña» o «En una ventana nueva».
+    - La ventana es la de DA47.
+    - La pestaña usa el mismo lector, con la misma copia para leer y las mismas páginas en blanco. Al volver a la pestaña pregunta si cambió lo vedado y, si cambió, recarga, igual que la ventana.
+    - Pedir de nuevo un PDF que ya está en una pestaña lleva a esa pestaña, en la página pedida.
+    - PDF.js y sus estilos se cargan con la primera pestaña de PDF, no al abrir la app.
+  - **Lo que queda montado:** la pantalla de detrás y cada PDF quedan montados aunque no se vean, así que al volver la clase y el documento siguen donde estaban. Con un PDF a la vista, la barra lateral navega en la última pestaña usada (o en una nueva) y el PDF queda.
+  - **Al abrir la app** vuelven las pestañas del mismo vault, cada una con su pantalla, su conversación y los PDF en la página donde quedaron. Las de un curso que ya no está vuelven a Inicio, y los PDF de ese curso se cierran. Al eliminar un curso (DA53) pasa lo mismo.
+- **Por qué:** se puede tener la clase en una pestaña, el libro en otra y una consulta de otro tema en una tercera, y saltar entre ellas sin perder ninguna. Dos clases a la vez necesitarían dos pi andando, con el doble de memoria. Además, la nota y el progreso de un curso suponen una clase por vez.
+- **Límites:**
+  - Una conversación que espera en su pestaña no avanza: el tutor responde sólo en la abierta.
+  - Pasar a la pestaña de otra conversación tarda lo que tarda retomarla desde Sesiones.
+  - Una conversación sin mensajes no se guarda. Si se deja su pestaña y se vuelve, empieza otra.
+  - Una pestaña no se puede pasar a una ventana después de abierta: se cierra y se abre el PDF en su ventana.
+- **Verifica:** `app/e2e/pestanas.test.mjs`:
+  - «cada una con su conversación…»: dos conversaciones en dos pestañas. Cada una vuelve a la suya y sigue ahí mismo. También comprueba retomar desde Sesiones, abrir en una pestaña nueva, el clic del medio, arrastrar, Ctrl+W y lo guardado;
+  - «con el tutor respondiendo…»: la pestaña late, y la pregunta deja esperar o cortar;
+  - «la clase de otro tema, empezada en otra pestaña…»: cada pestaña conserva su clase y su tema;
+  - «PDF en una pestaña…»: el menú, el libro sin la página reservada, la clase intacta al volver, el mismo PDF pedido otra vez y la barra lateral con un PDF a la vista;
+  - «al abrir vuelven…»: las pestañas guardadas, con el PDF en su página y la de un curso que ya no está en Inicio.
+
+  `app/e2e/visor.test.mjs` sigue probando la ventana de PDF, ahora elegida en el menú.

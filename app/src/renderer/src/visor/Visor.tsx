@@ -1,10 +1,11 @@
-// La ventana de PDF (DA47): el documento entero con PDF.js, abierto en la página citada. Lectura continua, búsqueda,
+// El lector de PDF (DA47): el documento entero con PDF.js, abierto en la página citada. Lectura continua, búsqueda,
 // zoom, miniaturas e índice del PDF. Lo que llega ya viene filtrado por el host: las páginas vedadas son hojas en blanco.
+// Vive en su propia ventana o en una pestaña de la ventana principal (DA56); lo que cambia es de dónde salen los datos.
 import { useEffect, useRef, useState } from "react";
 import { AnnotationMode, getDocument, type PDFDocumentProxy, type RenderTask } from "./pdfjs";
 import { EventBus, FindState, LinkTarget, PDFFindController, PDFLinkService, PDFViewer } from "pdfjs-dist/web/pdf_viewer.mjs";
 import { Ancho, Buscar, Cerrar, Contraste, Derecha, Izquierda, Lateral, Mas, Menos } from "../componentes/Iconos";
-import type { DatosPdf, Tema } from "./tipos";
+import type { DatosPdf, FuentePdf, Tema } from "./tipos";
 
 type Entrada = { title: string; dest: string | unknown[] | null; url: string | null; items: Entrada[] };
 type Lado = "paginas" | "indice";
@@ -20,13 +21,23 @@ const sinPrefijo = (e: unknown) => e instanceof Error ? e.message.replace(/^Erro
 // El tema de la app, como en la ventana principal: «sistema» deja decidir al sistema operativo.
 const aplicarTema = (tema: Tema) => { if (tema === "sistema") document.documentElement.removeAttribute("data-tema"); else document.documentElement.setAttribute("data-tema", tema); };
 
-// PDF.js pide los mapas de caracteres, las fuentes estándar y los decodificadores wasm al proceso principal: no hay red.
-class DatosPorIpc {
-  constructor(_opciones: unknown) {}
-  fetch({ kind, filename }: { kind: string; filename: string }) { return window.visor.recurso(kind, filename); }
-}
+// En su ventana, los datos llegan por el preload de la ventana de PDF.
+const fuenteVentana = (): FuentePdf => ({
+  datos: () => window.visor.datos(),
+  recurso: (tipo, nombre) => window.visor.recurso(tipo, nombre),
+  alIr: f => window.visor.alIr(f),
+  alRecargar: f => window.visor.alRecargar(f),
+  alError: f => window.visor.alError(f),
+  alTema: f => window.visor.alTema(f),
+});
 
-export function Visor() {
+// En una pestaña: si es la visible (los atajos son suyos sólo entonces), cómo se cierra y qué le cuenta a la pestaña.
+export interface EnPestana { activa: boolean; cerrar: () => void; alPagina: (n: number) => void; alTitulo: (t: string) => void }
+
+export function Visor({ fuente: dada, pestana }: { fuente?: FuentePdf; pestana?: EnPestana } = {}) {
+  const [fuente] = useState(() => dada ?? fuenteVentana());
+  const enPestana = useRef(pestana);
+  enPestana.current = pestana;
   const caja = useRef<HTMLDivElement>(null), campo = useRef<HTMLInputElement>(null), lector = useRef<Lector>(undefined);
   const [estado, setEstado] = useState<"cargando" | "listo" | "error">("cargando");
   const [error, setError] = useState("");
@@ -49,7 +60,7 @@ export function Visor() {
     enlaces.setViewer(viewer);
     const l: Lector = { viewer, enlaces, bus };
     lector.current = l;
-    bus.on("pagechanging", (e: { pageNumber: number }) => setPagina(e.pageNumber));
+    bus.on("pagechanging", (e: { pageNumber: number }) => { setPagina(e.pageNumber); enPestana.current?.alPagina(e.pageNumber); });
     bus.on("scalechanging", (e: { scale: number; presetValue?: string }) => setEscala({ valor: e.scale, ajuste: e.presetValue }));
     bus.on("updatefindmatchescount", (e: { matchesCount: { current: number; total: number } }) => setHallazgos(h => ({ ...h, actual: e.matchesCount.current, total: e.matchesCount.total })));
     bus.on("updatefindcontrolstate", (e: { state: number; matchesCount: { current: number; total: number } }) => setHallazgos({ actual: e.matchesCount.current, total: e.matchesCount.total, estado: e.state }));
@@ -58,8 +69,10 @@ export function Visor() {
     async function cargar(paginaPedida?: number) {
       const primera = !l.doc, antes = { pagina: viewer.currentPageNumber, escala: viewer.currentScaleValue };
       try {
-        const d: DatosPdf = await window.visor.datos();
-        aplicarTema(d.tema);
+        const d: DatosPdf = await fuente.datos();
+        if (!enPestana.current) aplicarTema(d.tema);
+        // PDF.js pide los mapas de caracteres, las fuentes estándar y los decodificadores wasm al proceso principal: no hay red.
+        const DatosPorIpc = class { constructor(_opciones: unknown) {} fetch({ kind, filename }: { kind: string; filename: string }) { return fuente.recurso(kind, filename); } };
         // Las fuentes estándar que el PDF no trae salen de PDF.js y no del sistema: se ven igual en Windows y en Linux.
         const nuevo = await getDocument({ data: d.bytes, BinaryDataFactory: DatosPorIpc, useWorkerFetch: false, useSystemFonts: false, cMapUrl: "pdfjs/cmaps/", cMapPacked: true,
           standardFontDataUrl: "pdfjs/standard_fonts/", wasmUrl: "pdfjs/wasm/" }).promise;
@@ -68,24 +81,25 @@ export function Visor() {
         bus.on("pagesinit", () => { viewer.currentScaleValue = primera || !antes.escala ? "auto" : antes.escala; viewer.currentPageNumber = destino; }, { once: true });
         viewer.setDocument(nuevo);
         enlaces.setDocument(nuevo, null);
-        document.title = `${d.titulo} · learn`;
+        if (enPestana.current) enPestana.current.alTitulo(d.titulo);
+        else document.title = `${d.titulo} · learn`;
         setTitulo(d.titulo); setDoc(nuevo); setPagina(destino); setEstado("listo");
         if (!primera) { setConsulta(""); setHallazgos(undefined); }
         void viejo?.loadingTask.destroy();
         nuevo.getOutline().then(o => setIndice((o ?? []) as Entrada[]), () => setIndice([]));
-        if (primera) caja.current?.focus();
+        if (primera && (!enPestana.current || enPestana.current.activa)) caja.current?.focus();
       } catch (e) {
-        setError((e as { name?: string })?.name === "PasswordException" ? "Este PDF tiene contraseña y la ventana no lo puede abrir." : sinPrefijo(e));
+        setError((e as { name?: string })?.name === "PasswordException" ? "Este PDF tiene contraseña y learn no lo puede abrir." : sinPrefijo(e));
         setEstado("error");
       }
     }
     void cargar();
     const quitar = [
-      window.visor.alIr(p => { if (l.doc) viewer.currentPageNumber = Math.min(Math.max(p, 1), l.doc.numPages); }),
-      window.visor.alRecargar(p => void cargar(p)),
-      window.visor.alTema(aplicarTema),
+      fuente.alIr(p => { if (l.doc) viewer.currentPageNumber = Math.min(Math.max(p, 1), l.doc.numPages); }),
+      fuente.alRecargar(p => void cargar(p)),
+      fuente.alTema(aplicarTema),
       // Dejó de poder mostrarse (por ejemplo, el documento pasó a tener soluciones): se saca de la ventana.
-      window.visor.alError(m => {
+      fuente.alError(m => {
         viewer.setDocument(null as unknown as PDFDocumentProxy); enlaces.setDocument(null, null);
         void l.doc?.loadingTask.destroy(); l.doc = undefined;
         setDoc(undefined); setError(m); setEstado("error");
@@ -130,11 +144,15 @@ export function Visor() {
   const cambiarLado = (nuevo: Lado | null) => { setLado(nuevo); recordar("visor:lado", nuevo ?? ""); };
   const cambiarOscuro = () => { setOscuro(!oscuro); recordar("visor:oscuro", oscuro ? "0" : "1"); };
 
-  // Atajos: la ventana no tiene menú, así que los maneja ella.
+  // Atajos: la ventana no tiene menú, así que los maneja ella. En una pestaña valen sólo si está a la vista, y Ctrl+W
+  // (cerrar la pestaña) lo maneja la ventana principal.
+  const activa = !pestana || pestana.activa;
   useEffect(() => {
+    if (!activa) return;
     const tecla = (e: KeyboardEvent) => {
       const v = lector.current?.viewer, mod = e.ctrlKey || e.metaKey, k = e.key.toLowerCase();
-      if (mod && k === "w") { e.preventDefault(); window.close(); return; }
+      if (document.querySelector(".velo")) return;
+      if (mod && k === "w" && !enPestana.current) { e.preventDefault(); window.close(); return; }
       if (mod && k === "f") { e.preventDefault(); campo.current?.focus(); campo.current?.select(); return; }
       if (!v?.pdfDocument) return;
       if (mod && (k === "+" || k === "=")) { e.preventDefault(); v.increaseScale(); }
@@ -144,7 +162,9 @@ export function Visor() {
     };
     window.addEventListener("keydown", tecla);
     return () => window.removeEventListener("keydown", tecla);
-  }, [consulta]);
+  }, [consulta, activa]);
+  // Al volver a la pestaña, el foco va al documento: las flechas y la rueda lo mueven enseguida.
+  useEffect(() => { if (pestana?.activa && doc) caja.current?.focus({ preventScroll: true }); }, [pestana?.activa]);
 
   const total = doc?.numPages ?? 0;
   const resultado = !consulta.trim() || !hallazgos ? ""
@@ -167,7 +187,7 @@ export function Visor() {
             onBlur={() => setEscribiendo(undefined)}
             onKeyDown={e => {
               if (e.key === "Enter") { irA(Number(escribiendo)); caja.current?.focus(); }
-              else if (e.key === "Escape") caja.current?.focus();
+              else if (e.key === "Escape") { e.preventDefault(); caja.current?.focus(); }
             }} />
           <span className="de-total">de {total || "…"}</span>
           <button className="icono" disabled={!doc || pagina >= total} onClick={() => irA(pagina + 1)} aria-label="Página siguiente" title="Página siguiente"><Derecha /></button>
@@ -187,7 +207,7 @@ export function Visor() {
             onChange={e => cambiarConsulta(e.target.value)}
             onKeyDown={e => {
               if (e.key === "Enter" && consulta.trim()) { e.preventDefault(); buscar(consulta, "again", e.shiftKey); }
-              else if (e.key === "Escape") { cambiarConsulta(""); caja.current?.focus(); }
+              else if (e.key === "Escape") { e.preventDefault(); cambiarConsulta(""); caja.current?.focus(); }
             }} />
           {consulta && <button className="limpiar" onClick={() => { cambiarConsulta(""); campo.current?.focus(); }} aria-label="Borrar la búsqueda" title="Borrar la búsqueda"><Cerrar /></button>}
         </div>
@@ -215,7 +235,7 @@ export function Visor() {
             <div className="estado-visor">
               {estado === "cargando"
                 ? <p className="apagado"><span className="giro" /> Abriendo el PDF…</p>
-                : <div><p className="fuerte">{error}</p><button className="fantasma" onClick={() => window.close()}>Cerrar la ventana</button></div>}
+                : <div><p className="fuerte">{error}</p><button className="fantasma" onClick={() => pestana ? pestana.cerrar() : window.close()}>{pestana ? "Cerrar la pestaña" : "Cerrar la ventana"}</button></div>}
             </div>
           )}
         </div>

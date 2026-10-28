@@ -1,16 +1,18 @@
-// Ajustes (§9.8): apariencia, cómo estudio (la mezcla de preguntas), foco, modelos (el de la clase y los de visión y
+// Ajustes (§9.8): apariencia (tema y tamaño de la interfaz), cómo estudio (la mezcla de preguntas), foco, modelos (el de la clase y los de visión y
 // researcher de esta máquina), consumo, cuentas, ajustes de pi que aplican fuera de la terminal, la carpeta del vault
 // y lo avanzado.
 import { useEffect, useState } from "react";
 import { arrancar, avisar, cambiar, confirmarApp, elegirModelo, elegirPreguntas, guardarAjustes, iniciarLogin, navegar, opcionesEstudio, pedir, usarTienda } from "../tienda";
 import type { Estudio } from "../tipos";
 import { ConsumoAjuste } from "./Consumo";
+import { ESCALAS, escalaValida } from "../../../lib/escala.ts";
 
 type Seccion = "apariencia" | "estudio" | "foco" | "modelos" | "consumo" | "cuentas" | "pi" | "vault" | "avanzado";
 const SECCIONES: [Seccion, string][] = [["apariencia", "Apariencia"], ["estudio", "Cómo estudio"], ["foco", "Foco"], ["modelos", "Modelos"], ["consumo", "Consumo"], ["cuentas", "Cuentas"], ["pi", "Conversación"], ["vault", "Carpeta del vault"], ["avanzado", "Avanzado"]];
 
 function Apariencia() {
   const tema = usarTienda(e => e.ajustes?.tema ?? "sistema");
+  const escala = usarTienda(e => escalaValida(e.ajustes?.escala));
   return (
     <section className="ajuste">
       <h2 className="serif">Apariencia</h2>
@@ -19,6 +21,14 @@ function Apariencia() {
           <label key={v} className="casilla"><input type="radio" name="tema" checked={tema === v} onChange={() => void guardarAjustes({ tema: v })} /><span>{t}<small>{d}</small></span></label>
         ))}
       </div>
+      <h3 className="subtitulo-ajuste">Tamaño de la interfaz</h3>
+      <p className="ayuda" style={{ margin: "0 0 12px" }}>Agranda o achica letras, botones y paneles en todas las ventanas de learn.</p>
+      <div className="opciones-escala" role="radiogroup" aria-label="Tamaño de la interfaz">
+        {ESCALAS.map(v => (
+          <button key={v} role="radio" aria-checked={escala === v} className={`fantasma ${escala === v ? "elegida" : ""}`} onClick={() => void guardarAjustes({ escala: v })}>{Math.round(v * 100)} %</button>
+        ))}
+      </div>
+      <p className="ayuda">También con Ctrl + y Ctrl −; Ctrl 0 vuelve al 100 %. En un PDF, esas teclas agrandan el documento.</p>
     </section>
   );
 }

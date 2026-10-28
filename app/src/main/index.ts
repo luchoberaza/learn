@@ -1,10 +1,11 @@
 // Proceso principal: la ventana, el host de pi y lo que la interfaz no puede hacer sola (diálogos, archivos, instalar).
-import { app, BrowserWindow, clipboard, dialog, ipcMain, nativeTheme, shell } from "electron";
+import { app, BrowserWindow, clipboard, dialog, ipcMain, Menu, nativeTheme, shell } from "electron";
 import { copyFileSync, cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, extname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { guardarAjustes, leerAjustes, leerFoco, sumarFoco, type Ajustes } from "./ajustes.js";
+import { escalaValida } from "../lib/escala.ts";
 import { Host } from "./host.js";
 import { diagnostico, instalar } from "./sistema.js";
 import { crearReproductores, esGrabacion, EXTENSIONES_GRABACION, registrarEsquemaGrabacion } from "./reproductor.js";
@@ -26,6 +27,18 @@ const visores = crearVisores(host, aqui, () => ventana);
 let reproductores: ReturnType<typeof crearReproductores> | undefined;
 
 function aplicarTema(tema: Ajustes["tema"]) { nativeTheme.themeSource = tema === "noche" ? "dark" : tema === "dia" ? "light" : "system"; }
+
+// La escala de la interfaz (DA55) vale en todas las ventanas: la principal, las de PDF y las de grabación. Se pone cada
+// vez que una carga su página, porque Chromium no la recuerda entre arranques.
+const escalaActual = () => escalaValida(leerAjustes().escala);
+app.on("browser-window-created", (_e, w) => w.webContents.on("did-finish-load", () => w.webContents.setZoomFactor(escalaActual())));
+// El menú de Electron sin sus atajos de zoom ni el de cerrar la ventana: Ctrl + y Ctrl − cambian la escala guardada
+// (los maneja la interfaz) y Ctrl+W cierra la pestaña (DA56).
+const menuDeLaApp = () => Menu.buildFromTemplate([
+  ...(process.platform === "darwin" ? [{ role: "appMenu" as const }] : []),
+  { role: "editMenu" as const },
+  { label: "Ver", submenu: [{ role: "reload" as const }, { role: "forceReload" as const }, { role: "toggleDevTools" as const }, { type: "separator" as const }, { role: "togglefullscreen" as const }] },
+]);
 
 function crearVentana() {
   const a = leerAjustes();
@@ -67,6 +80,7 @@ ipcMain.handle("app:ajustes", (_e, cambios?: Partial<Ajustes>) => {
   if (!cambios) return leerAjustes();
   const nuevo = guardarAjustes(cambios);
   if (cambios.tema) { aplicarTema(nuevo.tema); visores.tema(nuevo.tema); reproductores?.tema(nuevo.tema); }
+  if ("escala" in cambios) for (const w of BrowserWindow.getAllWindows()) w.webContents.setZoomFactor(escalaValida(nuevo.escala));
   return nuevo;
 });
 ipcMain.handle("app:elegir-carpeta", async (_e, titulo: string) => {
@@ -178,6 +192,7 @@ else {
   app.on("second-instance", () => { if (ventana) { if (ventana.isMinimized()) ventana.restore(); ventana.focus(); } });
   void app.whenReady().then(() => {
     reproductores = crearReproductores(aqui, () => ventana, vaultActual);
+    Menu.setApplicationMenu(menuDeLaApp());
     crearVentana();
     app.on("activate", () => { if (BrowserWindow.getAllWindows().length === 0) crearVentana(); });
   });

@@ -2,9 +2,10 @@
 // de la app, la confianza en la carpeta, el inicio de sesión con un proveedor y las pantallas de comandos de pi.
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { Item, Pedido } from "../tipos";
-import { abrirSesion, avisar, cambiar, cerrarLogin, enviar, enviarYEsperar, importarSesion, leer, navegar, pedir, responder, responderConfianza, responderLogin, usarConfirmacion, usarTienda } from "../tienda";
+import { avisar, cambiar, cerrarLogin, enviar, enviarYEsperar, importarSesion, leer, navegar, pedir, responder, responderConfianza, responderLogin, usarConfirmacion, usarTienda } from "../tienda";
 import { Diferencias } from "./Transcripcion";
 import { Prosa } from "./Prosa";
+import { BotonPestanaNueva, retomarDesdeLista } from "./Pestanas";
 import { cuando } from "../../../lib/texto.ts";
 
 export function Dialogo({ titulo, children, alCerrar, ancho = 560, etiqueta }: { titulo: ReactNode; children: ReactNode; alCerrar?: () => void; ancho?: number; etiqueta?: string }) {
@@ -36,7 +37,8 @@ export function Dialogo({ titulo, children, alCerrar, ancho = 560, etiqueta }: {
   );
 }
 
-export function MenuFlotante({ etiqueta, icono, opciones }: { etiqueta: string; icono: ReactNode; opciones: { texto: string; accion: () => void; peligro?: boolean }[] }) {
+// El botón es un ícono o, con texto, un botón de esa clase (por ejemplo, el «Abrir» de un documento).
+export function MenuFlotante({ etiqueta, icono, opciones, texto, clase = "icono", titulo }: { etiqueta: string; icono?: ReactNode; opciones: { texto: string; accion: () => void; peligro?: boolean }[]; texto?: string; clase?: string; titulo?: string }) {
   const [abierto, setAbierto] = useState(false);
   const caja = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -50,7 +52,7 @@ export function MenuFlotante({ etiqueta, icono, opciones }: { etiqueta: string; 
   }, [abierto]);
   return (
     <div className="menu" ref={caja}>
-      <button className="icono" onClick={() => setAbierto(!abierto)} aria-label={etiqueta} aria-expanded={abierto} title={etiqueta}>{icono}</button>
+      <button className={clase} onClick={() => setAbierto(!abierto)} aria-label={etiqueta} aria-haspopup="menu" aria-expanded={abierto} title={titulo ?? etiqueta}>{texto ?? icono}</button>
       {abierto && (
         <div className="menu-flotante" role="menu"
           onKeyDown={e => {
@@ -278,6 +280,8 @@ const ATAJOS: [string, string][] = [
   ["Alt Enter", "Mientras el tutor escribe: dejar el mensaje para cuando termine"], ["Esc", "Detener al tutor, o cerrar el panel o un diálogo"],
   ["a b c", "Elegir una opción del quiz"], ["n", "«No sé» en el quiz"], ["1 2 3", "Elegir una opción en las preguntas y diálogos"],
   ["↑", "Con la caja vacía, recuperar tu mensaje anterior"], ["/", "Comandos de learn, de las skills y de pi en la caja de texto"], ["Ctrl ,", "Ajustes"],
+  ["Ctrl T", "Pestaña nueva"], ["Ctrl W", "Cerrar la pestaña"], ["Ctrl Tab", "Pasar a la pestaña siguiente (con Shift, a la anterior)"],
+  ["Ctrl B", "Plegar o mostrar la barra lateral"], ["Ctrl +", "Agrandar la interfaz (en un PDF, el documento)"], ["Ctrl −", "Achicarla"], ["Ctrl 0", "Volver al 100 %"],
 ];
 function Atajos() {
   return (
@@ -389,10 +393,11 @@ export function ListaSesiones({ limite }: { limite?: number }) {
     <ul className="sesiones">
       {lista.map(s => (
         <li key={s.ruta}>
-          <button onClick={() => void abrirSesion(s.ruta)}>
+          <button {...retomarDesdeLista(s.ruta)}>
             <span className="fuerte">{s.nombre ?? (s.primerMensaje.slice(0, 80) || "Sin nombre")}</span>
             <span className="apagado">{s.ruta === actual ? "abierta ahora" : cuando(new Date(s.modificada), hoy)}, {s.mensajes === 1 ? "un mensaje" : `${s.mensajes} mensajes`}</span>
           </button>
+          <BotonPestanaNueva ruta={s.ruta} />
         </li>
       ))}
     </ul>

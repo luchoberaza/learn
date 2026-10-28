@@ -38,6 +38,11 @@ const errores = pagina => {
 const textoDePagina = (visor, n) => visor.locator(`.page[data-page-number="${n}"] .textLayer`);
 // Como volver a la ventana con el mouse: el proceso principal recibe el foco (la prueba no puede mover el foco del sistema).
 const enfocar = (app, titulo) => app.evaluate(({ BrowserWindow }, t) => { BrowserWindow.getAllWindows().find(w => w.getTitle().startsWith(t))?.emit("focus"); }, titulo);
+// Abrir el PDF entero en su ventana (DA56: al abrirlo se elige pestaña o ventana).
+async function enVentana(win, boton) {
+  await boton.click();
+  await win.getByRole("menuitem", { name: "En una ventana nueva" }).click();
+}
 
 test("ventana de PDF: el libro entero en la página citada, sin el problema reservado; se recarga y se cierra con la app", { skip: sinCurso, timeout: 240000 }, async t => {
   const restaurarProgreso = guardarProgreso(t);
@@ -46,7 +51,7 @@ test("ventana de PDF: el libro entero en la página citada, sin el problema rese
   await win.locator(".tutor sup.llamada").first().click({ timeout: 60000 });
   const panel = win.getByRole("complementary", { name: "Página del material" });
   await panel.locator(".panel-cuerpo img").waitFor({ timeout: 20000 });
-  const [visor] = await Promise.all([app.waitForEvent("window"), panel.getByRole("button", { name: "Abrir el PDF en una ventana" }).click()]);
+  const [visor] = await Promise.all([app.waitForEvent("window"), enVentana(win, panel.getByRole("button", { name: "Abrir el PDF entero" }))]);
   const erroresVisor = errores(visor);
 
   // Abre en la página citada, con el texto de PDF.js (seleccionable) y el título del documento.
@@ -89,7 +94,7 @@ test("ventana de PDF: el libro entero en la página citada, sin el problema rese
   restaurarProgreso();
   await win.getByRole("button", { name: "Redes (demo)" }).first().click();
   await win.getByRole("tab", { name: "Material" }).click();
-  await win.locator(".documentos li", { hasText: "Kurose" }).getByRole("button", { name: "Abrir" }).click();
+  await enVentana(win, win.locator(".documentos li", { hasText: "Kurose" }).getByRole("button", { name: "Abrir el PDF entero" }));
   await visor.waitForFunction(() => document.querySelector("input.numero-pagina")?.value === "1", null, { timeout: 30000 });
   assert.equal(app.windows().length, 2);
   await numero.fill("8");
@@ -99,8 +104,8 @@ test("ventana de PDF: el libro entero en la página citada, sin el problema rese
   // Ctrl+W la cierra. Los parciales no se abren enteros; un práctico sí, con su PDF tal cual.
   // (La ventana se cierra antes de que Playwright dé la tecla por terminada.)
   await Promise.all([visor.waitForEvent("close"), visor.keyboard.press("Control+w").catch(() => {})]);
-  assert.equal(await win.locator(".documentos li", { hasText: "Primer parcial" }).getByRole("button", { name: "Abrir" }).count(), 0);
-  const [practico] = await Promise.all([app.waitForEvent("window"), win.locator(".documentos li", { hasText: "Práctico 1" }).getByRole("button", { name: "Abrir" }).click()]);
+  assert.equal(await win.locator(".documentos li", { hasText: "Primer parcial" }).getByRole("button", { name: "Abrir el PDF entero" }).count(), 0);
+  const [practico] = await Promise.all([app.waitForEvent("window"), enVentana(win, win.locator(".documentos li", { hasText: "Práctico 1" }).getByRole("button", { name: "Abrir el PDF entero" }))]);
   const erroresPractico = errores(practico);
   await textoDePagina(practico, 1).getByText(/Ejercicio 1\./).waitFor({ timeout: 30000 });
   assert.equal(await practico.locator(".de-total").innerText(), "de 1");

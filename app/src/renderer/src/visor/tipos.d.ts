@@ -11,4 +11,7 @@ export interface ApiVisor {
   alTema(f: (tema: Tema) => void): () => void;
 }
 
+// De dónde saca el lector su documento: el preload de su ventana o, en una pestaña (DA56), la ventana principal.
+export type FuentePdf = ApiVisor;
+
 declare global { interface Window { visor: ApiVisor } }

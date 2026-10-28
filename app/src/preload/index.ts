@@ -36,6 +36,8 @@ contextBridge.exposeInMainWorld("learn", {
   foco: (suma?: { dia: string; minutos: number; bloque: boolean }) => ipcRenderer.invoke("app:foco", suma),
   titulo: (titulo: string) => ipcRenderer.invoke("app:titulo", titulo),
   abrirPdf: (pedido: unknown) => ipcRenderer.invoke("visor:abrir", pedido),
+  pdfPestana: (pedido: unknown, conBytes?: boolean) => ipcRenderer.invoke("visor:pestana", pedido, conBytes),
+  recursoPdf: (tipo: string, nombre: string) => ipcRenderer.invoke("visor:recurso", tipo, nombre),
   abrirGrabacion: (pedido: unknown) => ipcRenderer.invoke("reproductor:abrir", pedido),
   salir: () => ipcRenderer.invoke("app:salir"),
 });

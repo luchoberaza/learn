@@ -7,7 +7,7 @@ Electron, React y TypeScript. Corre la misma pi 1.4.0 y el mismo `.pi/` del vaul
 | Parte | Qué hace |
 |---|---|
 | `host/` | el proceso que corre pi, con el Node del sistema. `inicio.mjs` arma la sesión como `pi-learn` y atiende las acciones de la ventana. `filtro.mjs` decide qué sale hacia la ventana (nunca args ni resultados de las tools del curso, la correcta antes de responder, mensajes ocultos ni razonamiento). `interfaz.mjs` es la uiContext de pi (diálogos, quiz y preguntas). `paginas.mjs` aplica las reglas de `ver_pagina` al panel de página y a la ventana de PDF, que recibe una copia con las páginas vedadas en blanco (`lectura.py`). `curso.mjs` y `sesiones.mjs` leen el curso y las sesiones. `superficie.mjs` abre los paneles de subagentes. `consumo.mjs` junta el registro de consumo de learn, los cupos de los proveedores y el plan de cada cuenta, y estima cuántas consultas quedan con cada modelo |
-| `src/main/` | el proceso principal de Electron: ventana, ventanas de PDF (`visor.ts`), ajustes de la app, diálogos de archivos, «Preparar la computadora» (doctor e instalación) |
+| `src/main/` | el proceso principal de Electron: ventana, ventanas y pestañas de PDF (`visor.ts`), ajustes de la app (con la escala de la interfaz, los anchos y las pestañas), diálogos de archivos, «Preparar la computadora» (doctor e instalación) |
 | `src/preload/` | la API `window.learn` de la ventana y la `window.visor`, mínima, de cada ventana de PDF; sin acceso a Node |
 | `src/renderer/` | la interfaz: tienda de estado, pantallas, estilos (tokens Noche de Tokio y Día, Literata y Poppins empaquetadas). `visor.html` y `src/visor/` son la ventana de PDF, con PDF.js |
 | `src/lib/` | lógica pura con tests: temporizador de foco, textos (citas, plan, fechas) y los del medidor de consumo |
@@ -30,5 +30,6 @@ El curso de demostración se genera con `.pi/.venv/bin/python .pi/app/e2e/curso_
 
 - `PI_LEARN_E2E`, `PI_LEARN_E2E_GUION`, `PI_LEARN_E2E_TOKENS`: el proveedor falso y su guion (sólo pruebas).
 - `LEARN_APP_DATOS`: carpeta de datos de la app (sólo pruebas).
+- `LEARN_E2E_VAULT`: el vault de las pruebas de punta a punta, si no es el que contiene esta copia de learn (por ejemplo, uno de prueba con el curso de demostración).
 - `PI_LEARN_SIN_PARCHE=1`: no agrega la superficie de subagentes al paquete instalado.
 - `PI_LEARN_BASH`: el bash de los paneles de subagentes, si no es Git Bash ni `/bin/bash`.

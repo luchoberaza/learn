@@ -1,6 +1,6 @@
 # Interfaz de escritorio y Windows
 
-**Propuesta de luchoberaza para revisar en el PR.** La app vive en `app/`, el núcleo corre también en Windows y la terminal (`pi-learn`) queda igual. Las decisiones están en `DECISIONES.md` (DA39–DA53). Sin commits del lado del autor: el dueño del repo decide.
+**Propuesta de luchoberaza para revisar en el PR.** La app vive en `app/`, el núcleo corre también en Windows y la terminal (`pi-learn`) queda igual. Las decisiones están en `DECISIONES.md` (DA39–DA56). Sin commits del lado del autor: el dueño del repo decide.
 
 ## Qué trae
 
@@ -8,7 +8,10 @@
   - **Inicio:** «Seguir la clase» donde quedaste, con la última frase del tutor; el índice de cada curso como el de un libro; tu semana de foco.
   - **La clase:** se lee como un libro anotado. Literata a 18 px. Las citas `[[…pdf#page=N]]` van al margen con la miniatura de la página. El quiz está dentro del texto (teclas a, b, c y n), con fórmulas y diagramas.
   - **Panel de página** con las reglas de `ver_pagina`.
-  - **Ventana de PDF:** cada documento del curso, entero, en su propia ventana y en la página citada. Trae búsqueda, miniaturas y texto seleccionable. Las páginas reservadas para el simulacro llegan en blanco (DA47).
+  - **El PDF entero:** cada documento del curso, en la página citada, en una pestaña o en su propia ventana, como se elija al abrirlo. Trae búsqueda, miniaturas y texto seleccionable. Las páginas reservadas para el simulacro llegan en blanco (DA47, DA56).
+  - **Pestañas,** como en un navegador: una conversación o un PDF en cada una. Al volver a una pestaña, pi vuelve a su conversación; si el tutor está respondiendo, antes pregunta. Al abrir la app vuelven las pestañas que había (DA56).
+  - **La barra lateral se pliega** (Ctrl+B), y ella y el panel de página se ensanchan arrastrando su borde (DA54).
+  - **Tamaño de la interfaz** de 80 a 150 %, en Ajustes o con Ctrl + y Ctrl −, en todas las ventanas (DA55).
   - **Simulacro** con el reloj proporcional del examen.
   - **Temporizador de foco** que nunca corta la clase.
   - **Paleta** (Ctrl+K) con todos los comandos de learn, de las skills y de pi.
@@ -55,6 +58,14 @@ Capturas de las pruebas de punta a punta, con el curso de demostración y el tut
 **Ventana de PDF.** El libro entero, abierto en la página citada, con la búsqueda sin distinguir tildes. Se puede mover a otro monitor y cerrar.
 
 ![Ventana de PDF](interfaz/ventana-pdf.png)
+
+**Pestañas.** La clase, otra conversación y el libro, cada uno en su pestaña. Al abrir el PDF entero se elige si va en una pestaña o en una ventana.
+
+![Pestañas y el menú para abrir el PDF](interfaz/pestanas-menu-pdf.png)
+
+**El PDF en una pestaña.** El mismo lector de la ventana, sin las páginas reservadas para el simulacro. Al volver a la clase, sigue donde estaba.
+
+![El PDF en una pestaña](interfaz/pestanas-pdf.png)
 
 **Medidor de consumo.** Abajo en la barra lateral: el modelo de la clase, lo que queda en su cuenta y cuántas consultas alcanzan. Un clic abre los modelos de las cuentas conectadas, cada uno con lo que rinde.
 
@@ -137,9 +148,11 @@ Sin modelo ni red: el proveedor falso de pi-ai con guion hace de tutor. Windows 
 |---|---|---|
 | Node de learn (`tests/*.test.mjs`) | 317: 295 en verde, 0 en rojo, 22 salteadas con motivo | 317: 304 en verde, 0 en rojo, 13 salteadas con motivo |
 | Python de learn (`tests/ingesta`) | 175: 169 OK, 6 salteadas | 175: 171 OK, 4 salteadas |
-| App: host y lógica (`npm test`) | 45 de 45 | 45 de 45 |
-| App: punta a punta con Electron (`npm run e2e`) | 12 de 12 | 12 de 12 |
+| App: host y lógica (`npm test`) | 50: 46 en verde, 4 salteadas (piden el curso de demostración en el vault) | 50 de 50 |
+| App: punta a punta con Electron (`npm run e2e`) | 19 de 19 | 19 de 19 |
 | App empaquetada (instalador NSIS / AppImage) | abre con el medidor y la cuenta de Claude | abre una clase, el medidor y un PDF |
+
+Las filas de la app son del 2026-10-28, con DA54–DA56. En Windows, las de punta a punta corrieron contra un vault de prueba con el curso de demostración (`LEARN_E2E_VAULT`). Después del último ajuste (la pestaña de PDF ya no redibuja la ventana al pasar de página) se repitieron las de pestañas, más la ventana de PDF en Linux. Las filas de learn y la de la app empaquetada son de antes: DA54–DA56 no tocan el núcleo y los instaladores no se rearmaron.
 
 **Con el modelo real** (Claude Sonnet 5.5, en Windows, el 2026-10-26). Tres clases en la app con un alumno virtual, con un registrador entre pi y Anthropic que anota lo que factura cada respuesta:
 
@@ -172,7 +185,13 @@ Sin modelo ni red: el proveedor falso de pi-ai con guion hace de tutor. Windows 
 - el buscador del curso con un alias;
 - el medidor de consumo: lo que queda según el plan, la lista de modelos, la clase sumada al registro y al uso por modelo, y el plan cambiado desde Ajustes;
 - Cómo estudio y los modos (DA52): la mezcla guardada en `curso.config.local.json` sin tocar lo demás, «Desde cero» y «Fortalecer lo flojo» en el tema, y una clase desde cero con una pregunta de desarrollo. La respuesta esperada no se ve antes de responder, queda en la transcripción y en la nota, y el tutor falso comprueba que le llegan el modo, la mezcla y el conteo;
-- eliminar un curso (DA53): frena con una clase abierta en la app o en otro pi; la confirmación cuenta qué se va y arranca en «Cancelar»; el curso va a la papelera con su manifiesto y su propuesta, y «Seguir donde quedaste» retoma la clase anterior. Se agregó después de la tabla de arriba, que no se volvió a correr entera; esta prueba y la de la clase entera pasan en las dos, y la papelera real de cada sistema se probó aparte.
+- eliminar un curso (DA53): frena con una clase abierta en la app o en otro pi; la confirmación cuenta qué se va y arranca en «Cancelar»; el curso va a la papelera con su manifiesto y su propuesta, y «Seguir donde quedaste» retoma la clase anterior. Se agregó después de la tabla de arriba, que no se volvió a correr entera; esta prueba y la de la clase entera pasan en las dos, y la papelera real de cada sistema se probó aparte;
+- pestañas, paneles y escala (DA54–DA56):
+  - dos conversaciones en dos pestañas, cada una con la suya al volver, y dos clases de temas distintos en dos pestañas;
+  - la pregunta antes de cortar al tutor;
+  - el PDF en una pestaña, sin la página reservada y con la clase intacta al volver;
+  - lo que se restaura al abrir;
+  - la barra lateral plegada y arrastrada, el panel de página arrastrado y la escala contra el zoom real de la ventana.
 
 **Errores encontrados al verificar, y corregidos:**
 

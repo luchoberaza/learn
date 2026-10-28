@@ -1,10 +1,11 @@
 // Curso (§9.2): el índice, el material, las notas de clase y el estado (validación, ingesta e informe).
 import { useEffect, useState } from "react";
 import { cuando, esGrabacion } from "../../../lib/texto.ts";
-import { abrirGrabacion, abrirPagina, abrirPdf, eliminarCurso, enviar, estudiar, navegar, pedir, refrescarCursos, usarTienda } from "../tienda";
+import { abrirGrabacion, abrirPagina, eliminarCurso, enviar, estudiar, navegar, pedir, refrescarCursos, usarTienda } from "../tienda";
 import type { NotaResumen } from "../tipos";
 import { IndiceCurso } from "./Inicio";
 import { Prosa } from "./Prosa";
+import { MenuAbrirPdf } from "./PanelPagina";
 
 const TIPOS: Record<string, string> = { programa: "Programa", bibliografia: "Bibliografía", ejercicios: "Ejercicios y prácticos", evaluaciones: "Evaluaciones", soluciones: "Soluciones", practicos: "Prácticos", apuntes: "Apuntes", otros: "Otros" };
 type Pestana = "indice" | "material" | "notas" | "estado";
@@ -37,7 +38,7 @@ function Material({ slug }: { slug: string }) {
                   {evaluacion
                     ? <span className="apagado" title="Para no ver la solución antes de intentarlo, el tutor abre estas páginas recién después de tu intento.">se abre en la práctica</span>
                     : <>
-                      <button className="enlace cita" onClick={() => void abrirPdf({ curso: slug, doc: d.id, pagina: 1 })} title="El PDF entero, en su propia ventana">Abrir</button>
+                      <MenuAbrirPdf curso={slug} doc={d.id} pagina={1} texto="Abrir" clase="enlace cita" />
                       <button className="enlace cita" onClick={() => void abrirPagina({ curso: slug, doc: d.id, pagina: 1, origen: "material" })} title="Página por página, en el panel">Hojear</button>
                     </>}
                 </li>

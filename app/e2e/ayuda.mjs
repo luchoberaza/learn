@@ -9,7 +9,9 @@ import { fileURLToPath } from "node:url";
 
 const aqui = dirname(fileURLToPath(import.meta.url));
 export const APP = resolve(aqui, "..");
-export const VAULT = resolve(APP, "../..");
+// Con LEARN_E2E_VAULT, otro vault con su propio .pi (por ejemplo, uno de prueba con el curso de demostración), para no
+// tocar el vault de uso diario que contiene esta copia de learn.
+export const VAULT = process.env.LEARN_E2E_VAULT ? resolve(process.env.LEARN_E2E_VAULT) : resolve(APP, "../..");
 export const CURSO = "redes-demo";
 export const hayCurso = existsSync(join(VAULT, "cursos", CURSO, "indice.yaml"));
 

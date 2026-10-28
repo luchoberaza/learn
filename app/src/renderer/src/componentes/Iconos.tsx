@@ -19,4 +19,5 @@ export const Menos = () => <svg {...base}><path d="M6 12h12" /></svg>;
 export const Afuera = () => <svg {...base}><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" /></svg>;
 export const Hoja = () => <svg {...base}><path d="M7 3h7l5 5v12a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z" /><path d="M14 3v5h5M9 13h6M9 17h6" /></svg>;
 export const Terminal = () => <svg {...base}><rect x="3" y="4" width="18" height="16" rx="2" /><path d="M7 9l3 3-3 3M12 15h5" /></svg>;
+export const PestanaNueva = () => <svg {...base}><path d="M3 9V6a1 1 0 0 1 1-1h6l2 4h8a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9h9M12 12.5v5M9.5 15h5" /></svg>;
 export const Ok = () => <svg {...base}><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>;

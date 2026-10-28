@@ -2,7 +2,7 @@
 // aparecen en la clase como imágenes.
 import { useEffect, useState } from "react";
 import { cuando } from "../../../lib/texto.ts";
-import { enviar, enviarYEsperar, navegar, pedir, usarTienda } from "../tienda";
+import { enviar, enviarYEsperar, navegar, nuevaConversacion, pedir, usarTienda } from "../tienda";
 import type { NotaResumen } from "../tipos";
 
 export function TemaLibre() {
@@ -18,7 +18,7 @@ export function TemaLibre() {
     if (!tema.trim() || empezando) return;
     setEmpezando(true);
     try {
-      await pedir("nueva-sesion");
+      if (!(await nuevaConversacion())) return;
       if (conNota) {
         const ruta = await window.learn.notaLibre(tema.trim()).catch(() => undefined);
         if (ruta) await enviarYEsperar(`/md-log ${ruta}`);

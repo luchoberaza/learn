@@ -1,7 +1,11 @@
-// La ventana: barra lateral, la pantalla de la ruta, el panel de página a la derecha y las capas (diálogos, paleta, avisos).
-import { useEffect } from "react";
-import { arrancar, cambiar, cerrarPanel, leer, navegar, usarTienda } from "../tienda";
-import { Lateral } from "./Lateral";
+// La ventana: barra lateral, las pestañas con la pantalla de la ruta o un PDF, el panel de página a la derecha y las
+// capas (diálogos, paleta, avisos).
+import { useEffect, type CSSProperties } from "react";
+import { abrirPestana, arrancar, cambiar, cambiarEscala, cerrarPanel, cerrarPestana, leer, navegar, pestanaActiva, pestanaVecina, plegarLateral, usarTienda } from "../tienda";
+import { anchoLateral, LATERAL } from "../../../lib/escala.ts";
+import { BarraPestanas } from "./Pestanas";
+import { PestanaPdf } from "./PestanaPdf";
+import { Lateral, LateralPlegada } from "./Lateral";
 import { Inicio } from "./Inicio";
 import { Clase } from "./Clase";
 import { Curso } from "./Curso";
@@ -70,10 +74,29 @@ function SinPi() {
 export function App() {
   const panel = usarTienda(e => e.panel);
   const ruta = usarTienda(e => e.ruta);
+  // Sólo los ids de los PDF y si hay uno a la vista: pasar de página en un PDF no redibuja la ventana entera.
+  const pdfs = usarTienda(e => e.pestanas.filter(p => p.pdf).map(p => p.id).join(" "));
+  const activa = usarTienda(e => e.activa);
+  const enPdf = usarTienda(e => !!pestanaActiva(e).pdf);
+  const lateral = usarTienda(e => e.ajustes?.lateral);
+  const anchoPanel = usarTienda(e => e.ajustes?.anchoPanel);
   useEffect(() => {
     const teclas = (ev: KeyboardEvent) => {
-      if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === "k") { ev.preventDefault(); cambiar(e => ({ paleta: !e.paleta })); return; }
-      if ((ev.ctrlKey || ev.metaKey) && ev.key === ",") { ev.preventDefault(); navegar({ pantalla: "ajustes" }); return; }
+      const mod = ev.ctrlKey || ev.metaKey, k = ev.key.toLowerCase();
+      if (mod && k === "k") { ev.preventDefault(); cambiar(e => ({ paleta: !e.paleta })); return; }
+      if (mod && ev.key === ",") { ev.preventDefault(); navegar({ pantalla: "ajustes" }); return; }
+      // Pestañas (DA56) y barra lateral (DA54), salvo con un diálogo abierto.
+      if (mod && !document.querySelector(".velo")) {
+        if (k === "t" && !ev.shiftKey) { ev.preventDefault(); abrirPestana(); return; }
+        if (k === "w") { ev.preventDefault(); void cerrarPestana(); return; }
+        if (ev.ctrlKey && (k === "tab" || k === "pagedown" || k === "pageup")) { ev.preventDefault(); pestanaVecina(k === "pageup" || (k === "tab" && ev.shiftKey) ? -1 : 1); return; }
+        if (k === "b" && !ev.shiftKey) { ev.preventDefault(); plegarLateral(); return; }
+      }
+      // Escala de la interfaz (DA55); en una pestaña de PDF, Ctrl + y Ctrl − agrandan el documento.
+      if (mod && !pestanaActiva(leer()).pdf) {
+        const paso = k === "+" || k === "=" || ev.code === "NumpadAdd" ? 1 : k === "-" || ev.code === "NumpadSubtract" ? -1 : k === "0" || ev.code === "Numpad0" ? 0 : undefined;
+        if (paso !== undefined) { ev.preventDefault(); cambiarEscala(paso); return; }
+      }
       if (ev.key === "Escape" && !ev.defaultPrevented) {
         const e = leer();
         if (e.paleta) return cambiar({ paleta: false });
@@ -85,10 +108,20 @@ export function App() {
   }, []);
   // Un panel sin fijar se cierra al cambiar de pantalla.
   useEffect(() => { const p = leer().panel; if (p && !p.fijo) cerrarPanel(); }, [ruta]);
+  // Los anchos guardados (DA54) van como variables de la ventana; el tirador las cambia en vivo mientras se arrastra.
+  const plegada = !!lateral?.plegada;
+  const estilo = { "--lat": `${plegada ? LATERAL.plegada : anchoLateral(lateral?.ancho)}px`, ...(anchoPanel ? { "--panel": `${anchoPanel}px` } : {}) } as CSSProperties;
+  // La pantalla queda montada (oculta) mientras se ve un PDF: al volver, la clase sigue donde estaba.
   return (
-    <div className={`ventana ${panel ? "con-panel" : ""}`}>
-      <Lateral />
-      <div className="marco-pantalla"><Pantalla /></div>
+    <div className={`ventana ${panel ? "con-panel" : ""} ${plegada ? "plegada" : ""}`} style={estilo}>
+      {plegada ? <LateralPlegada /> : <Lateral />}
+      <div className="zona">
+        <BarraPestanas />
+        <div className="marco-pantalla">
+          <div className={`capa-pantalla ${enPdf ? "oculta" : ""}`} inert={enPdf}><Pantalla /></div>
+          {pdfs && pdfs.split(" ").map(id => <PestanaPdf key={id} id={id} activa={id === activa} />)}
+        </div>
+      </div>
       {panel && <PanelPagina />}
       <PanelSubagentes />
       <Paleta />

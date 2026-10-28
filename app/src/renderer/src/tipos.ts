@@ -1,4 +1,5 @@
 // Lo que viaja entre el host y la interfaz (ver app/host/filtro.mjs e interfaz.mjs) y la API del preload.
+import type { DatosPdf } from "./visor/tipos";
 
 export type Imagen = { mimeType: string; data: string };
 
@@ -106,6 +107,10 @@ export interface Ajustes {
   vault?: string; tema: "sistema" | "noche" | "dia"; node?: string; panelFijo: boolean;
   foco: { activo: boolean; foco: number; descanso: number; descansoLargo: number; ciclos: number; sonido: boolean };
   planes?: Record<string, Plan>;
+  lateral?: { ancho?: number; plegada?: boolean };
+  anchoPanel?: number;
+  escala?: number;
+  pestanas?: { vault: string; lista: unknown[]; activa: number };
 }
 export type Chequeo = { estado: "ok" | "falla" | "aviso" | "info"; nombre: string; detalle: string };
 
@@ -138,6 +143,8 @@ export interface ApiLearn {
   foco(suma?: { dia: string; minutos: number; bloque: boolean }): Promise<Record<string, { minutos: number; bloques: number }>>;
   titulo(titulo: string): Promise<void>;
   abrirPdf(pedido: { cita?: string; curso?: string; doc?: string; pagina?: number }): Promise<void>;
+  pdfPestana(pedido: { curso: string; doc: string; pagina?: number }, conBytes?: boolean): Promise<Omit<DatosPdf, "bytes"> & { curso: string; doc: string; bytes?: Uint8Array }>;
+  recursoPdf(tipo: string, nombre: string): Promise<Uint8Array>;
   abrirGrabacion(pedido: { cita: string; titulo?: string }): Promise<void>;
   salir(): Promise<void>;
 }

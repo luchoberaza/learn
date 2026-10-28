@@ -1,5 +1,5 @@
 // Ventanas de PDF (DA47): cada documento del curso entero en su propia ventana, que se puede mover a otro monitor y
-// cerrar. El host arma la copia para leer (cada página vedada cambiada por una hoja en blanco, host/paginas.mjs) y la
+// cerrar. También alimenta las pestañas de PDF de la ventana principal (DA56). El host arma la copia para leer (cada página vedada cambiada por una hoja en blanco, host/paginas.mjs) y la
 // ventana recibe sólo esa copia. Al volver a una ventana se pregunta de nuevo: si cambió lo vedado, se recarga.
 import { app, BrowserWindow, ipcMain, nativeTheme, screen, shell, type WebContents } from "electron";
 import { existsSync, readFileSync } from "node:fs";
@@ -86,9 +86,17 @@ export function crearVisores(host: Host, aqui: string, principal: () => BrowserW
     const { titulo, total, pagina, vedadas, clave } = a.lectura;
     return { titulo, total, pagina, vedadas, clave, tema: leerAjustes().tema, bytes: readFileSync(a.lectura.archivo) };
   });
+  // Una pestaña de PDF de la ventana principal (DA56): la misma copia para leer que recibe una ventana. Sin los bytes,
+  // sólo la clave, para saber al volver a la pestaña si cambió lo vedado.
+  ipcMain.handle("visor:pestana", async (e, pedido: PedidoPdf, conBytes = true) => {
+    if (e.sender !== principal()?.webContents) throw new Error("Sólo la ventana principal abre pestañas de PDF.");
+    const l = await host.pedir("lectura", { ...pedido, carpeta: carpeta() }) as Lectura;
+    const { curso, doc, titulo, total, pagina, vedadas, clave } = l;
+    return { curso, doc, titulo, total, pagina, vedadas, clave, tema: leerAjustes().tema, ...(conBytes ? { bytes: readFileSync(l.archivo) } : {}) };
+  });
   ipcMain.handle("visor:recurso", (e, tipo: string, nombre: string) => {
     const sub = DATOS_PDFJS[tipo];
-    if (!deVentana(e.sender) || !sub || typeof nombre !== "string" || basename(nombre) !== nombre) throw new Error("Recurso de PDF.js inválido.");
+    if ((!deVentana(e.sender) && e.sender !== principal()?.webContents) || !sub || typeof nombre !== "string" || basename(nombre) !== nombre) throw new Error("Recurso de PDF.js inválido.");
     return readFileSync(join(datosPdfjs(), sub, nombre));
   });
 
