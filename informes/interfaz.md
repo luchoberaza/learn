@@ -150,9 +150,9 @@ Sin modelo ni red: el proveedor falso de pi-ai con guion hace de tutor. Windows 
 | Python de learn (`tests/ingesta`) | 175: 169 OK, 6 salteadas | 175: 171 OK, 4 salteadas |
 | App: host y lógica (`npm test`) | 50: 46 en verde, 4 salteadas (piden el curso de demostración en el vault) | 50 de 50 |
 | App: punta a punta con Electron (`npm run e2e`) | 19 de 19 | 19 de 19 |
-| App empaquetada (instalador NSIS / AppImage) | abre con el medidor y la cuenta de Claude | abre una clase, el medidor y un PDF |
+| App empaquetada (instalador NSIS / AppImage) | una clase, el PDF en una pestaña y en una ventana, la barra plegada y la escala | lo mismo |
 
-Las filas de la app son del 2026-10-28, con DA54–DA56. En Windows, las de punta a punta corrieron contra un vault de prueba con el curso de demostración (`LEARN_E2E_VAULT`). Después del último ajuste (la pestaña de PDF ya no redibuja la ventana al pasar de página) se repitieron las de pestañas, más la ventana de PDF en Linux. Las filas de learn y la de la app empaquetada son de antes: DA54–DA56 no tocan el núcleo y los instaladores no se rearmaron.
+Las filas de la app son del 2026-10-28, con DA54–DA56. En Windows, las de punta a punta corrieron contra un vault de prueba con el curso de demostración (`LEARN_E2E_VAULT`). Después del último ajuste (la pestaña de PDF ya no redibuja la ventana al pasar de página) se repitieron las de pestañas, más la ventana de PDF en Linux. La app empaquetada se probó con los dos instaladores de la release `learn-app-0.1.0`, armados desde `ebd9b84`. En Windows también se instaló encima y abrió con un vault real. Las filas de learn son de antes: DA54–DA56 no tocan el núcleo.
 
 **Con el modelo real** (Claude Sonnet 5.5, en Windows, el 2026-10-26). Tres clases en la app con un alumno virtual, con un registrador entre pi y Anthropic que anota lo que factura cada respuesta:
 
