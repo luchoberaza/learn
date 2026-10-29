@@ -45,7 +45,9 @@ async function sesion(t) {
   };
   return { cortar };
 }
-const quiz = { question: "¿Qué retardo depende de L/R?", options: [{ label: "Transmisión" }, { label: "Propagación" }, { label: "Cola" }], correctAnswer: "Transmisión", explanation: "d_trans = L/R" };
+// Con su explicación en clase: tras el «Sigamos» del alumno, una pregunta sin texto visible no se muestra (DA57).
+const quiz = { question: "¿Qué retardo depende de L/R?", options: [{ label: "Transmisión" }, { label: "Propagación" }, { label: "Cola" }], correctAnswer: "Transmisión", explanation: "d_trans = L/R",
+  clase: "El retardo de transmisión es lo que tarda el router en poner todos los bits del paquete en el enlace: L bits a R bits por segundo, d_trans = L/R." };
 
 test("P2: cortar el turno con una pregunta abierta no arranca otra llamada ni muestra «Error: This operation was aborted»", async t => {
   const s = await sesion(t);

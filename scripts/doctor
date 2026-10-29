@@ -118,7 +118,7 @@ try {
   finally { if (commands.has("md-unlog")) await session.prompt("/md-unlog"); rmSync(pruebaFotos, { recursive: true, force: true }); }
   check(existsSync(join(piDir, "modo-curso.md")) && existsSync(join(piDir, "scripts/ingesta/sesion.py")), "Contexto de sesión", "modo-curso y lector/render local presentes; no requiere dependencias nuevas");
   const { systemPromptOptions: prompt } = await session.extensionRunner.emitBeforeAgentStart({ messageType: "user", prompt: "" }, { cwd: vaultDir });
-  const ajenas = Object.keys(prompt.sections).filter(s => !["teach", "modo_curso", "curso", "clase", "simulacro"].includes(s));
+  const ajenas = Object.keys(prompt.sections).filter(s => !["teach", "modo_curso", "curso", "clase", "simulacro", "python"].includes(s));
   if (prompt.forceSystemPrompt !== undefined) ajenas.push("prompt completo reemplazado");
   check(!ajenas.length, "Prompt del tutor", ajenas.length ? `secciones ajenas: ${ajenas.join(", ")}; filtrá su paquete en .pi/settings.json (SETUP.md)` : "sin secciones ajenas");
   // loadProject usa las mismas opciones de skills que config/fish/pi-learn.fish.

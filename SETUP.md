@@ -211,7 +211,7 @@ learn corre en Windows con los mismos tests en verde que en Linux (DA39–DA41).
 
 - **Instalación:** Node.js, Git for Windows (trae Git Bash, que pi necesita), uv y pi con `npm install -g --ignore-scripts @earendil-works/pi-coding-agent@1.4.0`. Clonar con `git -c core.autocrlf=false clone -b cursos …`: el repo fuerza LF con `.gitattributes`, pero un clon con `autocrlf` previo puede traer CRLF.
 - **Sin `pi-learn`:** fish y tmux no aplican. Se abre con la app, o en una terminal con `pi -ns --skill .pi/skills` desde la raíz del vault.
-- **El venv:** `.pi/.venv/Scripts/python.exe`. Los textos que sugieren comandos ya usan esa ruta.
+- **El venv:** `.pi/.venv/Scripts/python.exe`. Los textos que arma el código ya usan esa ruta. Los fijos (`CURSOS.md`, este archivo) muestran la de Linux; fuera de una clase, el prompt le dice al modelo cuál es la de esta máquina (DA57).
 - **Tesseract:** el de conda-forge (`micromamba create -p <carpeta> -c conda-forge tesseract=5.5.2 ghostscript libcurl`) más los modelos `spa`, `eng` y `osd` de `tessdata_fast`. Su ruta va en `curso.config.local.json` (`ruta_tesseract`), no en el `curso.config.json` versionado (DA40). La app lo hace sola desde «Preparar la computadora».
 - **Carpeta del vault:** conviene una local (por ejemplo `C:\Users\<vos>\pi-learning`) y no una sincronizada con OneDrive, por los enlaces y bloqueos de archivos de la ingesta.
 

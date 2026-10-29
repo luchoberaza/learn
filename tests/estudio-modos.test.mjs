@@ -281,22 +281,29 @@ test("guardia: una pregunta de verificación sin explicación visible desde la a
   const q = { question: "¿Qué retardo depende de la distancia?", options: [{ label: "Propagación", value: "prop" }, { label: "Transmisión", value: "trans" }, { label: "Cola", value: "cola" }], correctAnswer: "prop", explanation: "d_prop = d/s." };
   const anterior = (status = "answered", toolName = "quiz") => ({ type: "message", message: { role: "toolResult", toolCallId: "q0", toolName, details: { status } } });
   const tutor = (texto, id) => ({ type: "message", message: { role: "assistant", content: [...(texto ? [{ type: "text", text: texto }] : []), ...(id ? [{ type: "toolCall", id, name: "quiz", arguments: {} }] : [])] } });
+  const alumno = texto => ({ type: "message", message: { role: "user", content: [{ type: "text", text: texto }] } });
   const explicacion = "El retardo de propagación es lo que tarda un bit en viajar de un extremo al otro del enlace: depende del largo del cable y de la velocidad de la señal.";
   const conRama = (entradas, teclas = ["enter", "enter"]) => ({ ...ui(teclas), sessionManager: { getBranch: () => entradas } });
   const sinPopup = entradas => ({ hasUI: true, sessionManager: { getBranch: () => entradas }, ui: { custom: () => assert.fail("no se muestra") } });
 
   // Pregunta tras pregunta, sin texto (o con «Bien.»): no se muestra, md-log no la anota y el modelo recibe por qué.
-  for (const [entradas, escrito] of [[[anterior(), tutor("", "q1")], 0], [[anterior(), tutor("Bien.", "q1")], 5]]) {
+  // DA57: un mensaje del alumno corta igual que una pregunta respondida. Lo escrito antes no le responde, haya o no
+  // pregunta anterior (un alumno preguntó «¿por qué?» y recibió una pregunta sin la explicación).
+  for (const [entradas, escrito] of [[[anterior(), tutor("", "q1")], 0], [[anterior(), tutor("Bien.", "q1")], 5],
+    [[tutor(explicacion), alumno("No entendí. ¿Por qué?"), tutor("", "q1")], 0], [[anterior(), tutor(explicacion), alumno("Dale"), tutor("Bien.", "q1")], 5]]) {
     const r = await quiz.execute("q1", q, undefined, () => assert.fail("md-log no la anota"), sinPopup(entradas));
     assert.equal(r.details.status, "unavailable"); assert.equal(r.details.interno, true);
-    assert.match(r.content[0].text, new RegExp(`^Pregunta no mostrada: desde la pregunta anterior escribiste ${escrito} caracteres de texto visible, y el alumno no ve tu razonamiento`));
-    assert.match(r.content[0].text, /Poné en el campo clase de esta misma herramienta la explicación [^.]*o escribila como texto antes de llamarla\. No la pases al chat ni le cuentes al alumno de este aviso\./);
+    assert.match(r.content[0].text, new RegExp(`^Pregunta no mostrada: desde la pregunta anterior o el último mensaje del alumno escribiste ${escrito} caracteres de texto visible, y el alumno no ve tu razonamiento`));
+    assert.match(r.content[0].text, /Poné en el campo clase de esta misma herramienta la explicación [^.]*\(si el alumno te preguntó algo, empezá por responderle\)[^.]*o escribila como texto antes de llamarla\. No la pases al chat ni le cuentes al alumno de este aviso\./);
     assert.equal(quiz.renderResult(r, {}, theme).text, "(la pregunta vuelve después de la explicación)");
   }
-  // Con la explicación escrita (en el mismo mensaje o en uno anterior desde la pregunta), con momento diagnostico,
-  // sin pregunta respondida antes o tras una cancelada, se muestra.
+  // Con la explicación escrita (en el mismo mensaje, en uno anterior desde la pregunta o en clase, también después de un
+  // mensaje del alumno), con momento diagnostico, sin pregunta respondida ni mensaje del alumno antes o tras una
+  // cancelada, se muestra.
   for (const [entradas, params] of [[[anterior(), tutor(explicacion, "q1")], q], [[anterior(), tutor(explicacion), tutor("", "q1")], q],
-    [[anterior(), tutor("", "q1")], { ...q, momento: "diagnostico" }], [[tutor("", "q1")], q], [[anterior("cancelled"), tutor("", "q1")], q]]) {
+    [[anterior(), tutor("", "q1")], { ...q, momento: "diagnostico" }], [[tutor("", "q1")], q], [[anterior("cancelled"), tutor("", "q1")], q],
+    [[alumno("¿Por qué?"), tutor(explicacion, "q1")], q], [[alumno("¿Por qué?"), tutor("", "q1")], { ...q, clase: explicacion }],
+    [[alumno("¿Por qué?"), tutor("", "q1")], { ...q, momento: "diagnostico" }]]) {
     const r = await quiz.execute("q1", params, undefined, () => {}, conRama(entradas));
     assert.equal(r.details.status, "answered", JSON.stringify(entradas.map(e => e.message.role)));
   }

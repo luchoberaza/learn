@@ -4,7 +4,7 @@ import { existsSync, lstatSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { piDir, vaultDir, leerConfig } from "../../scripts/lib/pi-sdk.mjs";
 import { python, transcribir } from "./ingesta.ts";
-import { guardarCurso, registrarCuracion } from "./curacion.ts";
+import { guardarCurso, registrarCuracion, seccionPython } from "./curacion.ts";
 import { registrarSesion } from "./sesion.ts";
 import { registrarPresentacion } from "./presentacion.ts";
 import { registrarResearcher } from "./researcher.ts";
@@ -27,6 +27,12 @@ export default function (pi: ExtensionAPI) {
   registrarCuracion(pi);
   registrarIngestaFondo(pi);
   const sesion = registrarSesion(pi);
+  // Fuera de una clase, que no tiene bash, el prompt dice cuál es el Python de learn en esta máquina (DA57).
+  pi.on("before_agent_start", event => {
+    const python = sesion.actual() ? undefined : seccionPython();
+    if (python) event.systemPromptOptions.sections.python = python;
+    else delete event.systemPromptOptions.sections.python;
+  });
   registrarPreparacion(pi, sesion);
   const progreso = registrarProgreso(pi, sesion);
   registrarSimulacro(pi, sesion);

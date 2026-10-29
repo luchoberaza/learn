@@ -26,7 +26,7 @@ Archivo JSON en `_procesado/` de la raíz del vault, nunca en `cursos/<slug>/_pr
 
 ## Comandos locales
 
-Desde la raíz del vault:
+Desde la raíz del vault. En Windows, el Python es `.pi/.venv/Scripts/python.exe` en lugar de `.pi/.venv/bin/python`:
 
 ```bash
 .pi/.venv/bin/python .pi/scripts/ingesta/cursos.py revisar --curso ejemplo --propuesta _procesado/propuesta.json

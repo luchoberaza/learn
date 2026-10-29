@@ -34,6 +34,8 @@ La primera prueba de punta a punta con el modelo real (`gpt-6.1-sol`, una clase 
 
 **Paneles, escala y pestañas (2026-10-28, en el mismo PR):** pedido del dueño del repo después de usar la app. La barra lateral se pliega y, como el panel de página, se ensancha arrastrando su borde; la interfaz se agranda o achica en Ajustes o con Ctrl + y Ctrl −; y la ventana tiene pestañas, como un navegador, con una conversación o un PDF en cada una. Al abrir un PDF se elige si va en una pestaña o en su ventana. Ver DA54–DA56.
 
+**Lo que vio un alumno nuevo en Windows (2026-10-29, PR nuevo):** un amigo del usuario instaló la app en su PC y armó un curso. El tutor copió de `CURSOS.md` el Python de Linux y salió a buscar otro, contó como una falla las páginas que la ingesta deja para la visión y a un «¿por qué?» le contestó con una pregunta sin la explicación. Ver DA57.
+
 ## D0.1 — Conservar el upstream y fijar los subagentes
 
 - `.pi/` es el clon del fork `santi-esquerre/learn`, rama `cursos`.
@@ -1042,3 +1044,26 @@ Pedido del dueño del repo, que probó la app, por medio de luchoberaza: «no po
   - «al abrir vuelven…»: las pestañas guardadas, con el PDF en su página y la de un curso que ya no está en Inicio.
 
   `app/e2e/visor.test.mjs` sigue probando la ventana de PDF, ahora elegida en el menú.
+
+### DA57 — Lo que vio un alumno nuevo en Windows: el Python de esta máquina, las páginas dudosas y la pregunta sin respuesta
+
+- **Contexto:** un amigo del usuario instaló la app en su PC con Windows y armó un curso con la skill `curso-nuevo`. Se vieron tres problemas en sus capturas:
+  - **El Python:** `CURSOS.md`, de donde la skill toma «los comandos exactos», los escribe con `.pi/.venv/bin/python`, que es la ruta de Linux. En Windows uv deja el Python en `.pi/.venv/Scripts/python.exe`. El tutor copió el comando, falló y salió a buscar otro Python: `which python`, `py`, `where.exe python`, `uv`. En un Windows nuevo, `python` es el atajo de la Microsoft Store y `py` no existe, porque uv instala su propio Python. `ls .pi` no muestra `.venv`. En la PC del usuario pasó lo mismo el 27-oct, pero ese modelo listó `.pi/.venv/*` y siguió. Sólo `/curso-check` daba la ruta de Windows, con `PYTHON_TEXTO`.
+  - **Las páginas dudosas:** el informe de la ingesta marca las figuras y los diagramas («la estructura visual no fue transcrita»). El tutor se lo contó al alumno como algo que no pudo procesar, cuando la preparación por tema las pasa por visión la primera vez que se estudia el tema (`CURSOS.md`).
+  - **La pregunta sin respuesta:** el alumno preguntó por qué. El tutor cargó `teach` y le mandó un quiz sin explicación: la explicación apareció recién al corregir. La guardia de DA52 mide el texto visible desde la última pregunta respondida y, si no hay ninguna, deja pasar la pregunta. En esa sesión no había ninguna.
+- **Decisión:**
+  - **El Python de esta máquina:** fuera de una clase, en Windows, el prompt suma la sección `python`: «Esta computadora es Windows: el Python de learn es `.pi/.venv/Scripts/python.exe`. Donde CURSOS.md u otro texto diga `.pi/.venv/bin/python`, usá esa ruta; no busques otro Python.».
+    - En una clase no va, porque no hay bash, y en Linux no se agrega nada.
+    - El doctor la suma a su lista blanca.
+    - `CURSOS.md` y `SETUP.md` también nombran la ruta de Windows.
+  - **Las dudosas no son una falla:** `curso-nuevo` y `curso-agregar` piden presentarlas así. La ingesta sólo extrae texto, y la preparación por tema pasa por visión las figuras, los diagramas y los escaneos de su bibliografía la primera vez que se estudia el tema.
+  - **La guardia también corta en el mensaje del alumno:** la pregunta de verificación necesita 120 caracteres visibles desde la pregunta respondida anterior o desde el último mensaje del alumno, lo que esté más cerca. Lo escrito antes de que el alumno hable no le responde.
+    - Sigue igual: sin pregunta ni mensaje anterior no se exige, las del diagnóstico pasan y frena una sola vez.
+    - El aviso al modelo agrega que, si el alumno preguntó algo, empiece por responderle.
+- **Por qué:** el primer contacto de alguien nuevo es armar un curso, y ahí el tutor gastaba consultas buscando Python, contaba una falla que no era y no respondía una pregunta.
+- **Límites:**
+  - Si el modelo marca la pregunta como del diagnóstico (`momento: "diagnostico"`), la guardia no la mira, como en DA52.
+  - Después de un «dale» del alumno, una pregunta sin texto nuevo frena una vez y vuelve con su explicación: cuesta una llamada más.
+- **Verifica:**
+  - `tests/estudio-modos.test.mjs`, «guardia: …»: frena con un mensaje del alumno en el medio y sin pregunta anterior; pasa con la explicación en el mensaje o en `clase`, y con `momento: "diagnostico"`.
+  - `tests/entorno-auditoria.test.mjs`, «DA57: …»: el proyecto cargado como lo abre pi tiene la sección en Windows y no la tiene en Linux. La auditoría de la lista blanca del doctor y el doctor completo cubren la sección nueva.

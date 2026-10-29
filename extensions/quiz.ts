@@ -993,6 +993,8 @@ function withUILock<T>(fn: () => Promise<T>): Promise<T> {
 // verificación se muestra sólo si, desde la pregunta respondida anterior, el tutor escribió texto visible (también en el
 // mensaje que la hace). Las del diagnóstico (momento: "diagnostico") pueden ir seguidas; sin pregunta anterior no se exige.
 // Frena una sola vez seguida: en otra clase real el tutor reintentaba igual y terminaba preguntando por el chat.
+// DA57: un mensaje del alumno también corta, porque lo escrito antes no le responde. Un alumno nuevo preguntó «¿por qué?»
+// y recibió una pregunta sin explicación: en esa sesión no había ninguna respondida, y la guardia la dejaba pasar.
 const PREGUNTAS = new Set(["quiz", "pregunta_desarrollo"]);
 const MINIMO_EXPLICACION = 120;
 // Devuelve cuánto texto visible hubo si no alcanza, o undefined si la pregunta se puede mostrar.
@@ -1008,6 +1010,8 @@ export function faltaExplicacion(ctx: any, toolCallId: string, clase = ""): numb
 		const m = rama[i]?.type === "message" ? rama[i].message : undefined;
 		if (m?.role === "assistant") {
 			for (const b of m.content ?? []) if (b?.type === "text" && typeof b.text === "string") texto += b.text.trim().length;
+		} else if (m?.role === "user") {
+			return texto < MINIMO_EXPLICACION ? texto : undefined;
 		} else if (m?.role === "toolResult" && PREGUNTAS.has(m.toolName) && m.details?.interno) {
 			return undefined;
 		} else if (m?.role === "toolResult" && PREGUNTAS.has(m.toolName) && m.toolCallId !== toolCallId && m.details?.status === "answered") {
@@ -1017,7 +1021,7 @@ export function faltaExplicacion(ctx: any, toolCallId: string, clase = ""): numb
 	return undefined;
 }
 const sinExplicacion = (caracteres: number) =>
-	`Pregunta no mostrada: desde la pregunta anterior escribiste ${caracteres} caracteres de texto visible, y el alumno no ve tu razonamiento ni los argumentos de las tools. Poné en el campo clase de esta misma herramienta la explicación de lo que esta pregunta verifica, con el ejemplo y qué estuvo bien o mal en su respuesta (se le muestra al alumno antes de la pregunta), o escribila como texto antes de llamarla. No la pases al chat ni le cuentes al alumno de este aviso. Si es una pregunta del diagnóstico, pasá momento: "diagnostico".`;
+	`Pregunta no mostrada: desde la pregunta anterior o el último mensaje del alumno escribiste ${caracteres} caracteres de texto visible, y el alumno no ve tu razonamiento ni los argumentos de las tools. Poné en el campo clase de esta misma herramienta la explicación de lo que esta pregunta verifica (si el alumno te preguntó algo, empezá por responderle), con el ejemplo y qué estuvo bien o mal en su respuesta (se le muestra al alumno antes de la pregunta), o escribila como texto antes de llamarla. No la pases al chat ni le cuentes al alumno de este aviso. Si es una pregunta del diagnóstico, pasá momento: "diagnostico".`;
 
 // ────────────────────────────────────────────────────────────────────────────
 // pregunta_desarrollo — la que se responde escribiendo (DA52). Tiene una respuesta correcta, como el quiz, pero no se

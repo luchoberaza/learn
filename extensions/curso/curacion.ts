@@ -1,12 +1,18 @@
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { readdirSync } from "node:fs";
 import { join } from "node:path";
-import { piDir, vaultDir, pythonDelVenv, PYTHON_TEXTO } from "../../scripts/lib/pi-sdk.mjs";
+import { piDir, vaultDir, pythonDelVenv, PYTHON_TEXTO, WINDOWS } from "../../scripts/lib/pi-sdk.mjs";
 import { python } from "./ingesta.ts";
 import { elegir } from "../comun/elegir.ts";
 import { fallaPython } from "./sesion.ts";
 
 const patron = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
+// DA57: CURSOS.md y los demás textos fijos escriben el Python del venv como en Linux (.pi/.venv/bin/python). En Windows
+// uv lo deja en Scripts\, y un modelo que copiaba el comando fallaba y salía a buscar otro Python en la máquina.
+export const seccionPython = () => WINDOWS
+  ? `Esta computadora es Windows: el Python de learn es ${PYTHON_TEXTO}. Donde CURSOS.md u otro texto diga .pi/.venv/bin/python, usá esa ruta; no busques otro Python.`
+  : undefined;
 
 async function ejecutar(pi: ExtensionAPI, accion: string, curso: string, extras: string[] = [], signal?: AbortSignal) {
   if (!patron.test(curso)) throw new Error("Curso inválido: indicá un slug sin tildes.");

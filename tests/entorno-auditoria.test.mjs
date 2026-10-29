@@ -55,7 +55,7 @@ async function cargar(t, { home, agente }, argumentos) {
     t.after(() => session.dispose());
     await session.bindExtensions({});
     const { systemPromptOptions } = await session.extensionRunner.emitBeforeAgentStart({ messageType: "user", prompt: "" }, { cwd: vaultDir });
-    return { skills: loader.getSkills(), secciones: Object.keys(systemPromptOptions.sections), settingsManager };
+    return { skills: loader.getSkills(), secciones: Object.keys(systemPromptOptions.sections), textos: systemPromptOptions.sections, settingsManager };
   } finally { process.env.HOME = anterior; }
 }
 
@@ -69,6 +69,13 @@ test("H14: pi-learn abre el tutor sin ponytail ni skills globales y con las skil
   for (const n of ["teach", "curso-nuevo", "curso-agregar", "visualize"]) assert.ok(nombres.includes(n), n);
   assert.ok(!nombres.includes("ponytail"));
   assert.ok(skills.skills.find(s => s.name === "teach").filePath.endsWith("Projects/pi-learning/.pi/skills/teach/SKILL.md"));
+});
+
+// DA57: un modelo que copiaba los comandos de CURSOS.md (bin/python) en Windows fallaba y salía a buscar otro Python.
+test("DA57: fuera de una clase, en Windows el prompt da el Python de learn de esta máquina; en Linux no agrega nada", async t => {
+  const { textos } = await cargar(t, hogar(t), ["-ns", "--skill", join(piDir, "skills")]);
+  if (process.platform === "win32") assert.equal(textos.python, "Esta computadora es Windows: el Python de learn es .pi/.venv/Scripts/python.exe. Donde CURSOS.md u otro texto diga .pi/.venv/bin/python, usá esa ruta; no busques otro Python.");
+  else assert.equal(textos.python, undefined);
 });
 
 test("H09: el thinking del tutor queda oculto como setting de proyecto", async t => {
