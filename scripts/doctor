@@ -128,15 +128,20 @@ try {
   const oculto = session.settingsManager.getHideThinkingBlock();
   check(oculto, "Thinking oculto", oculto ? "hideThinkingBlock activo" : "agregá \"hideThinkingBlock\": true a .pi/settings.json");
   const registry = session.modelRuntime, principal = config.modelo_principal || `${session.settingsManager.getDefaultProvider()}/${session.settingsManager.getDefaultModel()}`;
+  // DA58: sin credenciales para el modelo configurado, pi abre la conversación con el primero que las tenga, y la visión
+  // (si acepta imágenes), el researcher y los subagentes usan ése. Sólo falla si no hay ninguno.
+  const conversacion = session.model && registry.hasConfiguredAuth(session.model.provider) ? session.model : undefined, usados = {};
   for (const [rol, id] of [["principal", principal], ["researcher", config.modelo_researcher], ["visión", config.modelo_vision]]) {
     const slash = id.indexOf("/"), model = registry.getModel(id.slice(0, slash), id.slice(slash + 1)), auth = Boolean(model) && registry.hasConfiguredAuth(model.provider);
-    check(auth, `Credenciales ${rol}`, `${id}: ${!model ? "no está en el catálogo; revisá /model" : auth ? "configuradas (sin llamar al modelo)" : "sin credenciales; ejecutá /login en pi"}`);
+    const reemplazo = !auth && conversacion && (rol !== "visión" || conversacion.input.includes("image")) ? conversacion : undefined;
+    usados[rol] = auth ? model : reemplazo;
+    if (reemplazo) console.log(`! Credenciales ${rol}: ${id}: ${model ? "sin credenciales" : "no está en el catálogo"}; se usa ${reemplazo.provider}/${reemplazo.id}, que sí tiene`);
+    else check(auth, `Credenciales ${rol}`, `${id}: ${!model ? "no está en el catálogo; revisá /model" : auth ? "configuradas (sin llamar al modelo)" : "sin credenciales; ejecutá /login en pi"}`);
   }
-  for (const [rol, id] of [["researcher", config.modelo_researcher], ["visión", config.modelo_vision]]) {
-    const slash = id.indexOf("/");
-    const model = registry.getModel(id.slice(0, slash), id.slice(slash + 1));
+  for (const [rol, configurado] of [["researcher", config.modelo_researcher], ["visión", config.modelo_vision]]) {
+    const model = usados[rol], id = model ? `${model.provider}/${model.id}` : configurado;
     if (sinRed) { check(false, `Modelo ${rol}`, `${id}: sin verificar (--sin-red)`); continue; }
-    if (!model) { check(false, `Modelo ${rol}`, `${id}: no está en el catálogo; revisá /model`); continue; }
+    if (!model) { check(false, `Modelo ${rol}`, `${id}: ningún modelo con credenciales${rol === "visión" ? " acepta imágenes" : ""}; ejecutá /login en pi`); continue; }
     try {
       const content = [{ type: "text", text: "Respondé únicamente OK." }];
       if (rol === "visión") content.push({ type: "image", mimeType: "image/png", data: readFileSync(join(piDir, "tests/fixtures/rojo.png")).toString("base64") });

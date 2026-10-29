@@ -2,7 +2,7 @@
 // proveedores y el modelo principal de la máquina, con un pi simulado y carpetas temporales.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { registrarModelos } from "../extensions/modelos.ts";
@@ -155,4 +155,24 @@ test("consumo: sin datos de uso o sin carpeta escribible no corta a quien llama"
   assert.doesNotThrow(() => anotarConsumo({ origen: "clase", proveedor: "anthropic", modelo: "x", usage: undefined }));
   assert.doesNotThrow(() => anotarConsumo({ origen: "clase", proveedor: "anthropic", modelo: "x", usage: USO }, join(process.env.LEARN_CONSUMO_DIR, "\0invalida")));
   assert.equal(leerConsumo().length, 0);
+});
+
+// DA58: los subagentes de agents/*.md fijan un modelo de openai-codex; learn tiene que andar con la clave del alumno.
+test("DA58: un subagente cuyo modelo no tiene credenciales va con el de la conversación; si las tiene o no fija modelo, no se toca", () => {
+  const recursos = temporal("learn-agentes-");
+  mkdirSync(join(recursos, "agents"));
+  writeFileSync(join(recursos, "agents/scout.md"), "---\nname: scout\nmodel: openai-codex/gpt-6-luna\n---\nCuerpo.\n");
+  writeFileSync(join(recursos, "agents/libre.md"), "---\nname: libre\n---\nSin modelo.\n");
+  const { h } = piSimulado(recursos);
+  const ctx = (conCodex = false) => ({ model: { provider: "anthropic", id: "claude-sonnet-5-5" },
+    modelRegistry: { find: (provider, id) => ({ provider, id }), hasConfiguredAuth: m => m.provider === "anthropic" || (conCodex && m.provider === "openai-codex") } });
+  const llamada = (input, c = ctx()) => { const evento = { toolName: "subagent", input: { task: "x", ...input } }; h("tool_call", evento, c); return evento.input.model; };
+  assert.equal(llamada({ agent: "scout" }), "anthropic/claude-sonnet-5-5");
+  assert.equal(llamada({ agent: "scout" }, ctx(true)), undefined);
+  assert.equal(llamada({ agent: "libre" }), undefined);
+  assert.equal(llamada({ agent: "scout", model: "openai-codex/gpt-6-luna:high" }), "anthropic/claude-sonnet-5-5");
+  assert.equal(llamada({ agent: "scout", model: "anthropic/claude-opus-5-5" }), "anthropic/claude-opus-5-5");
+  const otra = { toolName: "bash", input: { command: "ls" } };
+  h("tool_call", otra, ctx());
+  assert.deepEqual(otra.input, { command: "ls" });
 });

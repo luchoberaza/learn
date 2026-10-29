@@ -36,17 +36,27 @@ export function corteModelo(error = "") {
 type Solicitud = { vault: string; salida: string; doc: string; paginas: number[] };
 type Config = { modelo_vision: string; max_paginas_vision_sin_confirmar: number; umbral_calidad_pagina: number };
 
-// El modelo de visión configurado, o por qué no se puede usar (sin llamarlo).
-export async function modeloVision(ctx: Pick<ExtensionContext, "modelRegistry">, nombre: string): Promise<{ modelo: Model<Api> } | { motivo: string }> {
+// Por qué un modelo no sirve para visión, o undefined si sirve (sin llamarlo).
+async function sinVision(ctx: Pick<ExtensionContext, "modelRegistry">, modelo: Model<Api> | undefined, nombre: string) {
+  if (!modelo?.input.includes("image")) return `${nombre} no existe o no acepta imágenes; revisá modelo_vision en curso.config.json`;
+  // hasConfiguredAuth lee un snapshot que puede estar viejo; como pi, se confirma con la resolución real (un error lo informa la llamada).
+  const credenciales = ctx.modelRegistry.hasConfiguredAuth(modelo) || await ctx.modelRegistry.getProviderAuth(modelo.provider).catch(() => true);
+  return credenciales ? undefined : `no hay credenciales para ${modelo.provider}; ejecutá /login`;
+}
+// El modelo de visión configurado o, si no sirve, el de la conversación cuando acepta imágenes y tiene credenciales
+// (DA58): el repo fija uno de openai-codex y learn tiene que andar con la clave que tenga el alumno. reemplaza es el
+// configurado que no sirvió. Si ninguno sirve, por qué el configurado no.
+export async function modeloVision(ctx: Pick<ExtensionContext, "modelRegistry" | "model">, nombre: string): Promise<{ modelo: Model<Api>; nombre: string; reemplaza?: string } | { motivo: string }> {
   const separador = nombre.indexOf("/");
   const modelo = ctx.modelRegistry.find(nombre.slice(0, separador), nombre.slice(separador + 1));
-  // hasConfiguredAuth lee un snapshot que puede estar viejo; como pi, se confirma con la resolución real (un error lo informa la llamada).
-  const credenciales = modelo && (ctx.modelRegistry.hasConfiguredAuth(modelo) || await ctx.modelRegistry.getProviderAuth(modelo.provider).catch(() => true));
-  if (!modelo?.input.includes("image")) return { motivo: `${nombre} no existe o no acepta imágenes; revisá modelo_vision en curso.config.json` };
-  return credenciales ? { modelo } : { motivo: `no hay credenciales para ${modelo.provider}; ejecutá /login` };
+  const motivo = await sinVision(ctx, modelo, nombre);
+  if (!motivo) return { modelo: modelo!, nombre };
+  const actual = ctx.model, deActual = actual && `${actual.provider}/${actual.id}`;
+  if (actual && deActual !== nombre && !await sinVision(ctx, actual, deActual!)) return { modelo: actual, nombre: deActual!, reemplaza: nombre };
+  return { motivo };
 }
 
-export async function transcribir(ctx: Pick<ExtensionContext, "modelRegistry" | "hasUI" | "ui" | "mode">,
+export async function transcribir(ctx: Pick<ExtensionContext, "modelRegistry" | "model" | "hasUI" | "ui" | "mode">,
   solicitud: Solicitud, config: Config, signal?: AbortSignal, informar?: (texto: string) => void) {
   if (!Array.isArray(solicitud.paginas) || !solicitud.paginas.length || solicitud.paginas.some(n => !Number.isSafeInteger(n) || n < 1)) {
     throw new Error("Indicá páginas PDF enteras y positivas (base 1).");
@@ -64,11 +74,12 @@ export async function transcribir(ctx: Pick<ExtensionContext, "modelRegistry" | 
     resumen.avisos.push(`Visión no disponible: ${vision.motivo}.`);
     return { resumen, usage: undefined };
   }
-  const { modelo } = vision;
+  const { modelo, nombre } = vision;
+  if (vision.reemplaza) resumen.avisos.push(`Visión con ${nombre}, el modelo de la conversación: ${vision.reemplaza} no tiene credenciales o no acepta imágenes.`);
   if (paginas.length > config.max_paginas_vision_sin_confirmar) {
     if (!ctx.hasUI) throw new Error(`La tanda de ${paginas.length} páginas necesita confirmación interactiva; no se envió ninguna página.`);
     // ui.confirm de pi dibuja «Yes»/«No»; Esc o un corte valen como no.
-    resumen.cancelada = await elegir(ctx, `Confirmar gasto de visión\nSolicitaste ${paginas.length} páginas con ${config.modelo_vision}. Se reutilizará la caché disponible. ¿Autorizás esta tanda?`,
+    resumen.cancelada = await elegir(ctx, `Confirmar gasto de visión\nSolicitaste ${paginas.length} páginas con ${nombre}. Se reutilizará la caché disponible. ¿Autorizás esta tanda?`,
       ["Sí, transcribir", "No"], { signal }) !== "Sí, transcribir";
     if (resumen.cancelada) return { resumen, usage: undefined };
   }
@@ -78,7 +89,8 @@ export async function transcribir(ctx: Pick<ExtensionContext, "modelRegistry" | 
     informar?.(`${solicitud.doc}: página PDF ${pagina} (${resumen.transcritas + resumen.cache + resumen.fallidas.length + 1}/${paginas.length}).`);
     let preparada;
     let etapa = "preparar";
-    const datos = { ...solicitud, pagina, modelo: config.modelo_vision, umbral: config.umbral_calidad_pagina };
+    // La caché y lo guardado llevan el modelo que transcribe de verdad, no el configurado que no sirvió (DA58).
+    const datos = { ...solicitud, pagina, modelo: nombre, umbral: config.umbral_calidad_pagina };
     try {
       preparada = await python("preparar", datos, signal);
       if (preparada.cache) { resumen.cache++; continue; }

@@ -36,6 +36,8 @@ La primera prueba de punta a punta con el modelo real (`gpt-6.1-sol`, una clase 
 
 **Lo que vio un alumno nuevo en Windows (2026-10-29, PR nuevo):** un amigo del usuario instaló la app en su PC y armó un curso. El tutor copió de `CURSOS.md` el Python de Linux y salió a buscar otro, contó como una falla las páginas que la ingesta deja para la visión y a un «¿por qué?» le contestó con una pregunta sin la explicación. Ver DA57.
 
+**learn anda con la clave que tenga el alumno (2026-10-29, en el mismo PR):** la visión, el researcher y los subagentes tenían fijo un modelo de openai-codex. Sin una sesión de ChatGPT fallaban, aunque la conversación anduviera con otra clave. Ahora, si el modelo configurado no tiene credenciales, usan el de la conversación, y el doctor dice cuál en vez de marcarlo en rojo. Ver DA58.
+
 ## D0.1 — Conservar el upstream y fijar los subagentes
 
 - `.pi/` es el clon del fork `santi-esquerre/learn`, rama `cursos`.
@@ -1067,3 +1069,28 @@ Pedido del dueño del repo, que probó la app, por medio de luchoberaza: «no po
 - **Verifica:**
   - `tests/estudio-modos.test.mjs`, «guardia: …»: frena con un mensaje del alumno en el medio y sin pregunta anterior; pasa con la explicación en el mensaje o en `clase`, y con `momento: "diagnostico"`.
   - `tests/entorno-auditoria.test.mjs`, «DA57: …»: el proyecto cargado como lo abre pi tiene la sección en Windows y no la tiene en Linux. La auditoría de la lista blanca del doctor y el doctor completo cubren la sección nueva.
+
+### DA58 — learn anda con la clave que tenga el alumno: sin credenciales para el modelo configurado, va el de la conversación
+
+- **Contexto:** el repo fija `openai-codex/gpt-6-luna` para la visión (`modelo_vision` en `curso.config.json`), para el researcher y para los subagentes de `agents/*.md`. La conversación ya andaba con cualquier clave: sin credenciales para el modelo de `settings.json`, pi abre con el primero que las tenga. Pero con una clave de otro proveedor, como la de Anthropic de un alumno que no usa ChatGPT:
+  - la preparación de cada tema cortaba con «no hay credenciales para openai-codex; ejecutá /login»;
+  - `investigar_tema` decía «Verificación externa no disponible»;
+  - los subagentes se lanzaban con un `--model` sin credenciales;
+  - «Preparar la computadora» marcaba en rojo la visión y el researcher.
+  - Se podía cambiar a mano en *Ajustes → Modelo de visión* (`curso.config.local.json`), pero nada le avisaba a alguien nuevo que tenía que hacerlo. En la PC del usuario andaba porque ese archivo se armó a mano el 26-oct.
+- **Decisión:** si el modelo configurado no tiene credenciales (o no está en el catálogo), se usa el de la conversación.
+  - **Visión** (`modeloVision`, en la preparación por tema y en `transcribir_paginas`): sólo si el modelo de la conversación acepta imágenes. El aviso dice con cuál transcribe, y la caché y `calidad.json` llevan ese modelo, no el configurado que no sirvió. Si tampoco acepta imágenes, no llama y dice qué le falta al configurado, como antes.
+  - **Researcher:** se lanza con el de la conversación, y la nota de la verificación lleva ese modelo.
+  - **Subagentes:** un `tool_call` sobre `subagent` (en `extensions/modelos.ts`) cambia el modelo de la llamada, el pedido o el del frontmatter de su agente, si no tiene credenciales. Un modelo con credenciales, o un agente sin modelo, no se toca.
+  - **El doctor:** sin credenciales para el configurado pero con un modelo de conversación que sí las tiene, la línea pasa de ✗ a «!» y dice cuál se usa. El ping de visión y del researcher va al modelo que se usa de verdad. Sólo queda en rojo si no hay ningún modelo con credenciales (o, para la visión, ninguno que acepte imágenes).
+  - El repo conserva sus modelos: quien tiene ChatGPT sigue usándolos, y `curso.config.local.json` sigue pisándolos.
+- **Por qué:** learn tiene que andar con la clave que tenga quien lo instala. El modelo del repo es una preferencia de su autor, no un requisito.
+- **Límites:**
+  - La visión con el modelo de la conversación cuesta lo que cuesta ese modelo. En la primera clase de un tema, la preparación puede pasar hasta 150 páginas.
+  - Si la conversación usa un modelo sin imágenes (como DeepSeek), la visión sigue sin andar hasta elegir uno en Ajustes.
+  - Un agente que no está en `.pi/agents/`, como uno global del usuario, no se mira.
+- **Verifica:**
+  - `tests/vision-auditoria.test.mjs`, «DA58: …» (2): transcribe con el de la conversación y lo dice; sin imágenes, no llama.
+  - `tests/researcher-auditoria.test.mjs`, «DA58: …»: el hijo recibe `--model` con el de la conversación.
+  - `tests/modelos.test.mjs`, «DA58: …»: el subagente cambia de modelo sólo si el suyo no tiene credenciales.
+  - `tests/entorno-auditoria.test.mjs`, el doctor de una máquina nueva: sin claves, ✗; con una clave de Anthropic, «!» con el modelo que se usa en cada rol.

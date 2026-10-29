@@ -5,15 +5,34 @@
  *   que cada sesión nueva volvía a él. Con `modelo_principal` en curso.config.local.json (no versionado), las sesiones
  *   nuevas de la clase arrancan con ése, si tiene credenciales. No toca una sesión retomada, un `--model` explícito,
  *   el researcher ni los subagentes.
+ * - Subagentes (DA58): los de agents/*.md fijan su modelo. Si ése no tiene credenciales, van con el de la conversación.
  * - Consumo: cada respuesta del modelo deja una línea (proveedor, modelo, tokens, costo según el catálogo de pi) en la
  *   carpeta del agente; los cupos que el proveedor informa en las cabeceras quedan en cupos.json. Lo lee la app.
  */
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { leerConfigLocal, piDir } from "../scripts/lib/pi-sdk.mjs";
 import { agotadoDeCabeceras, anotarConsulta, anotarConsumo, anotarCupo, cupoDeCabeceras, leerCupos } from "../scripts/lib/consumo.mjs";
 
 // Las herramientas que esperan al alumno: su respuesta abre una consulta nueva, como un mensaje.
 const DEL_ALUMNO = new Set(["quiz", "ask_user_question"]);
+
+// El modelo que fija el frontmatter de agents/<nombre>.md, si lo hay.
+function modeloDelAgente(recursos: string, nombre: string) {
+  if (!/^[a-z0-9][a-z0-9-]*$/.test(nombre)) return undefined;
+  try {
+    const cabecera = readFileSync(join(recursos, "agents", `${nombre}.md`), "utf8").match(/^---\r?\n([\s\S]*?)\r?\n---/)?.[1];
+    return cabecera?.match(/^model:\s*(.+?)\s*$/m)?.[1];
+  } catch { return undefined; }
+}
+// Si «proveedor/modelo» (con su :thinking, si lo trae) tiene credenciales. Sin proveedor lo resuelve pi: no se toca.
+function conCredenciales(ctx: Pick<ExtensionContext, "modelRegistry">, nombre: string) {
+  const barra = nombre.indexOf("/");
+  if (barra < 1) return true;
+  const modelo = ctx.modelRegistry.find(nombre.slice(0, barra), nombre.slice(barra + 1).replace(/:(off|minimal|low|medium|high|xhigh)$/, ""));
+  return Boolean(modelo && ctx.modelRegistry.hasConfiguredAuth(modelo));
+}
 
 export default function modelos(pi: ExtensionAPI) {
   registrarModelos(pi);
@@ -35,6 +54,16 @@ export function registrarModelos(pi: ExtensionAPI, recursos = piDir) {
     if (!modelo || !ctx.modelRegistry.hasConfiguredAuth(modelo)) return;
     if (ctx.model?.provider === modelo.provider && ctx.model?.id === modelo.id) return;
     await pi.setModel(modelo);
+  });
+
+  // DA58: el repo fija en agents/*.md un modelo de openai-codex, y learn tiene que andar con la clave que tenga el alumno.
+  // Si el modelo del subagente (el que pide la llamada o el de su agente) no tiene credenciales, va el de la conversación.
+  pi.on("tool_call", (evento, ctx) => {
+    if (evento.toolName !== "subagent" || !ctx.model || !ctx.modelRegistry.hasConfiguredAuth(ctx.model)) return;
+    const input = evento.input as { agent?: unknown; model?: unknown };
+    const pedido = typeof input.model === "string" && input.model ? input.model : typeof input.agent === "string" ? modeloDelAgente(recursos, input.agent) : undefined;
+    if (!pedido || conCredenciales(ctx, pedido)) return;
+    input.model = `${ctx.model.provider}/${ctx.model.id}`;
   });
 
   // Una consulta es cada vez que el alumno actúa: un mensaje o la respuesta a un quiz o a una pregunta del tutor (que

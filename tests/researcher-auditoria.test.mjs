@@ -192,6 +192,18 @@ test('H34: un plazo vencido que el dossier recogió primero se avisa como no dis
   assert.equal(r.mensajes.length, 1); assert.doesNotMatch(r.mensajes[0][0].content, /^Informe/);
 });
 
+// DA58: el repo fija el researcher en openai-codex; learn tiene que andar con la clave que tenga el alumno.
+test('DA58: sin credenciales para el modelo del researcher, se lanza con el de la conversación', async t => {
+  const e = entorno(t), r = runtime(e, falso(e, informe));
+  r.ctx.model = { provider: 'anthropic', id: 'claude-sonnet-5-5' };
+  r.ctx.modelRegistry.hasConfiguredAuth = modelo => modelo.provider === 'anthropic';
+  const res = await r.alcance();
+  assert.equal(res.isError, undefined, res.content[0].text);
+  await esperar(() => existsSync(join(carpeta(e, res.details.nombre), 'codigo')));
+  const argv = JSON.parse(readFileSync(join(e.vault, 'argv.json'), 'utf8'));
+  assert.equal(argv[argv.indexOf('--model') + 1], 'anthropic/claude-sonnet-5-5');
+});
+
 test('H34: sin credenciales del modelo del researcher no se lanza nada', async t => {
   const e = entorno(t), r = runtime(e, falso(e, informe)); r.credenciales = false;
   const res = await r.alcance();

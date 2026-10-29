@@ -246,8 +246,12 @@ export function registrarResearcher(pi: ExtensionAPI, actual: () => Estado | und
         if (st === "corriendo" && !pendientes(ctx).some(i => i.nombre === clave(p))) pi.appendEntry("curso-researcher", { tipo: "inicio", nombre: clave(p), pedido: p } satisfies Inicio);
         if (st === "corriendo") return { content: [{ type: "text", text: "La verificación ya está en curso en segundo plano; seguí con el material." }], details: { pendiente: clave(p) } };
         if (st === "espera") throw new Error("Verificación externa no disponible por ahora (la última superó el plazo); seguí con el material.");
-        const a = agente(recursos), barra = a.modelo.indexOf("/"), modelo = ctx.modelRegistry.find(a.modelo.slice(0, barra), a.modelo.slice(barra + 1));
-        if (!modelo || !ctx.modelRegistry.hasConfiguredAuth(modelo)) throw new Error("Verificación externa no disponible: el modelo del researcher no tiene credenciales; seguí con el material.");
+        const a = agente(recursos), barra = a.modelo.indexOf("/"), configurado = ctx.modelRegistry.find(a.modelo.slice(0, barra), a.modelo.slice(barra + 1));
+        // DA58: sin credenciales para el del researcher (el repo fija uno de openai-codex), va el de la conversación: learn
+        // tiene que andar con la clave que tenga el alumno.
+        const modelo = configurado && ctx.modelRegistry.hasConfiguredAuth(configurado) ? configurado : ctx.model && ctx.modelRegistry.hasConfiguredAuth(ctx.model) ? ctx.model : undefined;
+        if (!modelo) throw new Error("Verificación externa no disponible: ni el modelo del researcher ni el de la conversación tienen credenciales; seguí con el material.");
+        if (modelo !== configurado) { a.modelo = `${modelo.provider}/${modelo.id}`; p.modelo = modelo.id; }
         // La preparación del tema está reescribiendo anclas: se lanza cuando termine con ellas (en recibir), así verifica el texto definitivo.
         if (p.modo === "alcance" && p.pendientes.length && preparando(estado.r)) {
           esperas.set(`${p.curso}/${p.tema}`, args.afirmaciones);

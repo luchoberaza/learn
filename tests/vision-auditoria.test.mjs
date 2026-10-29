@@ -90,3 +90,20 @@ test("H39: un snapshot de credenciales viejo no bloquea la visión si pi resuelv
   assert.equal(llamadas.length, 1);
   assert.doesNotMatch(resumen.avisos.join(" "), /no hay credenciales/);
 });
+// DA58: el repo fija un modelo de visión de openai-codex; learn tiene que andar con la clave que tenga el alumno.
+test("DA58: sin credenciales para el modelo de visión, transcribe con el de la conversación si acepta imágenes y lo dice", async () => {
+  ctx.model = { provider: "anthropic", id: "claude-sonnet-5-5", input: ["text", "image"] };
+  ctx.modelRegistry.hasConfiguredAuth = m => m.provider === "anthropic";
+  const { resumen } = await transcribir(ctx, solicitud, config);
+  assert.equal(llamadas.length, 1);
+  assert.equal(llamadas[0][0], ctx.model);
+  assert.equal(resumen.avisos[0], "Visión con anthropic/claude-sonnet-5-5, el modelo de la conversación: openai/gpt-6-luna no tiene credenciales o no acepta imágenes.");
+});
+test("DA58: si el de la conversación no acepta imágenes, no llama y dice qué falta del configurado", async () => {
+  ctx.model = { provider: "deepseek", id: "deepseek-chat", input: ["text"] };
+  ctx.modelRegistry.hasConfiguredAuth = m => m.provider === "deepseek";
+  const { resumen } = await transcribir(ctx, solicitud, config);
+  assert.equal(llamadas.length, 0);
+  assert.deepEqual(resumen.fallidas, [3]);
+  assert.deepEqual(resumen.avisos, ["Visión no disponible: no hay credenciales para openai; ejecutá /login."]);
+});
