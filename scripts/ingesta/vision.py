@@ -14,6 +14,7 @@ from almacen import Conflicto, atomico, guardar_json, leer_json, ruta_segura, sh
 from cursos import bloquear_breve, puntos_validos
 from extraccion import calidad
 from pipeline import ahora, cita, construir_busqueda, firma, informe, pagina_verificada, recuperar_registro
+from transcripcion import es_grabacion
 
 PROMPT = r"""Transcribí fielmente TODA esta única página, en su idioma original.
 No corrijas, completes ni uses tu memoria para reconstruir partes ausentes.
@@ -33,6 +34,8 @@ def cargar(raiz: Path, vault: Path, doc: str):
     meta = leer_json(raiz, f"{doc}/meta.json")
     if not meta or meta.get("id") != doc:
         raise ValueError("El documento no fue preparado por la ingesta base.")
+    if es_grabacion(meta["archivo"]):
+        raise ValueError(f"{doc} es una grabación: su texto sale de la transcripción de la ingesta base, no de la visión.")
     fuente = ruta_segura(vault, meta["archivo"])
     if fuente.suffix.lower() != ".pdf" or sha256(fuente) != meta["sha256"]:
         raise Conflicto("Cambió el PDF original; no se transcribió ni sobrescribió nada.")
@@ -192,7 +195,7 @@ def guardar_items(raiz: Path, vault: Path, datos: dict) -> dict:
             smeta, _, _ = cargar(raiz, vault, solucion["doc"])
             destino = ruta_segura(raiz, f"{solucion['doc']}/items.yaml")
             try:
-                vinculados = yaml.safe_load(destino.read_text()) if destino.exists() else {}
+                vinculados = yaml.safe_load(destino.read_text(encoding="utf-8")) if destino.exists() else {}
             except yaml.YAMLError:
                 raise ValueError("El archivo de ítems de soluciones no es YAML válido; se preservó.") from None
             if not isinstance(vinculados, dict) or not isinstance(vinculados.get("items", []), list):

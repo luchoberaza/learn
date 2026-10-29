@@ -24,6 +24,16 @@
 
 La primera prueba de punta a punta con el modelo real (`gpt-6.1-sol`, una clase de retardos con kill, `/compact`, `/simulacro` y `/fin` sobre una copia del vault, 41 llamadas) llegó a la primera pregunta a los 15,7 s y no perdió estado ni mostró soluciones antes del intento, pero encontró tres fallas graves: se enseñó de memoria sin leer la bibliografía, `/simulacro` gastó el reservado a mitad del tema y el reservado era casi copia de un ejercicio del dossier; además, textos de pi en inglés. Con los restos de la etapa anterior y los arreglos de fidelidad y plomería (DA29–DA36), la rama llega a `64cb42d`: sin modelo ni red, 267 tests Node en verde (incluyen la suite Python) y 151 tests Python OK. Pendiente: verificar con el modelo real las reglas nuevas de modo-curso (DA31) y en Obsidian el embed de la página mostrada (DA30); no hay simulacro de varios temas ni del curso completo, ni ficha del alumno (H58: patrones de error entre temas, confianza declarada y fechas de evaluación).
 
+**Interfaz de escritorio y Windows (2026-10-25, propuesta en un PR de luchoberaza):** app de escritorio en `app/` y núcleo portable a Windows, sin cambios de comportamiento en Linux ni en la terminal. Sin modelo ni red: suite Node 293 tests (Windows 271 en verde y 22 salteadas con motivo; Linux 280 y 13), Python 165 OK en las dos, y la app con 39 tests de host y lógica y 10 de punta a punta con Electron real en las dos. Con el modelo real se probó Claude Sonnet 5.5 en la app (DA48). La ingesta base procesa varias páginas a la vez según los hilos de cada máquina y deja los mismos archivos que de a una (DA50). Pendiente: probarla con `openai-codex` y decidir el fork de los subagentes. Ver DA39–DA50 y `informes/interfaz.md`.
+
+**Grabaciones de clase (2026-10-26, propuesta en el mismo PR):** un video o audio de clase es material del curso, transcripto en local con faster-whisper en tramos de cinco minutos que el tutor cita al segundo y la app reproduce en su propia ventana. Con DA51, sin modelo ni red: suite Node 298 tests (Windows 276 en verde y 22 salteadas; Linux 285 y 13), Python 175 (Windows 169 OK y 6 salteadas; Linux 171 y 4), y la app con 40 tests y 11 de punta a punta en las dos. Con el modelo real, una grabación de 41 minutos se transcribió sin placa de video. Ver DA51.
+
+**Un tutor que no da nada por sabido (2026-10-26, en el mismo PR):** el diagnóstico vuelve a ser el de `teach`, sin tope, y arranca con la lista de lo que el alumno ya vio. Cada pregunta llega con la explicación que verifica: en una clase real el tutor la escribía en su razonamiento, que el alumno no ve. Un tema se encara como siempre, desde cero o para fortalecer lo flojo, y el alumno elige la mezcla de múltiple opción y desarrollo. Con DA52, sin modelo ni red: suite Node 317 tests (Windows 295 en verde y 22 salteadas; Linux 304 y 13) y la app con 45 tests y 12 de punta a punta en las dos; la suite Python no cambió. Con el modelo real, cinco clases con un alumno simulado sin bases. Ver DA52.
+
+**Eliminar un curso (2026-10-27, en el mismo PR):** en la app, desde la pantalla del curso. Va a la papelera del sistema, de donde se restaura, y no se elimina con una clase abierta, la ingesta o la preparación de un tema corriendo. Con DA53, una prueba de host y una de punta a punta nuevas, que pasan en Windows y en Linux, igual que la papelera real de cada uno. Ver DA53.
+
+**Paneles, escala y pestañas (2026-10-28, en el mismo PR):** pedido del dueño del repo después de usar la app. La barra lateral se pliega y, como el panel de página, se ensancha arrastrando su borde; la interfaz se agranda o achica en Ajustes o con Ctrl + y Ctrl −; y la ventana tiene pestañas, como un navegador, con una conversación o un PDF en cada una. Al abrir un PDF se elige si va en una pestaña o en su ventana. Ver DA54–DA56.
+
 ## D0.1 — Conservar el upstream y fijar los subagentes
 
 - `.pi/` es el clon del fork `santi-esquerre/learn`, rama `cursos`.
@@ -317,6 +327,8 @@ La próxima activación detecta el último log del tema sin cierre final; coinci
 
 ## D7.3 — Confirmar el borde, no reiniciar el probe
 
+*Superada en parte por DA52: con borde previo el probe empieza por lo que fallaba, sin tope de preguntas.*
+
 Modo-curso pide confirmar domina/falla previos con hasta tres preguntas conceptuales en total; si los contradice la nueva evidencia, se amplía el mapeo. El dossier prioriza borde/próximo paso frente a listas de intentos. La sugerencia omite dominados y exige prerequisitos dominados; orden de preferencia: en curso, repasar, temas nuevos accesibles. No se agrega un planificador de repasos.
 
 Ensayo real final: _procesado/fase7/prueba-1792672775843/resultado.json. Dos sesiones nuevas de la fixture prueba-progreso con Sol, tres preguntas en cada una. El sistema recibió el borde de la primera; se cotejó en el JSONL de la segunda y las preguntas lo confirmaron en tres, con igual borde registrado. Dos /fin guardaron y conservaron el resumen antes de desvincular. Respuestas programadas: primer quiz correcto y siguientes no sé; sólo describen al alumno virtual aislado. No certifican el nivel del usuario, una clase completa, práctica evaluada ni el piloto humano. Researcher/visión se excluyeron de este smoke porque ya tienen ensayos propios.
@@ -385,6 +397,8 @@ node --test .pi/tests/*.test.mjs
 - **Verifica:** `ls _procesado/archivo-pruebas/redes/` muestra `LEEME.md`, `sesiones/` y `verificaciones/`; `cursos/redes/sesiones/` sólo conserva `adjuntos/`.
 
 ### DA7 — Pedagogía en `modo-curso.md`, que prevalece sobre teach (usuario, decisión 6)
+
+*Superada en parte por DA52: el probe vuelve a no tener tope, arranca con la lista de lo que el alumno ya vio y las raíces del plan son las que el alumno tiene; el corte por pedido de explicación queda.*
 
 - **Contexto:** la auditoría dejó al usuario el tope del probe, la aprobación del plan, el puntaje, la reserva de ítems y el simulacro (H12, H35, H56, H20; AUDITORIA §5). La precedencia entre teach y modo-curso era ambigua: un pedido de explicación esperó 3 min 46 s detrás del probe y del plan (H12), y al retomar se repetían objetivo y plan (H56).
 - **Decisión:** (a) un pedido explícito de explicación corta el probe, que tiene tope de 4 preguntas en un tema nuevo; (b) el plan se aprueba con `ask_user_question` y, al retomar con objetivo y plan guardados, no se vuelven a pedir; (c) la corrección da «≈ x/N» por pregunta, con el descuento de cada inciso (DA31), sólo cuando hay escala oficial; (d) un ítem reservado por tema y `/simulacro` (DA27); (e) por ahora no hay práctica por bloque: la práctica tipo evaluación va al final del tema.
@@ -646,3 +660,385 @@ node --test .pi/tests/*.test.mjs
 - **Por qué:** Tesseract no mejora lo que deja pendiente una capa previa (las fórmulas) y cuesta horas; lo que importa es que el tutor sepa qué está leyendo y que las páginas dudosas sigan yendo a visión.
 - **Límites:** las páginas ya pasadas por Tesseract se conservan en caché. Una capa previa mala se usa igual: queda pendiente y la preparación del tema la pasa por visión, pero sin visión el tutor lee ese texto con el aviso. La marca está sólo en `leer_paginas`: `buscar_material` devuelve fragmentos sin ella.
 - **Verifica:** `test_ingesta.py`: «test_capa_ocr_previa_se_usa_siempre_y_sin_capa_hay_tesseract»; `fidelidad-auditoria.test.mjs`: «DA38: una página con la capa OCR del escaneo llega al tutor marcada como OCR, y deja de estarlo al pasar por visión».
+
+## Interfaz de escritorio y Windows — 2026-10-25
+
+Propuesta de luchoberaza en un PR, para que la apruebe el dueño del repo. La app (`app/`) usa learn sin quitarle nada: todo lo que hoy es un comando pasa a ser algo que se ve y se toca, y la terminal sigue igual. Para que funcione en Windows hubo que tocar el núcleo (DA39–DA41) y, para que el quiz y las preguntas existan fuera de la terminal, sumar un puente (DA42–DA43). Informe completo, con capturas y pruebas: `informes/interfaz.md`.
+
+### DA39 — learn corre en Windows sin cambiar su comportamiento en Linux
+
+- **Contexto:** el núcleo no arrancaba en Windows. Python importaba `fcntl` y usaba `os.O_NOFOLLOW`; `os.kill(pid, 0)`, que en Windows **termina** el proceso en lugar de consultarlo; `start_new_session`. TypeScript tenía la ruta fija `.venv/bin/python` y comparaba con `/` las rutas de `path.relative`. El researcher se lanzaba con `sh -c "timeout …"`. Y Git con `autocrlf=true` convertía los archivos a CRLF, que rompían las huellas y los frontmatter. Línea de base en Windows: 147 tests Node en verde y 119 en rojo; la suite Python casi entera en rojo.
+- **Decisión:**
+  - **Python** (`almacen.py`): `tomar_bloqueo` usa `msvcrt.locking` en Windows y `fcntl.flock` en POSIX. `SIN_SEGUIR = getattr(os, "O_NOFOLLOW", 0)`, y sin él se rechaza el enlace simbólico con `is_symlink()` antes de abrir. `proceso_vivo` usa `OpenProcess` + `GetExitCodeProcess` (ctypes) en Windows. `opciones_desacoplado` da `DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP` en Windows. `_reemplazar` reintenta un momento si un lector retiene el destino. `atomico` escribe siempre LF y no sincroniza directorios en Windows. Los scripts reconfiguran stdin, stdout y stderr a UTF-8, y sus hijos reciben `PYTHONUTF8`.
+  - **TypeScript:** `pythonDelVenv()` y `PYTHON_TEXTO` en `scripts/lib/pi-sdk.mjs`, usados en todas las extensiones y en los textos que sugieren comandos. `aBarra()` en `material.ts` para comparar rutas en formato `/`. md-log acepta `C:\…` y barras invertidas en las fotos, y sin `O_NOFOLLOW` rechaza el enlace con `lstat`.
+  - **Researcher:** `scripts/vigilante.mjs` (Node, desacoplado) lanza `pi -p`, lo corta al vencer el plazo (`taskkill /T` en Windows, grupo de procesos en POSIX) y escribe `codigo` en forma atómica: 124 si venció, 137 si hubo que forzarlo. El hijo corre con cwd en la carpeta temporal, para que Windows pueda borrar su carpeta al recoger. `comandoPi()` lanza pi como `[process.execPath, cli.js]` en Windows (allá `pi` es un `.cmd`).
+  - **pi:** `rutaModuloPi` encuentra también una pi instalada con `npm install -g` (Windows no tiene la instalación administrada de Linux).
+  - **Repo:** `.gitattributes` con `* text=auto eol=lf`.
+- **Por qué:** el comportamiento en Linux es el mismo de antes. En cada lugar, la rama de Windows reemplaza sólo lo que allá no existe o hace otra cosa.
+- **Límites:** en Windows no hay `pi-learn` (fish + tmux): se abre con la app (DA44) o con `pi -ns --skill .pi/skills`. Un PDF abierto en otro programa puede demorar un reemplazo hasta un segundo.
+- **Verifica:** `test_portabilidad.py`: «test_proceso_vivo_consulta_sin_terminar_el_proceso», «test_bloqueo_exclusivo_entre_procesos», «test_un_mismo_proceso_no_toma_dos_veces_el_bloqueo», «test_enlace_simbolico_rechazado», «test_atomico_escribe_saltos_de_linea_lf», «test_python_del_venv_y_arranque_desacoplado_segun_la_plataforma». `researcher-auditoria.test.mjs` y `researcher.test.mjs` corren con el vigilante en las dos plataformas. Las dos suites en verde en Windows y en Linux (cifras en `informes/interfaz.md`).
+
+### DA40 — Lo propio de cada máquina va en `curso.config.local.json`
+
+- **Contexto:** `curso.config.json` versiona valores de una computadora: `vault`, `ruta_tesseract` y los modelos. En Windows hubo que apuntar a otro Tesseract, y cambiarlo ensuciaba el repo.
+- **Decisión:** `curso.config.local.json` (en `.gitignore`) puede pisar sólo `vault`, `ruta_tesseract`, `modelo_vision`, `modelo_researcher` y, desde DA49, `modelo_principal` (`leerConfig` y `leerConfigLocal` en `pi-sdk.mjs`; `cargar_config` y `CLAVES_LOCALES` en `almacen.py`). El researcher toma su modelo de ahí si está. `usar_tesseract` pone la carpeta del Tesseract primero en el PATH y fija `TESSDATA_PREFIX` si encuentra `../share/tessdata` (el Tesseract de conda-forge en Windows).
+- **Por qué:** cada máquina usa lo suyo sin tocar archivos versionados. La app escribe ahí lo que el alumno elige en Ajustes y en «Preparar la computadora».
+- **Límite:** una clave que no está en la lista se ignora en el archivo local: los umbrales siguen siendo del curso.
+- **Verifica:** `test_portabilidad.py`: «test_la_configuracion_local_pisa_solo_sus_claves». El doctor muestra el modelo del researcher de la máquina si difiere.
+
+### DA41 — El doctor revisa lo que corresponde a cada plataforma
+
+- **Contexto:** el doctor exigía fish, tmux, `wl-paste` y `timeout`, que en Windows no existen ni hacen falta.
+- **Decisión:** en Windows informa que fish, tmux y `pi-learn` no aplican y revisa Git Bash, que pi usa para su herramienta bash. El chequeo de `timeout` pasa a ser «Vigilante del researcher». Un Node distinto del verificado pero que cumple el piso de pi 1.4.0 (`>=22.19.0`) es un aviso (`!`), no una falla. Suma «Diagramas (visualize)» (DA46) como aviso.
+- **Por qué:** el diagnóstico tiene que decir qué falta de verdad en esa máquina.
+- **Verifica:** `entorno-auditoria.test.mjs` y «H80: el doctor revisa el vigilante, la web del researcher y el renombre a web_fetch en vez de safe_bash».
+
+### DA42 — Quiz y preguntas fuera de la terminal: `ctx.ui.preguntar`
+
+- **Contexto:** fuera de la terminal (modo RPC o SDK), `ctx.ui.custom` devuelve `undefined`: el quiz quedaba «cancelado», `ask_user_question` con opciones también, y la aprobación del plan («Dale» / «Ajustar») nunca aparecía.
+- **Decisión:** `extensions/comun/preguntar.ts`. Si la interfaz trae `ctx.ui.preguntar` y `ctx.mode !== "tui"`, `quiz.ts` y `ask-user-question.ts` le mandan la pregunta armada en lugar de dibujarla. El quiz manda el enunciado limpio, las opciones ya barajadas con su número, el modo, las correctas y la explicación. Ask manda las opciones y la etiqueta de «Otra». Todo lo demás queda igual: la normalización, el rechazo con menos de tres opciones, `cortable`, el `onUpdate` previo para md-log y `buildResult`. La interfaz es la que hace cumplir lo mismo que el popup. La app recibe la correcta y la explicación recién cuando el alumno respondió: la corrección la arma el proceso que corre pi, no la ventana (`app/host/interfaz.mjs`). Un corte cierra la pregunta como cancelada, salvo un quiz ya corregido, cuya respuesta se conserva (DA35).
+- **Por qué:** sin esto, la app perdía la parte central de la clase. En la terminal el popup sigue siendo el de siempre.
+- **Verifica:** `preguntar.test.mjs`: «Puente: el quiz llega a la app barajado, sin enlaces ni LaTeX en el enunciado, con la correcta y la explicación para después», «Puente: respuesta incorrecta, «No sé» con nota y multi-select se corrigen igual que en el popup», «Puente: cancelar en la app o mandar una respuesta vacía deja la pregunta cancelada, sin calificar», «Puente: ask_user_question con botones, «Otra» con texto, varias respuestas ordenadas y texto libre», «Puente: sin preguntar todo sigue como antes, y en la terminal manda el popup aunque haya preguntar», «Puente: un corte del turno con la pregunta abierta en la app la cierra como cancelada y termina el turno».
+
+### DA43 — Una sola tabla de etiquetas para la terminal y la app
+
+- **Contexto:** la terminal muestra cada tool del curso como una línea en español y nunca su resultado (DA18). La tabla vivía en `render.ts`, que importa pi-tui.
+- **Decisión:** `extensions/curso/etiquetas.ts` (sin pi-tui) tiene `TOOLS_DEL_CURSO`, `etiquetaLlamada`, `etiquetaResultado` y `textoParcial`. `render.ts` y la app la usan.
+- **Por qué:** una tool nueva sigue necesitando su fila, y queda igual en las dos interfaces.
+- **Verifica:** `etiquetas.test.mjs`: «etiquetas: cubre cada tool del curso y nunca muestra el texto del resultado», «etiquetas: la terminal dibuja exactamente las mismas líneas», que compara con el `ToolExecutionComponent` real de pi.
+
+### DA44 — La app de escritorio: Electron, un proceso aparte para pi y un filtro
+
+- **Contexto:** hoy se usa sólo desde la terminal, recordando comandos (`/estudiar redes retardos`, `/simulacro`, `/fin`, `pi-learn -c`), y las notas se leen aparte en Obsidian.
+- **Decisión:** `app/`, con Electron, React y TypeScript. pi no corre en la ventana sino en un proceso aparte (`app/host/inicio.mjs`), con el **Node del sistema** y la misma instalación de pi 1.4.0 que usa la terminal. Las extensiones, skills y settings son las del `.pi/` del vault, sin bifurcar, y se cargan como hace `pi-learn` (`noSkills` más `.pi/skills`, `PI_OFFLINE` si faltan los paquetes fijados).
+  - **Filtro** (`app/host/filtro.mjs`): nada sale hacia la ventana salvo lo que se arma campo por campo. Nunca salen los args ni resultados de las tools del curso, la correcta o la explicación de un quiz antes de responder, los mensajes ocultos (`curso-orden`), el razonamiento ni el `SKILL.md` de una skill cargada.
+  - **Panel de página:** aplica las reglas de `ver_pagina`: nunca una página con el reservado o una casi copia, y en evaluaciones y soluciones sólo la página que el tutor citó.
+  - **Datos del curso:** salen de `sesion.py cargar`, en sólo lectura.
+  - **Comandos de pi:** los que necesitan una pantalla (`/tree`, `/fork`, `/login`, `/model`…) tienen la suya. `/share`, `/bug` y `/llama` avisan que siguen en la terminal.
+- **Por qué:** si pi trabaja o se cuelga, la ventana no se congela, y hay una sola pi para todo. Tauri se descartó porque en Linux usa WebKitGTK, con problemas conocidos en Wayland y NVIDIA (Omarchy).
+- **Límites:** las pruebas automáticas usan el proveedor falso de pi-ai con guion. Con el modelo real se probó el 2026-10-26 con Claude Sonnet 5.5 (DA48); con `openai-codex` falta probarla en la app. Los instaladores no están firmados (SmartScreen avisa la primera vez).
+- **Verifica:** `app/host/test/filtro.test.mjs`, `host.test.mjs`, `instancia.test.mjs` y las ocho pruebas de punta a punta de `app/e2e/app.test.mjs`, con Electron real en Windows y en Linux.
+
+### DA45 — Subagentes en paneles de la app, sin tmux
+
+- **Contexto:** `pi-interactive-subagents` (de un tercero, fijado en `c3e8b53`) exige tmux. En Windows no hay tmux, así que `visualize` (mermaid-maker, svg-maker), el researcher de `teach` fuera de un curso, scout y worker no andaban.
+- **Decisión:** el paquete concentra en `tmux.ts` todo lo que hace con un panel. `app/subagentes/superficie.ts` exporta lo mismo y elige: si existe `globalThis.__piLearnSuperficie` (lo pone la app), usa sus paneles; si no, delega todo en `tmux.ts`, sin cambios. La app abre cada subagente en una terminal real (node-pty: ConPTY en Windows, PTY en Linux) con bash (Git Bash en Windows), lee la pantalla con `@xterm/headless` como `tmux capture-pane` y la dibuja con xterm.js. El alumno puede escribirle al subagente como en tmux. Lo que se escribe antes de que bash muestre su prompt se guarda y se manda después: Git Bash tarda más que los 300 ms que espera el paquete. Un panel que el alumno detiene cuenta como un fin con código 130, porque Windows da códigos negativos y el paquete sólo reconoce dígitos. Mientras el paquete no traiga la superficie, la app la agrega al checkout instalado en `.pi/git/` (`app/subagentes/aplicar.mjs`, reversible con `--quitar`; `.pi/git/` no se versiona). En la terminal no cambia nada.
+- **Por qué:** el comportamiento con tmux queda intacto, y en la app los subagentes andan en las dos plataformas.
+- **Decisión pendiente del dueño:** adoptar la superficie con un fork fijado del paquete o con un PR a su autor, y actualizar el pin en `.pi/settings.json`. Hasta entonces, la app aplica el parche local cada vez que abre (`PI_LEARN_SIN_PARCHE=1` lo evita).
+- **Verifica:** `app/host/test/superficie.test.mjs`: «superficie: un panel corre bash, se lee como tmux capture-pane y avisa a la app», «parche de subagentes: agrega la superficie, es idempotente y se quita», «superficie.ts del paquete: con la app usa sus paneles; sin ella, tmux como siempre». `app/e2e/app.test.mjs`: «app: un subagente corre en su panel (sin tmux) y su resultado vuelve a la clase», con un `scout` real.
+
+### DA46 — `visualize` dibuja en Windows y Linux, y sus dependencias se instalan
+
+- **Contexto:** `extensions/visual-tools` buscaba Chrome sólo en rutas de macOS y unía el PATH con `:` (en Windows es `;`). Lanzaba `node_modules/.bin/mmdc`, que en Windows es un `.cmd` que Node no ejecuta sin shell. Y su `package-lock.json` traía una dependencia de desarrollo enlazada a la máquina de su autor (`/Users/amos/.nvm/…`), así que `npm ci` fallaba en cualquier otra (`EMISSINGTARGET`): los diagramas no se dibujaban fuera de esa máquina.
+- **Decisión:** `chromeCandidates()` busca Chrome, Chromium y Edge en Windows, Linux y macOS, y `PI_VISUAL_CHROME` fija uno. `augmentedPath()` usa el separador de la plataforma. `render_mermaid` corre el `cli.js` de mermaid-cli con el Node de pi. `render_svg` suma un último recurso, `tools/svg-chrome.mjs`, que dibuja con ese navegador y el puppeteer que ya trae mermaid-cli, para cuando no hay `rsvg-convert` ni `magick` (lo normal en Windows). El lock se regeneró sin la entrada rota: las 196 dependencias de ejecución conservan su versión exacta y la de desarrollo pasa a `@earendil-works/pi-coding-agent` 1.4.0. Se instala con `PUPPETEER_SKIP_DOWNLOAD=1 npm ci --omit=dev --ignore-scripts --prefix .pi/extensions/visual-tools`, sin bajar otro navegador.
+- **Por qué:** `visualize` es parte de learn (README) y no funcionaba en ninguna de las dos máquinas.
+- **Límite:** necesita un Chrome, Chromium o Edge instalado. Windows 11 trae Edge; en Linux, si no hay ninguno, el doctor lo avisa.
+- **Verifica:** `visual-tools.test.mjs`: «visualize: busca Chrome, Chromium o Edge en Windows, Linux y macOS», «visualize: el PATH de los renders usa el separador de la plataforma», «visualize: Mermaid se dibuja con mmdc, el Node de pi y el navegador encontrado», «visualize: un SVG se dibuja con el navegador cuando no hay rsvg-convert ni magick».
+
+### DA47 — Los PDFs del curso, enteros, en su propia ventana
+
+- **Contexto:** desde una cita, el panel de página muestra una sola página como imagen. Para leer el capítulo alrededor, buscar una palabra o seleccionar texto había que abrir el PDF afuera, y abierto afuera se ve todo: también la página del ejercicio guardado para el simulacro.
+- **Decisión:** cada documento del curso se abre entero en una ventana propia, que se puede mover a otro monitor y cerrar (`app/src/main/visor.ts`). Se abre desde el panel de página («Abrir el PDF en una ventana», en la página citada) y desde *Curso → Material* («Abrir»). Si el documento ya tiene ventana, salta a la página pedida en vez de abrir otra.
+  - **Las mismas reglas que el panel:** la ventana nunca recibe el PDF original si tiene páginas vedadas. El host arma una copia para leer (`host/paginas.mjs` `lectura`, con `host/lectura.py` y PyMuPDF): cada página con un ítem reservado para `/simulacro`, su solución o una casi copia pasa a ser una hoja en blanco del mismo tamaño que lo avisa. La numeración no cambia, así que una cita a la página N sigue cayendo en la N. Sin vedadas va el PDF tal cual. Los parciales, las soluciones y los documentos con soluciones integradas no se abren enteros: siguen en el panel, sólo con la página que citó el tutor.
+  - **Lo vedado puede cambiar:** al volver a la ventana se pregunta de nuevo y, si cambió (se rindió o se reservó un ejercicio, cambió el material), se recarga en la misma página.
+  - **El lector:** PDF.js (`pdfjs-dist` 6.4.299, Apache 2.0), con lectura continua, búsqueda sin distinguir tildes, texto seleccionable, zoom, miniaturas, el índice del PDF si lo trae y una página oscura para leer de noche. Sin red: el PDF, las fuentes estándar, los mapas de caracteres y los decodificadores wasm llegan por el proceso principal, empaquetados con la app. La ventana tiene su propio preload, mínimo, y no abre otras ventanas ni navega.
+- **Por qué:** se puede leer el libro al lado de la clase sin salir de la app y sin ver lo que el simulacro necesita inédito.
+- **Límites:** en un documento con vedadas, la copia se arma por tramos y pierde los enlaces internos de una página a otro tramo; el índice del PDF se conserva. Las copias ocupan disco en la carpeta de datos de la app (`lectura/`), una por documento.
+- **Verifica:** `app/host/test/host.test.mjs`: «host: la ventana de PDF recibe el libro entero con la página vedada en blanco, y el parcial no se abre entero». `app/e2e/visor.test.mjs`: «ventana de PDF: el libro entero en la página citada, sin el problema reservado; se recarga y se cierra con la app», en Windows y en Linux. El curso de demostración (`app/e2e/curso_demo.py`) suma al libro la página 8 con el problema P29, casi copia de la pregunta reservada del parcial.
+
+### DA48 — Cuánto se gasta y cuánto queda, por cuenta y por modelo
+
+- **Contexto:** learn no mostraba cuánto consume, y cada cuenta mide distinto: una clave de API cobra por token, la suscripción de ChatGPT da un cupo por ventanas de tiempo y los planes gratis cuentan pedidos por día. Sin ese dato no se sabe hasta cuándo preguntar ni si conviene cambiar de modelo. Medido en la app con Claude Sonnet 5.5: una clase de 10 intervenciones con su cierre costó 0,19 USD, el verificador del tema 0,08 y una página de visión 0,01.
+- **Decisión:**
+  - **Registro local** (`scripts/lib/consumo.mjs`, `extensions/modelos.ts`): cada respuesta del modelo deja una línea en `<agente de pi>/learn/consumo.jsonl` con el origen (clase, preparación, verificador o subagente), el proveedor, el modelo, los tokens y el costo que calcula pi con su catálogo. Las llamadas de una misma respuesta del tutor quedan agrupadas como una consulta (un mensaje del alumno). La preparación del tema anota desde `ingesta.ts` y `preparacion.ts`, y el researcher carga la misma extensión con `LEARN_ORIGEN=verificador`. Nunca guarda texto de la clase y nunca corta a quien llama. Es por máquina: no va al vault.
+  - **Cupos que informa el proveedor:** la extensión lee las cabeceras de cada respuesta (`after_provider_response`). De la suscripción de ChatGPT toma el % usado de las ventanas de 5 horas y semanal, con su renovación (`x-codex-*`, sin documentar), y mide cuánto de la ventana gasta cada consulta. De Groq toma los pedidos del día. Un 429 queda como agotado hasta su `retry-after`. El host consulta además el saldo de OpenRouter (`/api/v1/key` y `/api/v1/credits`, con los pedidos gratis del día) y de DeepSeek (`/user/balance`).
+  - **El plan de cada cuenta** (Ajustes → Consumo): créditos del plan Max 20x o 5x de Claude, un presupuesto por mes, un saldo cargado, un plan gratis con pedidos por día o sin tope, con el día en que se renueva. Lo que queda sale del proveedor cuando lo informa y, si no, del plan menos lo anotado.
+  - **Cuánto rinde cada modelo** (`app/host/consumo.mjs`): el costo de una consulta con los precios del catálogo de pi y los tokens promedio de las últimas consultas propias. Sin historia se usa lo medido en la clase real: 1,5 llamadas, unos 37 mil tokens de contexto y 712 de salida. De ahí salen las consultas por dólar y las que quedan con lo que hay en la cuenta.
+  - **Por modelo y sin costo:** cada cuenta muestra lo usado con cada modelo (consultas, pedidos, tokens y costo). Los modelos gratis no tienen dólares que contar: su cuenta (DeepSeek, Qwen o GLM gratis por OpenRouter, NVIDIA, los gratis de OpenCode) muestra los pedidos y tokens de hoy y, si su plan gratis tiene un límite por día, cuántas consultas quedan. Los planes de tokens que no informan su cupo (Kimi, GLM, Qwen, Xiaomi) muestran lo usado y remiten a la página del proveedor.
+  - **En la app:** la barra lateral muestra el modelo de la clase, lo que queda en su unidad (dólares, % de la ventana o pedidos) y cuántas consultas alcanzan. Un clic abre los modelos de las cuentas conectadas para cambiar. Con menos de 30 consultas, otra vez con menos de 10, o si el proveedor corta por cupo, un aviso propone el modelo que alcanza para bastante más, primero en la misma cuenta.
+- **Por qué:** con una clave, una suscripción o un plan gratis, el alumno ve hasta dónde puede seguir y qué modelo le conviene, sin abrir la consola del proveedor.
+- **Límites:** con una clave de Anthropic u OpenAI el saldo real no se puede consultar (hace falta una clave de administrador de la organización): se cuenta lo de esta máquina, y lo que la misma clave gaste en otro programa no se ve. Las cabeceras de ChatGPT y los saldos de OpenRouter y DeepSeek se probaron con respuestas armadas según sus clientes y su documentación, no con una cuenta real. La compactación de pi no pasa por `message_end` y no se anota. La estimación para otro modelo supone los mismos tokens que el medido.
+- **Verifica:** `tests/modelos.test.mjs` (7), `app/host/test/consumo.test.mjs` (9), `app/src/lib/consumo.test.mjs` (4) y «app: el medidor de consumo muestra lo que queda según el plan, cuánto rinde cada modelo y suma la clase» en `app/e2e/app.test.mjs`, en Windows y en Linux. Las apps empaquetadas (instalador y AppImage) abren con el medidor. Una clase real con Claude Sonnet 5.5 en la app, con el registro comparado contra lo que respondió Anthropic (cifras en `informes/interfaz.md`).
+
+### DA49 — El modelo principal de cada máquina
+
+- **Contexto:** `.pi/settings.json` fija `openai-codex/gpt-6.1-sol`, y pi hace ganar los settings del proyecto sobre los globales. El modelo elegido con `/model` o en la app valía para esa sesión, pero cada sesión nueva, y cada vez que se abría la app, volvía al del repo. Con otra cuenta (por ejemplo, Claude) había que elegirlo cada vez.
+- **Decisión:** `modelo_principal` en `curso.config.local.json` (se suma a las claves de DA40). Al arrancar o abrir una sesión nueva, `extensions/modelos.ts` cambia a ése si existe y tiene credenciales. No toca una sesión retomada ni bifurcada, un `--model` explícito, el researcher ni los subagentes. La app lo guarda cuando se elige el modelo en Ajustes → Modelos, en el menú de la barra lateral o en Consumo. El doctor revisa las credenciales de ese modelo.
+- **Por qué:** cada máquina usa su cuenta sin tocar el repo, también en la terminal.
+- **Límite:** los subagentes (scout, worker, mermaid-maker, svg-maker) siguen con el modelo de su `agents/*.md`; sin credenciales de `openai-codex` no arrancan.
+- **Verifica:** `tests/modelos.test.mjs`: «modelo principal: una sesión nueva usa el de curso.config.local.json si tiene credenciales; una retomada o un --model, no» y «consumo: el verificador y los subagentes se anotan con su origen y no eligen modelo». La clase real con Claude arrancó con `modelo_principal` y nada más que lo eligiera. Los dos tests del doctor de `entorno-auditoria.test.mjs` no dependen de la configuración local: en una máquina con modelo principal propio esperaban el del repo y fallaban.
+
+## Ingesta base más rápida — 2026-10-26
+
+Propuesta de luchoberaza en el mismo PR. Una condición: no cambia nada de lo que sale, sólo cuánto tarda.
+
+### DA50 — La ingesta base procesa varias páginas a la vez, según los hilos de cada máquina
+
+- **Contexto:** la ingesta procesaba una página por vez con un solo hilo, y después de cada página reescribía `calidad.json` y `estructura.json` enteros y `estado-ingesta.json` dos veces, cada uno con su fsync. En una PC de 12 hilos, sobre PDFs sintéticos:
+  - una página escaneada sin capa de texto tardaba 5,5 s en caliente;
+  - un PDF digital de 300 páginas tardaba 40 s, y más de la mitad era escritura: 21 s, contra 18,7 s de extracción;
+  - el mismo comando de OCR, con varias páginas a la vez, daba el mismo texto en 12 de 12 páginas.
+- **Decisión:**
+  - `ingestar.py procesar` (también el que lanza `iniciar`) usa `trabajadores_de_la_maquina()`: procesos para la mitad de los hilos (`os.process_cpu_count() // 2`, como mucho 61 por el límite de Windows) y, como cada OCR usa dos hilos, la mitad de eso en OCR a la vez (un semáforo). Con 12 hilos son 6 y 3; con 4 hilos, 2 y 1; con 2, una página por vez como antes.
+  - `pipeline.ejecutar` decide primero qué páginas van de la caché y manda las nuevas a un `ProcessPoolExecutor` (spawn, para no heredar el bloqueo ni el estado de MuPDF). Cada proceso abre el PDF por su cuenta, comprueba la huella y corre `analizar_pagina`, el mismo código de antes, ahora sin escribir nada. El proceso principal guarda los resultados en orden de página, como antes.
+  - `calidad.json`, `estructura.json` y `estado-ingesta.json` se guardan una vez por segundo como mucho, al terminar cada documento, al pausar y al cortarse. El registro de cada página en `cache/` se sigue guardando enseguida, y es lo que manda tras un corte (`recuperar_registro`).
+  - La ingesta corre con prioridad baja (`almacen.bajar_prioridad`: BELOW_NORMAL en Windows, `nice` 10 en POSIX), y sus procesos y el OCR la heredan.
+  - Si muere un proceso del grupo, esa página y las siguientes se procesan en el principal.
+  - Un extractor inyectado (los tests) va de a una, igual que `ejecutar` sin `trabajadores`.
+- **Por qué:** cada página se procesa sin depender de las otras, así que da lo mismo en qué orden y en qué proceso. Dejar media máquina libre mantiene usable la computadora, también la app, mientras se arma un curso. Se descartó todo lo que cambia el texto (otro motor de OCR, menos resolución) y lo que no ganaba nada: con `--output-type none` OCRmyPDF tardó 5,51 s contra 5,54.
+- **Resultado**, con los archivos idénticos a los de antes (606 en el PDF digital y 54 en el escaneado):
+
+  | 12 hilos, 6 y 3 trabajadores | Antes | Con DA50 |
+  |---|---|---|
+  | Windows 11, PDF digital de 300 páginas | 44,9 s | 12,9 s |
+  | Windows 11, escaneado de 24 páginas sin capa de texto | 178,8 s | 54,5 s |
+  | Ubuntu en WSL, PDF digital de 300 páginas | 61,4 s | 13,7 s |
+  | Ubuntu en WSL, escaneado de 24 páginas sin capa de texto | 105,2 s | 33,1 s |
+
+- **Límites:**
+  - Con un corte duro (kill -9, apagón), `calidad.json` puede quedar hasta un segundo atrás. Las páginas de ese segundo tienen su registro en `cache/` y la próxima corrida las recupera sin reextraer.
+  - Si se corta, los procesos que estaban con una página la terminan y salen solos: no escriben nada.
+  - Si muere un proceso del grupo, `ProcessPoolExecutor` cierra también los otros. El OCR que tenían en curso puede dejar su carpeta `pi-ingesta-ocr-*` en el temporal del sistema, como pasa hoy con un kill durante el OCR.
+  - Cuánto se gana depende de los hilos de cada máquina. Los tiempos se midieron con PDFs sintéticos; falta medir un libro real.
+  - La preparación con el modelo de visión, en la primera clase de cada tema, sigue de a una página.
+- **Verifica:** `tests/ingesta/test_paralelo.py`:
+  - «varias a la vez dejan los mismos archivos que de a una», con una página escaneada por el OCR real y un parcial;
+  - «una pausa a la vez no procesa de más y se reanuda igual»;
+  - «calidad se guarda una vez por segundo y entera al cortar»;
+  - «la mitad de los hilos y la mitad de eso para el OCR»;
+  - «la ingesta baja su prioridad y la heredan sus procesos».
+
+  Además, a mano: con un proceso del grupo matado en medio de una corrida, la ingesta terminó con los mismos archivos.
+
+## Grabaciones de clase — 2026-10-26
+
+Propuesta de luchoberaza en el mismo PR. Las grabaciones de las clases pasan a ser material del curso, transcriptas en local.
+
+### DA51 — Las grabaciones de clase se transcriben en local, en tramos de cinco minutos que se citan al segundo
+
+- **Contexto:** learn sólo tomaba PDFs, y una clase grabada (video o audio) es a menudo el material que mejor sigue lo que se evalúa. Mandar el audio a un modelo cada vez gasta créditos y repite trabajo. Pasarlo a texto una sola vez, en la computadora, sigue la idea de la ingesta base: texto que se reusa en todas las clases.
+- **Decisión:**
+  - **Motor:** faster-whisper 1.2.1 en el venv de la ingesta, con el modelo `modelo_transcripcion` de `curso.config.json` (`large-v3-turbo` por defecto; una máquina puede pisarlo en `curso.config.local.json`). Se descarga la primera vez, unos 1,6 GB, a la caché de Hugging Face o a `carpeta_modelos` de `curso.config.local.json` (otro disco, por ejemplo). Precisión int8: en turbo da el mismo error que float16 (benchmark de faster-whisper, issue #1030). Va por tandas (`BatchedInferencePipeline`), con el filtro de voz Silero: los silencios y la música no llegan al modelo, que es donde Whisper inventa frases. Usa la mitad de los hilos de la máquina, como DA50, y una placa NVIDIA si están CUDA 12 y cuDNN 9; si no, el procesador. PyAV queda en 18.1.0: la 19 quitó `metadata_errors` de `av.open`, que faster-whisper 1.2.1 todavía pasa.
+  - **Tramos como páginas:** una grabación es un documento de tipo `bibliografia` u `otros` (no hay parciales grabados). Sus «páginas» son tramos de 5 minutos; un resto de menos de un minuto se suma al último. `paginas` es la cantidad de tramos, y los rangos del índice son tramos, así que la búsqueda, el índice, `leer_paginas`, el researcher y `/curso-check` funcionan sin cambios de fondo. `cursos.py inventario` da páginas o tramos, duración y SHA-256 de lo que hay en `_entrada/`.
+  - **Cortes en silencios:** el tramo k termina en el primer silencio desde el minuto 5·k, como mucho un minuto después; sin pausa, en el nominal y el tramo lo avisa. Así ningún tramo empieza antes de su minuto nominal, y su cita (`#t=` del inicio nominal) nunca cae después de lo que dice. Cortes e idioma, detectado una vez por grabación, quedan en `grabacion.json`: al reanudar, los tramos son los mismos.
+  - **Texto y citas:** cada párrafo dura hasta un minuto, se corta en las pausas y empieza con su hora (`[12:05] …`). `leer_paginas` le suma a cada párrafo el enlace a su segundo (`[[cursos/<curso>/fuentes/<tipo>/clase.mp4#t=725]]`) y avisa que es una transcripción automática: puede confundir nombres, términos y fórmulas dichas en voz alta, y lo escrito en el pizarrón no está. Los segmentos con poca confianza de Whisper (`avg_logprob` < −1 o compresión > 2,4) quedan como «audio dudoso» en los avisos del tramo.
+  - **Fuera de la visión:** ningún tramo va al modelo de visión. `ver_pagina` y `transcribir_paginas` rechazan una grabación con un mensaje claro, y la preparación por tema no la encola.
+  - **Ingesta:** cada tramo se guarda como una página, con caché por tramo y la misma pausa y reanudación. La barra muestra «Transcribiendo clase-3: tramo 2 de 9» y, la primera vez, la descarga del modelo.
+  - **App:** «Crear curso» y «Agregar material» aceptan grabaciones. Una cita `#t=` es una nota al margen con «Escuchar desde 12:05», que abre la grabación en su propia ventana, en ese segundo. La ventana pide el archivo por `learn-medio://<permiso>`: un protocolo propio que sólo sirve lo que abrió la ventana principal, con rangos de bytes para adelantar. Otra cita de la misma grabación salta en la ventana abierta.
+- **Por qué:** el texto se paga una vez, en la computadora, y después cuesta lo mismo que un PDF. Los tramos como páginas evitan un segundo sistema de material. Turbo es entre 2 y 3 veces más rápido que large-v3 con casi el mismo error (YouTube Commons: 13,4 % contra 13,2 %); las versiones «distil» son sólo inglés.
+- **Límites:**
+  - Obsidian abre el video desde el principio: `#t=` sólo lo respetan complementos como Video Notes. La app sí salta al segundo.
+  - Sin placa NVIDIA con CUDA, transcribir lleva tiempo: en una notebook Ryzen 5 4600H, con 6 hilos, unos 57 s por cada 108 s de audio; una grabación de 41 minutos, 23 minutos con otras pruebas corriendo a la vez. La primera vez se suma la descarga del modelo.
+  - El audio decodificado entero queda en memoria mientras se transcribe: unos 230 MB por hora de grabación.
+  - Chromium no reproduce todos los .mkv o .mov. La transcripción no depende de eso, y la ventana lo avisa.
+  - Los rangos por tema de una grabación se asignan después de la ingesta, leyendo la transcripción.
+  - Sin memoria para cargar el modelo, cada tramo queda pendiente con el aviso «no hubo memoria para el modelo de transcripción», sin guardar un idioma que no se detectó; la próxima corrida lo reintenta.
+- **Verifica:**
+  - `tests/ingesta/test_grabaciones.py`, con un WAV sintético y un transcriptor falso:
+    - «tramos de cinco minutos y horas»;
+    - «cada corte cae en la primera pausa desde el inicio nominal»;
+    - «párrafos de hasta un minuto cortados en las pausas»;
+    - «una grabación se ingiere en tramos con su hora y su cita»;
+    - «una pausa se reanuda sin retranscribir ni recalcular los cortes»;
+    - «un tramo que falla queda pendiente y la próxima corrida lo reintenta»;
+    - «sin memoria para el modelo los tramos quedan pendientes sin inventar el idioma»;
+    - «una grabación no es ejercicio ni pasa por visión»;
+    - «el inventario da páginas y tramos y el curso valida los tramos».
+  - Con el modelo real, si está descargado y `LEARN_GRABACION_REAL` apunta a una grabación: «faster-whisper transcribe el primer tramo en español». Con 108 s de Wikipedia hablada en español (dominio público), detectó el idioma y transcribió bien; erró nombres propios («Nobel» por Novell). Pasa también en Linux, con el modelo que bajó Windows a `carpeta_modelos`.
+  - Una grabación de 41 minutos de punta a punta, con `ingestar.py procesar` y la descarga del modelo: 9 tramos, los 8 cortes en pausas, idioma español y ningún tramo dudoso; erró términos poco comunes («coronario» por corolario).
+  - `tests/grabaciones.test.mjs`: la cita al segundo, `leer_paginas` con el enlace de cada párrafo y lo que falta, el dossier, las etiquetas, la barra y las anclas del researcher.
+  - `app/src/lib/texto.test.mjs`: «el momento de una grabación se reconoce aparte de una página».
+  - `app/e2e/grabacion.test.mjs`: la cita abre la grabación en su segundo, se puede adelantar (rangos de bytes), otra cita reusa la ventana, `learn-medio://` no sirve un permiso ajeno y la ventana se cierra con la principal.
+
+### DA52 — El tutor no da nada por sabido, el tema se encara de tres formas y el alumno elige la mezcla de preguntas
+
+- **Contexto:** el autor del curso notó que el tutor empeoró después de DA7. Antes preguntaba mucho para ubicar al alumno; ahora a veces usa definiciones que el alumno no vio. El learn original (`amosblomqvist/learn`, del que este repo es fork) no tiene tope en el probe: `teach` pide, en cada hebra que va a usar la lección, un piso (algo que acierta) y un techo (algo que falla) antes de planear, y confirmar cada raíz con el alumno.
+  - DA7 puso un tope de 4 preguntas en un tema nuevo (3 con borde previo), con el nivel de las evaluaciones desde la primera.
+  - DA7 aceptó «techo no localizado» y verificó las raíces del plan contra el material, no contra el alumno.
+  - F1 (`7935ca0`) sumó leer la definición del libro antes de cada nodo.
+  - Con eso el tutor no sabía qué bases tenía el alumno y enseñaba con el vocabulario del libro.
+  - Una clase real con Claude Sonnet 5.5 mostró una causa más, que viene de antes de DA52 (la clase real del 26-oct con el `modo-curso.md` anterior hace lo mismo).
+    - El tutor escribía la explicación en su razonamiento («Expliqué el concepto…», «Te doy una analogía con una canilla…») y preguntaba como si la hubiera dado.
+    - El alumno no ve el razonamiento: veía sólo preguntas seguidas y, después de responder, la explicación del quiz.
+    - La regla «nunca dos quizzes seguidos sin texto de clase en el medio» ya estaba y no alcanzó.
+  - Además, el alumno pidió repasar un tema de cero, trabajar sólo lo flojo y elegir cuántas preguntas son de múltiple opción y cuántas de desarrollo.
+- **Decisión:**
+  - **Probe sin tope** (`modo-curso.md`): el de `teach`.
+    - Arranca desde la base de cada hebra, no desde el nivel del parcial, y sigue hasta tener piso y techo en cada hebra que usa la clase.
+    - Sube fuerte tras un acierto y no repregunta lo que ya quedó claro.
+    - Para que no canse, primero un `ask_user_question` de selección múltiple, «¿Qué de esto ya viste?», con los conceptos base. Sólo se verifica lo marcado; lo no marcado se enseña sin preguntarlo.
+    - «Explicame» sigue cortando el probe (H12), pero lo que quedó sin medir se comprueba al llegar a su nodo.
+    - «Techo no localizado» vale sólo si el alumno acertó lo más difícil del tema.
+    - Con borde previo, el probe empieza por lo que fallaba.
+  - **Ningún término sin presentar:** antes de usar un término, un símbolo o una definición (también la del libro), el tutor comprueba que el alumno lo tiene: lo acertó en la clase, figura en «domina» o se lo enseñó. Si no, lo presenta primero, con un ejemplo y, si el tema se apoya en él, una pregunta. Las raíces del plan son lo que el probe mostró que el alumno tiene y que consta en el material.
+  - **Modos** (`extensions/comun/estudio.ts`): `/estudiar <curso> <tema> [desde-cero|fortalecer]`.
+    - **Desde cero:** sin la lista de lo que ya vio, probe desde la base y objetivo y plan nuevos. Se enseñan todos los nodos, también lo dominado; lo registrado no se borra.
+    - **Fortalecer lo flojo:** el probe y el plan van sobre lo que el progreso registra como falla, errores abiertos y ejercicios fallados, y sobre sus bases, con práctica en cada nodo y `falla_resuelta`. Sin fallas registradas, sigue como desde cero.
+    - El modo queda en el estado de la clase (sobrevive `pi -c`) y cambia la orden de arranque.
+    - En la app, la página del tema suma «Desde cero» y «Fortalecer lo flojo»; el segundo, sólo si hay algo guardado que falle.
+  - **Mezcla de preguntas:** automático (el predeterminado), sólo múltiple opción, más múltiple opción (3 de cada 4), mitad y mitad, más desarrollo (3 de cada 4 de desarrollo) o sólo desarrollo.
+    - Se guarda como `preguntas` en `curso.config.local.json`. Se elige con `/preguntas` en la terminal y en Ajustes → Cómo estudio en la app.
+    - Con una mezcla fija, cada pregunta respondida suma al resultado, sólo para el modelo, el conteo de la clase y cuál toca después. Con 3 de cada 4: opción, opción, opción, desarrollo.
+    - Automático usa múltiple opción en el probe y al verificar algo nuevo, y desarrollo cuando el alumno ya acertó ese concepto.
+    - La práctica con ítems de evaluación sigue en el chat.
+    - También vale en una clase de tema libre.
+  - **Sección «Esta clase»:** el modo y la mezcla van en una sección propia del prompt, que sólo cambia si cambian ellos.
+    - Así una mezcla nueva vale desde la pregunta siguiente sin romper la caché del prompt en cada turno.
+    - Las reglas de cada modo sólo van cuando se usa.
+  - **El alumno ve la explicación antes de cada pregunta:**
+    - `quiz` y `pregunta_desarrollo` suman `clase`: la explicación que la pregunta verifica, escrita para el alumno. Se muestra justo antes de la pregunta: en la terminal, en el historial y con formato; en la app, como texto del tutor con sus citas al margen; en la nota, como texto del tutor.
+    - **La guardia:** una pregunta de verificación se muestra sólo si, desde la pregunta respondida anterior, hay al menos 120 caracteres visibles entre el texto de los mensajes y su `clase`. Si no, vuelve al modelo con el motivo, sin que el alumno la vea (ni la app ni la nota).
+    - Frena una sola vez seguida: un reintento igual pasa, para que no haya bucles.
+    - Las del diagnóstico llevan `momento: "diagnostico"` y pueden ir seguidas.
+    - Después de cada respuesta de verificación, el resultado le recuerda al modelo que primero va la explicación.
+    - `modo-curso.md` lo dice: el alumno sólo ve el texto de los mensajes y `clase`, nunca el razonamiento ni los argumentos de las tools.
+  - **`pregunta_desarrollo`:** pregunta con respuesta correcta que se responde escribiendo, con «No sé».
+    - La respuesta esperada no se muestra ni se anota antes de responder; después se ve junto a lo escrito.
+    - El tutor corrige en su mensaje siguiente, sin exigir las palabras exactas.
+    - En la terminal es un popup, en la app una tarjeta y en la nota sus bloques.
+  - El tope de `modo-curso.md` pasa de 11,5 a 13,5 KiB; hoy mide 13 507 B.
+- **Por qué:**
+  - Sin el borde de cada hebra no se puede enseñar en la zona de desarrollo próximo, y una definición con términos que el alumno no tiene no se fija: son los dos principios de `teach`.
+  - Los programas que no avanzan hasta tener las bases rinden más, y más en los alumnos flojos (Kulik, Kulik y Bangert-Drowns, 1990, 108 evaluaciones).
+  - Lo que ayuda a un principiante le estorba a quien ya sabe (Kalyuga y otros, 2003): por eso los modos.
+  - Las dos formas de pregunta fijan lo aprendido, sin un ganador claro:
+    - la múltiple opción, si las opciones incorrectas son creíbles (Little y Bjork);
+    - la de desarrollo rinde menos mientras el alumno todavía falla mucho (van Wijk y otros, 2024);
+    - practicar en el formato del examen da una ventaja chica.
+    - De ahí el automático.
+  - La lista de lo que ya vio baja la cantidad de preguntas sin dar nada por sabido: lo marcado se comprueba y lo no marcado se enseña.
+  - Pedirle al modelo que escriba la explicación no alcanzó, ni con la guardia sola. El modelo sí completa bien los campos de las tools, así que la explicación viaja en la pregunta (`clase`).
+- **Límites:**
+  - Que la mezcla se cumpla depende del tutor, que recibe el conteo: el código no impide una pregunta del tipo que no toca.
+  - La lista se responde de memoria y puede sobreestimar: por eso lo marcado se verifica. Lo no marcado se enseña aunque el alumno lo supiera.
+  - Sin tope, el probe hace más preguntas que con DA7 y gasta más; «Explicame» lo corta.
+  - La pregunta de desarrollo no admite foto: los ejercicios largos siguen en el chat.
+  - La guardia mide cantidad, no calidad: 120 caracteres que no explican nada la pasan.
+  - Si el reintento llega sin explicación, la pregunta pasa igual.
+  - Con el modelo real se probó Claude Sonnet 5.5.
+- **Verifica:**
+  - `tests/estudio-modos.test.mjs`:
+    - «el modo va al final de /estudiar, también «desde cero» en dos palabras, y el resto es el tema»;
+    - «con una mezcla fija la próxima pregunta sale del conteo; automático la deja al tutor»;
+    - «la sección «Esta clase» nombra el modo sólo si no es seguir, la mezcla y la primera pregunta»;
+    - «/estudiar … desde-cero: el modo queda en el estado de la clase, en la orden de arranque y en «Esta clase»»;
+    - «al retomar la sesión (pi -c) la clase conserva su modo; uno inválido se descarta»;
+    - «cada pregunta respondida suma el conteo de la clase para el modelo»;
+    - «tema libre (skill teach fuera de un curso): también lleva la mezcla de preguntas y su conteo, sin modo»;
+    - «/preguntas: elige en la terminal, acepta el id o el nombre, guarda y automático no queda escrito»;
+    - las tres de `pregunta_desarrollo` (terminal, «No sé» y app) y la de md-log.
+  - `tests/pedagogia-auditoria.test.mjs`: «modo-curso: prevalece sobre teach con sus conflictos explícitos y trae las reglas de la auditoría», con las reglas nuevas, sin el tope y con 13,5 KiB.
+  - `app/host/test/desarrollo.test.mjs`: el filtro y la interfaz no dejan pasar la respuesta esperada antes de responder.
+  - `app/e2e/estudio.test.mjs`: «Cómo estudio guarda la mezcla, el tema ofrece los modos y la clase desde cero pregunta para escribir». El tutor falso comprueba que el modo, la mezcla y el conteo le llegan, y la explicación de la pregunta se ve antes que ella.
+  - `tests/estudio-modos.test.mjs`, además: «guardia: una pregunta de verificación sin explicación visible desde la anterior no se muestra y vuelve al modelo» y «la explicación de la pregunta (clase) se dibuja en la terminal antes de la pregunta, viaja a la app y nunca lleva la respuesta».
+  - **Con el modelo real**, cinco clases nuevas de retardos en la app (Claude Sonnet 5.5, mezcla «Mitad y mitad») con un alumno simulado sin bases: marca un solo concepto de la lista, contesta «No sé» y escribe respuestas incompletas. Costaron entre 0,35 y 0,52 USD cada una.
+    - En todas, la clase arrancó con la lista, verificó sólo lo marcado, alternó múltiple opción y desarrollo según el conteo y no dio por cerrado un nodo con un «creo que lo entendí».
+    - Sin `clase` ni guardia: la explicación quedaba en el razonamiento.
+    - Con la guardia sola: aparecieron explicaciones largas, que presentan cada término antes de usarlo («un router (una estación intermedia que lo reenvía)»), pero el modelo reintentaba sin texto (hasta 10 frenos en una clase) y terminaba preguntando por el chat.
+    - Con `clase`: cada pregunta de verificación llegó con su explicación o su corrección visible («Corrección: a medias. Lo que escribiste…») y la guardia frenó una sola vez.
+
+## Eliminar un curso — 2026-10-27
+
+Propuesta de luchoberaza en el mismo PR. Un curso se elimina desde la app.
+
+### DA53 — Un curso se elimina desde su pantalla y va a la papelera del sistema
+
+- **Contexto:** ni la terminal ni la app tenían cómo quitar un curso. Había que borrar `cursos/<slug>/` a mano, y quedaban su manifiesto y su propuesta en `_procesado/` de la raíz. El alumno pidió que la opción aparezca al entrar al curso.
+- **Decisión:**
+  - **Dónde:** «Eliminar el curso», en rojo, en la cabecera de la pantalla del curso, junto a «Agregar material». Sólo en la app: la terminal queda igual.
+  - **A la papelera:** `cursos/<slug>/` entero (las copias del material, `_procesado/`, las notas de clase, el progreso y el índice) va a la papelera del sistema con `shell.trashItem` de Electron, y con él `_procesado/manifiesto-<slug>.json` y `_procesado/propuesta-<slug>.json`. Los PDFs de `_entrada/` no se tocan. Antes se cierran las ventanas de PDF y de grabación de ese curso.
+  - **Cuándo no:** el host (`paraEliminar`, en `app/host/curso.mjs`) no deja eliminar un curso con:
+    - una clase abierta del curso en la app;
+    - una clase abierta del curso en otro pi (su `.sesion-activa.json`, con el proceso vivo);
+    - la ingesta leyendo sus PDFs (`estado-ingesta.json` en curso, con el proceso vivo);
+    - la preparación de un tema escribiendo (`.preparacion.lock` vigente, con el mismo criterio de antigüedad que `preparacion.ts`).
+
+    Lo dice en un aviso, sin abrir la confirmación. El proceso principal vuelve a preguntarlo justo antes de eliminar.
+  - **La confirmación** cuenta qué se va: las notas de clase, el progreso de los temas empezados y las copias del material. El botón de aceptar va en rojo y el foco arranca en «Cancelar», así que un Enter no elimina nada (`confirmarApp(…, peligro)`).
+  - **Después:**
+    - se vuelve a Inicio, y «Volver» ya no lleva a las pantallas del curso;
+    - «Seguir donde quedaste» saltea las clases de un curso que ya no está y toma la anterior;
+    - una sesión de ese curso sigue en «Todas las sesiones»; si se abre, `sesion.ts` avisa que no pudo restaurar el curso.
+- **Por qué:** la papelera hace reversible un error sin que learn tenga una papelera propia. Frenar mientras corre la clase, la ingesta o la preparación evita que un proceso siga escribiendo en una carpeta que ya no está.
+- **Límites:**
+  - Sin papelera en el sistema (un Linux sin escritorio), no se elimina: el aviso lo dice y el curso queda como estaba.
+  - Una propuesta guardada con otro nombre queda en `_procesado/`. El manifiesto y la propuesta van a la papelera por separado, y sólo hacen falta para volver a ingerir o ampliar el curso, que los escriben de nuevo.
+  - El consumo del curso queda en `consumo.jsonl`: ya se gastó.
+- **Verifica:**
+  - `app/host/test/eliminar.test.mjs`: «cuenta las notas de clase y no deja con una clase abierta, la ingesta o la preparación corriendo». Un proceso muerto o un candado de más de 6 horas no frenan; un nombre inválido o un curso que no está, sí.
+  - `app/e2e/eliminar.test.mjs`, sobre una copia del curso de demostración, con la papelera en una carpeta temporal:
+    - con la clase abierta en la app y con otra en otro pi, avisa y no elimina;
+    - la confirmación cuenta las notas y los documentos, arranca en «Cancelar» y Enter cancela;
+    - al aceptar, el curso, su manifiesto y su propuesta van a la papelera, el curso sale de la barra lateral y se vuelve a Inicio;
+    - «Seguir donde quedaste» retoma la clase anterior, de otro curso. Sin el arreglo, la prueba falla.
+  - La papelera real, en Windows (la Papelera de reciclaje) y en Linux (`~/.local/share/Trash`), con una copia descartable del curso.
+  - `app/e2e/app.test.mjs`, «una clase entera…», pasa por la confirmación de «Terminar la clase» y por «Volvé a…» en Inicio.
+
+## Paneles, escala y pestañas — 2026-10-28
+
+Pedido del dueño del repo, que probó la app, por medio de luchoberaza: «no podés ajustar el tamaño de los paneles ni cerrar la barra lateral», «debería tener una configuración para ajustar la escala de la interfaz, y que los paneles se puedan ajustar con el mouse» y «los PDF, estaría bueno que puedas abrir pestañas: que tengas las conversaciones o los PDF». Sobre el PDF, luchoberaza: «que tengas la opción, cuando le des clic a ver el PDF, de elegir pestaña o ventana».
+
+### DA54 — La barra lateral se pliega, y ella y el panel de página se ensanchan con el mouse
+
+- **Contexto:** la barra lateral medía siempre 256 px y no se podía cerrar: el usuario la había pedido siempre visible. El panel de página ocupaba el 34 % de la ventana, con un mínimo de 340 px. En una pantalla chica, o para leer la clase con el panel al lado, no había cómo repartir el lugar.
+- **Decisión:**
+  - **Plegar:** un botón arriba de la barra, junto a la marca, y Ctrl+B. Plegada queda una franja de 44 px con el botón para mostrarla, la búsqueda (Ctrl+K) y el latido si el tutor está trabajando. Sigue visible de entrada, como se había pedido.
+  - **Arrastrar:** el borde de la barra lateral (de 200 a 420 px) y el del panel de página (desde 300 px hasta el 60 % de la ventana, dejando al menos 360 px a la pantalla). Doble clic sobre el borde vuelve al ancho de siempre. Con el teclado, el borde se enfoca y las flechas lo mueven de a 16 px.
+  - **Mientras se arrastra** cambia sólo una variable CSS de la ventana, sin redibujar la app. Al soltar se guarda en los ajustes de la app (`lateral` y `anchoPanel`), junto con si la barra quedó plegada. Los cortes de las pantallas (`@container`) ya miden el lugar que queda, así que se acomodan solas.
+  - Los avisos y el cajón de los subagentes siguen esos anchos.
+- **Por qué:** cada uno reparte la pantalla según lo que esté haciendo, y lo encuentra igual al volver.
+- **Límites:** el panel de página tiene un solo ancho, no uno por documento.
+- **Verifica:** `app/src/lib/escala.test.mjs` (los topes de cada ancho) y `app/e2e/pestanas.test.mjs`:
+  - «barra lateral plegable y con el ancho a mano…»: Ctrl+B y el botón, el arrastre con su tope, el doble clic, las flechas y lo guardado;
+  - «PDF en una pestaña…»: el arrastre del panel de página.
+
+### DA55 — La escala de la interfaz se elige en Ajustes o con Ctrl + y Ctrl −
+
+- **Contexto:** el tamaño de letra y de los controles era fijo. Las combinaciones de zoom del menú de Electron cambiaban la escala sin guardarla, y al volver a abrir la app se perdía.
+- **Decisión:**
+  - **Ajustes → Apariencia → Tamaño de la interfaz:** 80, 90, 100, 110, 125 y 150 %, los pasos de un navegador. Ctrl + y Ctrl − pasan al siguiente o al anterior, y Ctrl 0 vuelve al 100 %.
+  - **En todas las ventanas:** la principal, las de PDF y las de grabación. El proceso principal la aplica cada vez que una ventana carga su página, y a todas cuando cambia (`setZoomFactor`).
+  - **En un PDF**, Ctrl + y Ctrl − siguen agrandando el documento, como en la ventana de PDF.
+  - **El menú de la app** queda sin los atajos de zoom de Electron, que cambiaban la escala sin guardarla, y sin el de cerrar la ventana, porque Ctrl+W ahora cierra la pestaña (DA56). Siguen recargar, herramientas de desarrollo y pantalla completa.
+  - Una escala guardada que no está en la lista se lleva a la más cercana (`app/src/lib/escala.ts`).
+- **Por qué:** con la escala del sistema operativo no alcanza: puede convenir la app más grande que el resto, o más chica en una pantalla chica.
+- **Verifica:** `app/src/lib/escala.test.mjs` y `app/e2e/pestanas.test.mjs`:
+  - «barra lateral plegable…» comprueba los pasos con Ctrl + y Ctrl −, Ctrl 0 y Ajustes, contra el zoom real de la ventana;
+  - «PDF en una pestaña…» comprueba que ahí Ctrl + agranda el documento y no la interfaz;
+  - «al abrir vuelven…» comprueba que la escala guardada vale desde el arranque.
+
+### DA56 — Pestañas: una conversación o un PDF en cada una; el PDF se abre en una pestaña o en su ventana
+
+- **Contexto:** la ventana mostraba una pantalla por vez y pi tiene una sola conversación abierta. Para pasar de una clase a otra había que ir a Sesiones, y un PDF sólo se abría en su propia ventana (DA47).
+- **Decisión:**
+  - **Una barra de pestañas** arriba del contenido, como la de un navegador.
+    - Cada pestaña tiene su pantalla y su historial, y la barra lateral navega en la pestaña activa. Con una sola pestaña, la app se usa como antes.
+    - El + y Ctrl+T abren una en Inicio. Ctrl+W y el clic del medio cierran. Ctrl+Tab (con Shift, hacia atrás) pasa de una a otra. Arrastrando una pestaña se cambia el orden.
+    - Cerrar una pestaña no borra su conversación: sigue en Sesiones. Si se cierra la última, queda una en Inicio.
+  - **Cada conversación vive en su pestaña** y pi sigue con una sola abierta, como hasta ahora. La pestaña recuerda el archivo de su sesión.
+    - Al volver a una pestaña con su clase, pi cambia a esa conversación (`abrir-sesion`, lo mismo que retomar desde Sesiones) y la clase se restaura como al retomarla.
+    - Si el tutor está respondiendo, antes se pregunta: «Cortar y cambiar» o «Esperar». Pasar a una pestaña de Inicio, del curso o de un PDF no corta nada: el tutor sigue escribiendo y su pestaña late.
+    - Lo que empieza una conversación en una pestaña que no tiene la abierta (estudiar un tema, Tema libre, Crear curso, sesión nueva) abre una nueva, y la de la otra pestaña queda intacta.
+    - Retomar una sesión que ya está en una pestaña lleva a esa pestaña. En Sesiones y en «Otras clases» de Inicio, un botón (o Ctrl+clic, o el clic del medio) la abre en una pestaña nueva.
+    - «Volver a la clase», desde la barra lateral o la paleta, lleva a la pestaña de la conversación.
+  - **El PDF entero:** «Abrir el PDF entero», en el panel de página y en *Curso → Material*, ofrece «En una pestaña» o «En una ventana nueva».
+    - La ventana es la de DA47.
+    - La pestaña usa el mismo lector, con la misma copia para leer y las mismas páginas en blanco. Al volver a la pestaña pregunta si cambió lo vedado y, si cambió, recarga, igual que la ventana.
+    - Pedir de nuevo un PDF que ya está en una pestaña lleva a esa pestaña, en la página pedida.
+    - PDF.js y sus estilos se cargan con la primera pestaña de PDF, no al abrir la app.
+  - **Lo que queda montado:** la pantalla de detrás y cada PDF quedan montados aunque no se vean, así que al volver la clase y el documento siguen donde estaban. Con un PDF a la vista, la barra lateral navega en la última pestaña usada (o en una nueva) y el PDF queda.
+  - **Al abrir la app** vuelven las pestañas del mismo vault, cada una con su pantalla, su conversación y los PDF en la página donde quedaron. Las de un curso que ya no está vuelven a Inicio, y los PDF de ese curso se cierran. Al eliminar un curso (DA53) pasa lo mismo.
+- **Por qué:** se puede tener la clase en una pestaña, el libro en otra y una consulta de otro tema en una tercera, y saltar entre ellas sin perder ninguna. Dos clases a la vez necesitarían dos pi andando, con el doble de memoria. Además, la nota y el progreso de un curso suponen una clase por vez.
+- **Límites:**
+  - Una conversación que espera en su pestaña no avanza: el tutor responde sólo en la abierta.
+  - Pasar a la pestaña de otra conversación tarda lo que tarda retomarla desde Sesiones.
+  - Una conversación sin mensajes no se guarda. Si se deja su pestaña y se vuelve, empieza otra.
+  - Una pestaña no se puede pasar a una ventana después de abierta: se cierra y se abre el PDF en su ventana.
+- **Verifica:** `app/e2e/pestanas.test.mjs`:
+  - «cada una con su conversación…»: dos conversaciones en dos pestañas. Cada una vuelve a la suya y sigue ahí mismo. También comprueba retomar desde Sesiones, abrir en una pestaña nueva, el clic del medio, arrastrar, Ctrl+W y lo guardado;
+  - «con el tutor respondiendo…»: la pestaña late, y la pregunta deja esperar o cortar;
+  - «la clase de otro tema, empezada en otra pestaña…»: cada pestaña conserva su clase y su tema;
+  - «PDF en una pestaña…»: el menú, el libro sin la página reservada, la clase intacta al volver, el mismo PDF pedido otra vez y la barra lateral con un PDF a la vista;
+  - «al abrir vuelven…»: las pestañas guardadas, con el PDF en su página y la de un curso que ya no está en Inicio.
+
+  `app/e2e/visor.test.mjs` sigue probando la ventana de PDF, ahora elegida en el menú.

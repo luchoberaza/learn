@@ -7,7 +7,7 @@ import { spawnSync } from "node:child_process";
 import { registrarSesion } from "../extensions/curso/sesion.ts";
 import { buscarMaterial, leerItems, leerPaginas } from "../extensions/curso/material.ts";
 import { tokenizar } from "../scripts/ingesta/bm25.ts";
-import { loadProject, piDir, vaultDir } from "../scripts/lib/pi-sdk.mjs";
+import { loadProject, piDir, vaultDir, pythonDelVenv } from "../scripts/lib/pi-sdk.mjs";
 
 const PAGINAS = {
   parcial: [
@@ -181,7 +181,7 @@ test("las tools declaran despues_del_intento para el modelo", async () => {
 // Datos reales del curso de Redes (consultas de la auditoría; la última es la de la sesión real).
 const redes = join(vaultDir, "cursos/redes"), parcial = join(redes, "_procesado/sol-prc20240926/paginas");
 test("datos reales: 0 fragmentos de solución en búsquedas, páginas e ítems del parcial", { skip: !existsSync(parcial) && "sin datos de Redes" }, () => {
-  const cargado = spawnSync(join(piDir, ".venv/bin/python"), [join(piDir, "scripts/ingesta/sesion.py"), "cargar", "--vault", vaultDir, "--curso", "redes"],
+  const cargado = spawnSync(pythonDelVenv(piDir), [join(piDir, "scripts/ingesta/sesion.py"), "cargar", "--vault", vaultDir, "--curso", "redes"],
     { encoding: "utf8", timeout: 30000, env: { ...process.env, PYTHONDONTWRITEBYTECODE: "1" } });
   assert.equal(cargado.status, 0, cargado.stderr);
   const d = JSON.parse(cargado.stdout);

@@ -56,7 +56,7 @@ class IngestaTest(unittest.TestCase):
         self.temporal.cleanup()
 
     def leer(self, nombre):
-        return json.loads((self.salida / nombre).read_text())
+        return json.loads((self.salida / nombre).read_text(encoding="utf-8"))
 
     def ejecutar(self, **kwargs):
         return ejecutar(self.manifiesto, self.vault, self.salida, **kwargs)
@@ -127,7 +127,7 @@ class IngestaTest(unittest.TestCase):
         self.assertEqual(estructura["secciones"][1]["paginas"], [2, 3])
         indice = self.leer("busqueda.json")
         self.assertTrue(any("derivacion" in f["frecuencias"] for f in indice["fragmentos"]))
-        self.assertIn("[[muestra.pdf#page=1]]", (self.salida / "informe-ingesta.md").read_text())
+        self.assertIn("[[muestra.pdf#page=1]]", (self.salida / "informe-ingesta.md").read_text(encoding="utf-8"))
         self.assertNotIn("<!--", "".join(f["texto"] for f in indice["fragmentos"]))
 
     def test_pausa_y_reanudacion_sin_extraer_dos_veces(self):
@@ -193,9 +193,9 @@ class IngestaTest(unittest.TestCase):
     def test_rechaza_markdown_editado(self):
         self.ejecutar()
         pagina = self.salida / "muestra/paginas/0001.md"
-        pagina.write_text("Mis anotaciones personales")
+        pagina.write_text("Mis anotaciones personales", encoding="utf-8", newline="\n")
         self.assertIn("adoptar", " ".join(self.ejecutar()["editadas"]))
-        self.assertEqual(pagina.read_text(), "Mis anotaciones personales")
+        self.assertEqual(pagina.read_text(encoding="utf-8"), "Mis anotaciones personales")
 
     def test_rechaza_pdf_cambiado_sin_borrar_resultados(self):
         self.ejecutar()
@@ -210,10 +210,10 @@ class IngestaTest(unittest.TestCase):
     def test_rechaza_salida_ajena_enlaces_y_traversal(self):
         self.salida.mkdir(parents=True)
         nota = self.salida / "nota.md"
-        nota.write_text("No sobrescribir")
+        nota.write_text("No sobrescribir", encoding="utf-8", newline="\n")
         with self.assertRaises(Conflicto):
             self.ejecutar()
-        self.assertEqual(nota.read_text(), "No sobrescribir")
+        self.assertEqual(nota.read_text(encoding="utf-8"), "No sobrescribir")
         salida_enlace = self.vault / "_procesado/enlace"
         salida_enlace.symlink_to(self.vault, target_is_directory=True)
         with self.assertRaises(Conflicto):
@@ -230,7 +230,7 @@ class IngestaTest(unittest.TestCase):
     def test_rango_base_uno_y_muestra_no_es_documento_completo(self):
         self.manifiesto["documentos"][0]["paginas"] = [3]
         self.ejecutar()
-        reporte = (self.salida / "informe-ingesta.md").read_text()
+        reporte = (self.salida / "informe-ingesta.md").read_text(encoding="utf-8")
         self.assertIn("Fuera de esta selección: 2", reporte)
         self.assertEqual(set(self.leer("muestra/calidad.json")["paginas"]), {"3"})
         self.manifiesto["documentos"][0]["paginas"] = [0]
@@ -239,7 +239,7 @@ class IngestaTest(unittest.TestCase):
 
     def test_iniciar_libera_el_bloqueo_antes_de_lanzar_el_hijo(self):
         manifiesto = self.vault / "manifiesto.json"
-        manifiesto.write_text(json.dumps(self.manifiesto))
+        manifiesto.write_text(json.dumps(self.manifiesto), encoding="utf-8", newline="\n")
         args = SimpleNamespace(comando="iniciar", vault=self.vault, salida=self.salida,
                                manifiesto=manifiesto, limite_paginas=None)
         def lanzar(*_, **__):
@@ -274,7 +274,7 @@ class IngestaTest(unittest.TestCase):
         (self.vault / "alias.pdf").write_bytes(self.fuente.read_bytes())
         self.manifiesto["documentos"][0]["archivo"] = "alias.pdf"
         self.ejecutar()
-        self.assertIn("[[alias.pdf#page=3]]", (self.salida / "muestra/paginas/0003.md").read_text())
+        self.assertIn("[[alias.pdf#page=3]]", (self.salida / "muestra/paginas/0003.md").read_text(encoding="utf-8"))
 
     def test_ocr_real_local_sin_llm(self):
         with pymupdf.open(self.fuente) as pdf:

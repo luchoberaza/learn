@@ -10,6 +10,7 @@ import {
 } from "@mariozechner/pi-tui";
 import { Type } from "@sinclair/typebox";
 import { cortable } from "./comun/corte.ts";
+import { preguntarConApp, type RespuestaAsk } from "./comun/preguntar.ts";
 
 interface AskOption {
 	label: string;
@@ -182,6 +183,27 @@ function unavailableResult(question: string, mode: AskUserQuestionMode, message:
 		content: [{ type: "text" as const, text: message }],
 		details: buildStructuredResult("unavailable", question, mode, [], context, message),
 	};
+}
+
+// Lo que devuelve la app, con las mismas formas que el popup: una respuesta de texto (aunque esté vacía), una opción u
+// «Otra» con texto, o varias ordenadas. Índices fuera de rango u «Otra» vacía se descartan; si no queda nada, cancelada.
+function respuestasDeApp(respuestas: RespuestaAsk[] | null, mode: AskUserQuestionMode, options: AskOption[]): AskAnswer[] | null {
+	if (!respuestas) return null;
+	if (mode === "text") {
+		const texto = respuestas.find((r) => r.tipo === "text");
+		return texto && texto.tipo === "text" ? [{ type: "text", label: texto.texto.trim(), value: texto.texto.trim() }] : null;
+	}
+	const answers: AskAnswer[] = [];
+	for (const r of respuestas) {
+		if (r.tipo === "option" && Number.isInteger(r.indice) && r.indice >= 1 && r.indice <= options.length && !answers.some((a) => a.type === "option" && a.index === r.indice)) {
+			const o = options[r.indice - 1];
+			answers.push({ type: "option", label: o.label, value: o.value, index: r.indice });
+		} else if (r.tipo === "other" && r.texto.trim() && !answers.some((a) => a.type === "other")) {
+			answers.push({ type: "other", label: r.texto.trim(), value: r.texto.trim() });
+		}
+	}
+	if (!answers.length) return null;
+	return mode === "single-select" ? answers.slice(0, 1) : sortAnswers(answers);
 }
 
 function buildResult(question: string, context: string | undefined, mode: AskUserQuestionMode, answers: AskAnswer[]) {
@@ -652,6 +674,16 @@ export default function askUserQuestion(pi: ExtensionAPI) {
 			}
 
 			return withUILock(async () => {
+				// Con la app de escritorio la pregunta se dibuja allá; en la terminal, el popup de siempre.
+				const app = preguntarConApp(ctx);
+				if (app) {
+					const answers = respuestasDeApp(await app({
+						tipo: "ask", pregunta: params.question, contexto: context, modo: mode, etiquetaOtra: getOtherLabel(options),
+						opciones: options.map((o, i) => ({ indice: i + 1, label: o.label, value: o.value, ...(o.description ? { description: o.description } : {}) })),
+					}, signal), mode, options);
+					return answers ? buildResult(params.question, context, mode, answers) : cancelledResult(params.question, mode, context);
+				}
+
 				if (mode === "text") {
 					// En RPC no hay custom (rpc-mode.js:152-155) y el editor lo dibuja el cliente.
 					const answer = ctx.mode === "rpc" ? await ctx.ui.editor(context ? `${params.question}\n\n${context}` : params.question) : await askText(ctx, params.question, context, signal);

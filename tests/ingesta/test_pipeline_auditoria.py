@@ -52,7 +52,7 @@ class Base(unittest.TestCase):
         return ejecutar(manifiesto, self.vault, self.salida, **kwargs)
 
     def q(self, doc: str, pagina: int = 1) -> dict:
-        return json.loads((self.salida / f"{doc}/calidad.json").read_text())["paginas"][str(pagina)]
+        return json.loads((self.salida / f"{doc}/calidad.json").read_text(encoding="utf-8"))["paginas"][str(pagina)]
 
     def transcribir(self, doc: str, texto: str, pagina: int = 1) -> dict:
         datos = {"doc": doc, "pagina": pagina, "modelo": "openai/gpt-6-luna", "umbral": 0.6}
@@ -103,7 +103,7 @@ class MatematicaDigitalTest(Base):
         q = self.q("libro")
         self.assertEqual((q["ruta"], q["motor"], q["pendiente"]), ("vision", "vision", False))
         self.assertFalse(q["clasificacion"]["posible_matematica"])
-        self.assertIn(texto, (self.salida / "libro/paginas/0001.md").read_text())
+        self.assertIn(texto, (self.salida / "libro/paginas/0001.md").read_text(encoding="utf-8"))
 
 
 class MatematicaOcrTest(Base):
@@ -159,7 +159,7 @@ class FalloVisionTest(Base):
 
 class SolucionesFueraDelIndiceTest(Base):
     def indexado(self, doc: str) -> str:
-        return " ".join(f["texto"] for f in json.loads((self.salida / "busqueda.json").read_text())["fragmentos"] if f["doc"] == doc)
+        return " ".join(f["texto"] for f in json.loads((self.salida / "busqueda.json").read_text(encoding="utf-8"))["fragmentos"] if f["doc"] == doc)
 
     def test_evaluaciones_indexan_solo_enunciados_y_soluciones_nada(self):
         self.pdf("parcial.pdf", ["Pregunta 1 (10 puntos)\nCalcule enunciadouno.\nSolución\nsecretouno",
@@ -172,7 +172,7 @@ class SolucionesFueraDelIndiceTest(Base):
             self.assertIn(palabra, texto)
         self.assertNotIn("secreto", texto)
         self.assertEqual(self.indexado("resueltos"), "")
-        indice = json.loads((self.salida / "busqueda.json").read_text())
+        indice = json.loads((self.salida / "busqueda.json").read_text(encoding="utf-8"))
         self.assertEqual({f["tipo"] for f in indice["fragmentos"]}, {"evaluaciones"})
 
     def test_pagina_faltante_no_deja_pasar_una_solucion_que_continua(self):
@@ -217,10 +217,10 @@ class EdicionManualTest(Base):
         self.pdf("b.pdf", ["Segundo documento con texto sobre congestión y control de flujo. " * 4])
         self.ejecutar(self.doc("a"), self.doc("b"))
         self.editada = self.salida / "a/paginas/0001.md"
-        self.editada.write_text("Mi resumen corregido sobre enrutamiento", encoding="utf-8")
+        self.editada.write_text("Mi resumen corregido sobre enrutamiento", encoding="utf-8", newline="\n")
 
     def busqueda(self) -> dict:
-        return json.loads((self.salida / "busqueda.json").read_text())
+        return json.loads((self.salida / "busqueda.json").read_text(encoding="utf-8"))
 
     def adoptar(self, doc: str = "a", pagina: int = 1) -> int:
         args = SimpleNamespace(comando="adoptar", vault=self.vault, salida=self.salida, doc=doc, pagina=pagina, manifiesto=None, limite_paginas=None)
@@ -233,7 +233,7 @@ class EdicionManualTest(Base):
         self.assertIn("ingestar.py adoptar", estado["editadas"][0])
         self.assertIn("--doc a --pagina 1", estado["editadas"][0])
         self.assertEqual({(f["doc"], f["pagina"]) for f in self.busqueda()["fragmentos"]}, {("a", 2), ("b", 1)})
-        self.assertIn("| editada |", (self.salida / "informe-ingesta.md").read_text())
+        self.assertIn("| editada |", (self.salida / "informe-ingesta.md").read_text(encoding="utf-8"))
         self.assertEqual(self.transcribir("b", "Transcripción de visión: " + PROSA)["ruta"], "vision")
         estado = self.ejecutar(self.doc("a"), self.doc("b"))
         self.assertEqual(estado["estado"], "completada_con_pendientes")
@@ -242,7 +242,7 @@ class EdicionManualTest(Base):
     def test_una_solucion_editada_tambien_se_avisa(self):
         self.pdf("resueltos.pdf", ["Ejercicio 1\nLa solución completa del ejercicio."])
         self.ejecutar(self.doc("resueltos", "soluciones"))
-        (self.salida / "resueltos/paginas/0001.md").write_text("Mi corrección de la solución", encoding="utf-8")
+        (self.salida / "resueltos/paginas/0001.md").write_text("Mi corrección de la solución", encoding="utf-8", newline="\n")
         estado = self.ejecutar(self.doc("b"))
         self.assertTrue(any("--doc resueltos --pagina 1" in aviso for aviso in estado["editadas"]))
         self.assertNotIn("resueltos", {f["doc"] for f in self.busqueda()["fragmentos"]})
@@ -252,7 +252,7 @@ class EdicionManualTest(Base):
         q = self.q("a")
         self.assertEqual((q["ruta"], q["revision_humana"], q["pendiente"]), ("manual", "hecha", False))
         self.assertIn("Mi resumen corregido", " ".join(f["texto"] for f in self.busqueda()["fragmentos"]))
-        self.assertEqual(json.loads((self.salida / "estado-ingesta.json").read_text())["editadas"], [])
+        self.assertEqual(json.loads((self.salida / "estado-ingesta.json").read_text(encoding="utf-8"))["editadas"], [])
         with patch("extraccion.VERSION_ALGORITMO", 99):
             estado = self.ejecutar(self.doc("a"), self.doc("b"))
         self.assertEqual((estado["estado"], estado["editadas"]), ("completada", []))
@@ -266,19 +266,19 @@ class ArranqueTest(Base):
         self.pdf("libro.pdf", [PROSA])
         self.manifiesto = self.vault / "manifiesto.json"
         self.manifiesto.write_text(json.dumps({"version": 1, "motores": {c: "pymupdf" for c in ["digital", "escaneada", "mixta"]},
-                                               "documentos": [self.doc("libro")]}))
-        self.config = {k: v for k, v in json.loads(ingestar.CONFIG.read_text()).items() if k != "ruta_tesseract"}
+                                               "documentos": [self.doc("libro")]}), encoding="utf-8", newline="\n")
+        self.config = {k: v for k, v in json.loads(ingestar.CONFIG.read_text(encoding="utf-8")).items() if k != "ruta_tesseract"}
         # Como /usr/bin/tesseract: sin 'spa'.
         binarios = self.vault / "bin"
         binarios.mkdir()
         falso = binarios / "tesseract"
-        falso.write_text("#!/bin/sh\nif [ \"$1\" = --list-langs ]; then printf 'List of available languages (2):\\neng\\nosd\\n'; else echo 'tesseract 5.5.3'; fi\n")
+        falso.write_text("#!/bin/sh\nif [ \"$1\" = --list-langs ]; then printf 'List of available languages (2):\\neng\\nosd\\n'; else echo 'tesseract 5.5.3'; fi\n", encoding="utf-8", newline="\n")
         falso.chmod(0o755)
         for parche in [patch("ingestar.CONFIG", self.vault / "curso.config.json"),
                        patch.dict(os.environ, {"PATH": f"{binarios}{os.pathsep}{os.environ['PATH']}"})]:
             parche.start()
             self.addCleanup(parche.stop)
-        (self.vault / "curso.config.json").write_text(json.dumps(self.config))
+        (self.vault / "curso.config.json").write_text(json.dumps(self.config), encoding="utf-8", newline="\n")
 
     def cli(self, comando: str) -> tuple[int, str, str]:
         args = SimpleNamespace(comando=comando, vault=self.vault, salida=self.salida, manifiesto=self.manifiesto, limite_paginas=None, doc=None, pagina=None)
@@ -309,7 +309,7 @@ class ArranqueTest(Base):
             return hijos[-1]
         def consultar():
             # Popen está parcheado en todo el módulo subprocess: la consulta usa el real.
-            consulta = real([sys.executable, ingestar.__file__, "estado", "--salida", str(self.salida)], stdout=subprocess.PIPE, text=True)
+            consulta = real([sys.executable, ingestar.__file__, "estado", "--salida", str(self.salida)], stdout=subprocess.PIPE, text=True, encoding="utf-8")
             vistos.append(json.loads(consulta.communicate()[0])["estado"])
             hijos[0].kill()
         temporizador = threading.Timer(0.5, consultar)
@@ -321,9 +321,9 @@ class ArranqueTest(Base):
 
     def test_estado_con_el_proceso_muerto_muestra_la_ultima_linea_del_log(self):
         self.assertEqual(self.cli("procesar")[0], 0)
-        estado = json.loads((self.salida / "estado-ingesta.json").read_text())
-        (self.salida / "estado-ingesta.json").write_text(json.dumps({**estado, "estado": "en_curso"}))
-        (self.salida / "proceso.log").write_text("Traceback (most recent call last):\nMemoryError\n")
+        estado = json.loads((self.salida / "estado-ingesta.json").read_text(encoding="utf-8"))
+        (self.salida / "estado-ingesta.json").write_text(json.dumps({**estado, "estado": "en_curso"}), encoding="utf-8", newline="\n")
+        (self.salida / "proceso.log").write_text("Traceback (most recent call last):\nMemoryError\n", encoding="utf-8", newline="\n")
         estado = json.loads(self.cli("estado")[1])
         self.assertEqual(estado["estado"], "interrumpida")
         self.assertIn("MemoryError", estado["aviso"])
@@ -350,7 +350,7 @@ class ArranqueTest(Base):
             ejecutar(manifiesto, self.vault, self.salida, extractor=lambda *_: "Texto del OCR " + PROSA)
         q = self.q("escaneado")
         self.assertEqual((q["motor"], q["ruta"]), ("vision", "vision"))
-        self.assertIn("Transcripción de visión", (self.salida / "escaneado/paginas/0001.md").read_text())
+        self.assertIn("Transcripción de visión", (self.salida / "escaneado/paginas/0001.md").read_text(encoding="utf-8"))
 
     def test_aviso_de_ocr_lento_en_espanol_y_sin_el_comando(self):
         manifiesto = {"version": 1, "motores": {c: "ocrmypdf" for c in ["digital", "escaneada", "mixta"]}, "documentos": [self.doc("libro")]}
@@ -361,7 +361,7 @@ class ArranqueTest(Base):
                                                        "la página queda pendiente.); se continúa con las otras páginas.")
 
     def test_ruta_tesseract_va_primero_en_el_path(self):
-        (self.vault / "curso.config.json").write_text(json.dumps({**self.config, "ruta_tesseract": str(self.vault / "otro/tesseract")}))
+        (self.vault / "curso.config.json").write_text(json.dumps({**self.config, "ruta_tesseract": str(self.vault / "otro/tesseract")}), encoding="utf-8", newline="\n")
         caminos = []
         with patch("ingestar.ejecutar", side_effect=lambda *a, **k: caminos.append(os.environ["PATH"]) or {}):
             self.cli("procesar")

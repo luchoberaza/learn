@@ -16,3 +16,6 @@ __pycache__/
 # Runtime state
 .memory/
 *.log
+
+# Configuración de esta máquina (ruta de Tesseract, modelos): pisa curso.config.json sin tocarlo; ver SETUP.md
+curso.config.local.json

@@ -27,7 +27,7 @@ class VisionPedidosTest(unittest.TestCase):
     preparar, guardar, items, q = test_vision.VisionTest.preparar, test_vision.VisionTest.guardar, test_vision.VisionTest.items, test_vision.VisionTest.q
 
     def adoptar(self, n, texto):
-        (self.raiz / f"practico/paginas/{n:04}.md").write_text(texto)
+        (self.raiz / f"practico/paginas/{n:04}.md").write_text(texto, encoding="utf-8", newline="\n")
         with bloquear(self.raiz, self.vault):
             adoptar(self.raiz, "practico", n)
 
@@ -42,13 +42,13 @@ class VisionPedidosTest(unittest.TestCase):
                 with bloquear(self.raiz, self.vault):
                     vision.guardar(self.raiz, self.vault, {**en_vuelo, "texto": test_vision.TEXTO, "completa": True}, fallo=fallo)
         self.assertEqual(self.q()["ruta"], "manual")
-        self.assertIn("corregida a mano", (self.raiz / "practico/paginas/0001.md").read_text())
+        self.assertIn("corregida a mano", (self.raiz / "practico/paginas/0001.md").read_text(encoding="utf-8"))
         self.assertEqual(self.items([{"id": "1", "paginas": [1], "enunciado": "Ejercicio 1."}])["ids"], ["1"])
 
     def test_texto_de_vision_limpio_no_queda_pendiente_por_un_falso_positivo_de_matematica(self):
-        calidades = json.loads((self.raiz / "practico/calidad.json").read_text())
+        calidades = json.loads((self.raiz / "practico/calidad.json").read_text(encoding="utf-8"))
         calidades["paginas"]["1"]["clasificacion"]["posible_matematica"] = True
-        (self.raiz / "practico/calidad.json").write_text(json.dumps(calidades))
+        (self.raiz / "practico/calidad.json").write_text(json.dumps(calidades), encoding="utf-8", newline="\n")
         (self.raiz / "practico/cache/0001.json").unlink(missing_ok=True)
         limpio = "Ejercicio 1. Un host envía paquetes por un enlace y el router los reenvía. " * 3
         salida = self.guardar(texto=limpio)
@@ -60,7 +60,7 @@ class VisionPedidosTest(unittest.TestCase):
         retenido.enter_context(bloquear(self.raiz, self.vault))
         threading.Timer(1, retenido.close).start()
         r = subprocess.run([sys.executable, str(Path(vision.__file__)), "preparar"], capture_output=True, text=True, timeout=30,
-                           input=json.dumps({**self.datos, "vault": str(self.vault), "salida": str(self.raiz)}))
+                           input=json.dumps({**self.datos, "vault": str(self.vault), "salida": str(self.raiz)}), encoding="utf-8")
         self.assertEqual(r.returncode, 0, r.stderr)
         with patch("cursos.ESPERA", 0.3), bloquear(self.raiz, self.vault):
             with self.assertRaisesRegex(Conflicto, "Ya hay una ingesta"):
@@ -110,12 +110,12 @@ class ValidarPedidosTest(CursoPreparacion):
         self.segmentar("parcial", [{"id": "1", "paginas": [1], "enunciado": "Derive.", "puntos": 8},
                                    {"id": "1-solucion", "paginas": [2], "enunciado": "Respuesta.", "solucion_de": "1"}])
         asignaciones = self.raiz / "_procesado/asignaciones.json"
-        asignaciones.write_text(json.dumps({"version": 1, "items": [{"doc": "parcial", "id": "1", "tema": "integracion"}, {"doc": "parcial", "id": "1-solucion", "tema": "derivacion"}]}))
+        asignaciones.write_text(json.dumps({"version": 1, "items": [{"doc": "parcial", "id": "1", "tema": "integracion"}, {"doc": "parcial", "id": "1-solucion", "tema": "derivacion"}]}), encoding="utf-8", newline="\n")
         r = self.guardar_indice(self.indice)
         self.assertNotIn("Tema integracion sin preguntas", "\n".join(r["avisos"]))
         self.assertIn("Tema derivacion sin preguntas", "\n".join(r["avisos"]))
         self.assertNotIn({"doc": "parcial", "id": "1"}, r["items_sin_asignar"])
-        asignaciones.write_text("{roto")
+        asignaciones.write_text("{roto", encoding="utf-8", newline="\n")
         self.assertIn("asignaciones.json ilegible", "\n".join(self.guardar_indice(self.indice)["avisos"]))
 
     def test_un_documento_de_soluciones_no_promete_prepararse_solo(self):
@@ -127,13 +127,13 @@ class ValidarPedidosTest(CursoPreparacion):
 
     def test_edicion_cita_adoptar_e_informe_cuenta_la_ruta_manual(self):
         pagina = self.raiz / "_procesado/libro/paginas/0003.md"
-        pagina.write_text(pagina.read_text() + "\nCorrección a mano.\n")
+        pagina.write_text(pagina.read_text(encoding="utf-8") + "\nCorrección a mano.\n", encoding="utf-8", newline="\n")
         errores = " ".join(self.guardar_indice(self.indice)["errores"])
         self.assertIn("ingestar.py adoptar --salida cursos/ejemplo/_procesado --doc libro --pagina 3", errores)
         with bloquear(self.raiz / "_procesado", self.vault):
             adoptar(self.raiz / "_procesado", "libro", 3)
         publicar_informe(self.vault, "ejemplo")
-        self.assertIn("manual: 1 (33.3 %)", (self.raiz / "informe-ingesta.md").read_text())
+        self.assertIn("manual: 1 (33.3 %)", (self.raiz / "informe-ingesta.md").read_text(encoding="utf-8"))
 
 
 class TrabajoTest(CursoPreparacion):
@@ -177,7 +177,7 @@ class TrabajoTest(CursoPreparacion):
     def test_un_parcial_editado_a_mano_no_se_vuelve_a_segmentar(self):
         self.segmentar("parcial", [{"id": "1", "paginas": [1], "enunciado": "Derive."}])
         items = self.raiz / "_procesado/parcial/items.yaml"
-        items.write_text(items.read_text() + "# Revisado por la cátedra.\n")
+        items.write_text(items.read_text(encoding="utf-8") + "# Revisado por la cátedra.\n", encoding="utf-8", newline="\n")
         t = self.trabajo()
         self.assertEqual([s["doc"] for s in t["segmentar"]], ["practico"])
         self.assertEqual([(c["doc"], c["id"]) for c in t["clasificar"]], [("parcial", "1")])
@@ -190,9 +190,9 @@ class TrabajoTest(CursoPreparacion):
             with self.subTest(mala=mala), self.assertRaises(ValueError):
                 preparacion.asignar(self.vault, "ejemplo", [mala])
         archivo = self.raiz / "_procesado/asignaciones.json"
-        archivo.write_text("{roto")
+        archivo.write_text("{roto", encoding="utf-8", newline="\n")
         preparacion.asignar(self.vault, "ejemplo", [{"doc": "parcial", "id": "1", "tema": "integracion"}])
-        datos = json.loads(archivo.read_text())
+        datos = json.loads(archivo.read_text(encoding="utf-8"))
         self.assertEqual((datos["version"], datos["automatico"]), (1, True))
         self.assertEqual([(a["doc"], a["id"], a["tema"], len(a["huella"])) for a in datos["items"]], [("parcial", "1", "integracion", 64)])
         self.assertEqual((self.raiz / "indice.yaml").read_bytes(), antes)

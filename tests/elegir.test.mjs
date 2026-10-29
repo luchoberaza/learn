@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readdirSync, readFileSync } from "node:fs";
 import { getEventListeners } from "node:events";
-import { join } from "node:path";
+import { join, sep } from "node:path";
 import { elegir } from "../extensions/comun/elegir.ts";
 import { piDir } from "../scripts/lib/pi-sdk.mjs";
 
@@ -78,6 +78,6 @@ test("H45: fuera de la terminal (rpc, json, print o sin modo) usa ui.select tal 
 
 test("H45: las extensiones no llaman a ui.select ni ui.confirm directo: todo pasa por el selector en español", () => {
   const archivos = dir => readdirSync(dir, { withFileTypes: true }).flatMap(e => e.isDirectory() ? (e.name === "node_modules" ? [] : archivos(join(dir, e.name))) : e.name.endsWith(".ts") ? [join(dir, e.name)] : []);
-  const directas = archivos(join(piDir, "extensions")).filter(f => !f.endsWith("comun/elegir.ts") && /\bui\.(select|confirm)\(/.test(readFileSync(f, "utf8")));
+  const directas = archivos(join(piDir, "extensions")).filter(f => !f.split(sep).join("/").endsWith("comun/elegir.ts") && /\bui\.(select|confirm)\(/.test(readFileSync(f, "utf8")));
   assert.deepEqual(directas, []);
 });

@@ -1,0 +1,14 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- La ventana de PDF: sin red. El PDF y los datos de PDF.js llegan por el proceso principal; wasm decodifica imágenes. -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>learn</title>
+</head>
+<body>
+  <div id="raiz"></div>
+  <script type="module" src="./src/visor/main.tsx"></script>
+</body>
+</html>

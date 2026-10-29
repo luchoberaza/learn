@@ -27,12 +27,12 @@ class SesionTest(unittest.TestCase):
 
     def test_yaml_invalido_no_impide_cargar_material_disponible(self):
         p = self.base.raiz / "progreso.yaml"
-        p.write_text("[inválido")
+        p.write_text("[inválido", encoding="utf-8", newline="\n")
         d = cargar(self.base.vault, "ejemplo", True)
         self.assertEqual(d["progreso"]["temas"], {})
         self.assertTrue(d["avisos"])
-        self.assertEqual(p.read_text(), "[inválido")
-        (self.base.raiz / "indice.yaml").write_text("[inválido")
+        self.assertEqual(p.read_text(encoding="utf-8"), "[inválido")
+        (self.base.raiz / "indice.yaml").write_text("[inválido", encoding="utf-8", newline="\n")
         self.assertEqual(cargar(self.base.vault, "ejemplo")["temas"], [])
 
     def test_renderiza_pagina_sin_ingesta_y_reutiliza_cache(self):

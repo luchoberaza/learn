@@ -1,16 +1,24 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { existsSync, mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, mkdirSync, readdirSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { prepararInvestigacion, registrarResearcher, verificacionPrevia } from '../extensions/curso/researcher.ts';
-import { agentDir, loadProject } from '../scripts/lib/pi-sdk.mjs';
+import { agentDir, loadProject, importDependenciaPi } from '../scripts/lib/pi-sdk.mjs';
 
 const agente = (modelo, cuerpo = 'PROMPT ESPAÑOL') => `---\nname: researcher\ntools: web_search, web_fetch, read\nmodel: ${modelo}\nthinking: medium\n---\n\n${cuerpo}\n`;
+function limpiar(vault) {
+  if (process.platform === 'win32') {
+    const buscar = dir => { try { return readdirSync(dir, { withFileTypes: true }).flatMap(e => e.isDirectory() ? buscar(join(dir, e.name)) : e.name === 'trabajo.json' ? [join(dir, e.name)] : []); } catch { return []; } };
+    for (const f of buscar(vault)) try { spawnSync('taskkill', ['/PID', String(JSON.parse(readFileSync(f, 'utf8')).pid), '/T', '/F'], { stdio: 'ignore' }); } catch { /* ya terminó */ }
+  }
+  rmSync(vault, { recursive: true, force: true, maxRetries: 20, retryDelay: 100 });
+}
 function entorno(t) {
   const vault = mkdtempSync(join(tmpdir(), 'pi-researcher-aud-')), recursos = join(vault, '.pi'), raiz = join(vault, 'cursos/calculo');
-  t.after(() => rmSync(vault, { recursive: true, force: true }));
+  t.after(() => limpiar(vault));
   for (const p of [join(recursos, 'agents'), join(raiz, '_procesado/libro/paginas')]) mkdirSync(p, { recursive: true });
   writeFileSync(join(recursos, 'curso.config.json'), JSON.stringify({ modelo_researcher: 'openai/gpt-6-luna', modelo_vision: 'openai/gpt-6-luna' }));
   writeFileSync(join(recursos, 'agents/researcher.md'), agente('openai/gpt-6-luna'));
@@ -124,7 +132,10 @@ test('H33: la sesión que encuentra en curso el trabajo de otra (pi cerrado) rec
 
 // Nunca entrega; termina solo cuando el test borra el vault.
 const eterno = `setInterval(() => { if (!existsSync(vault)) process.exit(0); }, 100);`;
-const matar = dir => { try { process.kill(-JSON.parse(readFileSync(join(dir, 'trabajo.json'), 'utf8')).pid, 'SIGKILL'); } catch { /* Ya terminó. */ } };
+const matar = dir => { try {
+  const pid = JSON.parse(readFileSync(join(dir, 'trabajo.json'), 'utf8')).pid;
+  if (process.platform === 'win32') spawnSync('taskkill', ['/PID', String(pid), '/T', '/F'], { stdio: 'ignore' }); else process.kill(-pid, 'SIGKILL');
+} catch { /* Ya terminó. */ } };
 test('H33: un researcher muerto sin informe no bloquea el alcance tras /reload y no sugiere subagent_message', async t => {
   const e = entorno(t), r = runtime(e, falso(e, eterno));
   const res = await r.alcance(), dir = carpeta(e, res.details.nombre);
@@ -203,9 +214,9 @@ test('H08: alcance acepta afirmaciones omitidas y guarda un mapa sin veredictos;
 });
 
 test('H08: alcance con afirmaciones vacías pasa el validador de pi, sin «Validation failed» ni argumentos a la vista', async () => {
-  const p = await loadProject(), raiz = process.env.PI_MANAGED_INSTALL_ROOT || join(agentDir, 'install');
+  const p = await loadProject();
   try {
-    const { validateToolArguments } = await import(join(raiz, 'releases', readFileSync(join(raiz, 'current-version'), 'utf8').trim(), 'node_modules/@earendil-works/pi-ai/dist/index.js'));
+    const { validateToolArguments } = await importDependenciaPi("@earendil-works/pi-ai");
     const tool = p.session.getAllTools().find(x => x.name === 'investigar_tema');
     assert.deepEqual(validateToolArguments(tool, { name: 'investigar_tema', arguments: { modo: 'alcance', afirmaciones: [] } }), { modo: 'alcance', afirmaciones: [] });
   } finally { await p.close(); }

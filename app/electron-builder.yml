@@ -1,0 +1,39 @@
+# Instaladores de la app: NSIS para Windows y AppImage para Linux (Omarchy / Arch). Sin firma de código: para uso
+# personal alcanza; Windows muestra el aviso de SmartScreen la primera vez.
+appId: uy.learn.estudio
+productName: learn
+copyright: learn, santi-esquerre y luchoberaza
+directories:
+  output: dist
+  buildResources: recursos
+files:
+  - out/**
+  - host/**
+  - "!host/test/**"
+  - subagentes/**
+  - recursos/icono.png
+  - package.json
+# El host corre con el Node del sistema (el mismo de pi) y no puede leer dentro del asar: va afuera con lo que importa.
+asarUnpack:
+  - host/**
+  - subagentes/**
+  - node_modules/@lydell/**
+  - node_modules/@xterm/headless/**
+npmRebuild: false
+win:
+  target: nsis
+  icon: recursos/icono.png
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  shortcutName: learn
+  artifactName: learn-${version}-instalador-windows.${ext}
+linux:
+  target: AppImage
+  icon: recursos/icono.png
+  category: Education
+  executableName: learn
+  syncDesktopName: true
+  synopsis: Estudiá con el tutor de learn
+  artifactName: learn-${version}-linux.${ext}

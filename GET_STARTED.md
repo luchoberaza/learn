@@ -18,6 +18,8 @@ Guía de uso de punta a punta: crear un curso, estudiar un tema, practicar, rend
 
 Para ver si todo está en orden en cualquier momento: `.pi/scripts/doctor` desde la raíz del vault y dentro de tmux. Un «✗» es una falla y un «!» es sólo un aviso.
 
+**Con la app de escritorio** (Windows o Linux) es lo mismo sin comandos. Los cursos y temas están en la barra de la izquierda, e Inicio ofrece «Seguir la clase» donde quedaste. Los botones de la clase son Simulacro y Terminar clase, y el quiz se responde con el mouse o con las teclas a, b, c y n. Con Ctrl+K se busca un tema, una sesión o cualquier comando. La tabla del final dice dónde está cada comando en la app.
+
 ## Mapa del vault
 
 ```
@@ -38,11 +40,11 @@ Para ver si todo está en orden en cualquier momento: `.pi/scripts/doctor` desde
 
 ## 1. Crear un curso
 
-1. **Juntá el material** en `_entrada/`: el programa, la bibliografía, los prácticos y los parciales, mejor con solución. Pueden ir en subcarpetas. Los PDFs originales nunca se modifican.
+1. **Juntá el material** en `_entrada/`: el programa, la bibliografía, los prácticos y los parciales, mejor con solución. También las grabaciones de las clases, en video o audio (mp4, mp3, m4a, wav, ogg, webm, mkv…). Pueden ir en subcarpetas. Los originales nunca se modifican.
 2. **Abrí `pi-learn` y escribí** `/curso-nuevo <slug>`, por ejemplo `/curso-nuevo redes`. El slug es un nombre corto, sin espacios.
 3. **El agente inventaría los PDFs** y te muestra qué toma para el curso. Si algo es dudoso (otra materia, una edición vieja), te pregunta con botones.
 4. **Arma dos archivos.** `curso.md` es el contrato: objetivos, cómo se evalúa y formato de las preguntas, todo citado del programa o con «no consta». `indice.yaml` tiene los temas, el rango de páginas de la bibliografía de cada uno, los prerequisitos y los ejercicios.
-5. **Indexa todas las páginas en local, sin modelo**, en segundo plano. Sobre el editor aparece una barra con el avance («⏳ Ingesta de <slug> [████░░…] 568/2592 páginas · 22%»). No hace falta escribir nada: cuando termina, el agente sigue solo con el armado. Si se corta, te avisa y te propone reanudar.
+5. **Indexa todas las páginas en local, sin modelo**, en segundo plano, y transcribe las grabaciones con faster-whisper, también en tu computadora y sin costo. La primera vez baja el modelo de transcripción, unos 1,6 GB. Una grabación se parte en tramos de 5 minutos, que el índice usa como páginas; el tutor la cita al minuto (`[[clase.mp4#t=725]]`). En la app, la cita abre el video ahí mismo; en Obsidian, el video se abre desde el principio, salvo que tengas un complemento como Video Notes. Transcribir con el procesador puede tardar del orden de la mitad de la grabación o más, según la computadora. Sobre el editor aparece una barra con el avance («⏳ Ingesta de <slug> [████░░…] 568/2592 páginas · 22%»). No hace falta escribir nada: cuando termina, el agente sigue solo con el armado. Si se corta, te avisa y te propone reanudar.
 6. **Revisá la tabla tema → material** que te muestra y abrí `cursos/<slug>/informe-ingesta.md` en Obsidian. El curso queda como borrador hasta que la revises. Cada cambio a un curso ya guardado te muestra el diff y pide confirmación.
 
 Más adelante:
@@ -64,6 +66,7 @@ Más adelante:
 - **Un tema fuera del índice** (`/estudiar redes multicast`) se busca en la bibliografía:
   - si cae en un tema, lo abre;
   - si no, ofrece una **clase ad hoc**: no toca el índice ni el progreso y sólo deja su nota. Al cerrarla, el tutor ofrece sumar el tema al curso con `/curso-agregar`.
+- **Cómo encararlo**, al final: `desde-cero` repasa todo el tema desde las bases, aunque figure como sabido; `fortalecer` trabaja lo que te costó (los errores guardados y sus bases). Por ejemplo, `/estudiar redes retardos desde-cero`. Sin nada, sigue donde quedaste.
 
 Antes de arrancar, `/estudiar` comprueba credenciales y disco: con menos de 200 MB libres no arranca.
 
@@ -78,13 +81,15 @@ Si el tema ya lo estudiaste, el tutor arranca con una línea de dónde quedaron 
 
 ### Diagnóstico (probe)
 
-El tutor primero mide qué sabés, con preguntas del nivel y la notación de los parciales:
-- **tema nuevo:** hasta 4 preguntas;
-- **tema ya visto:** hasta 3, empezando por lo que te costaba.
+El tutor primero ve qué sabés, sin dar nada por sabido:
+1. **Una lista** con los conceptos base del tema: marcás los que ya viste. Lo que no marcás te lo enseña sin preguntártelo.
+2. **Preguntas** sobre lo que marcaste. Empieza por la base de cada parte del tema y sigue hasta encontrar, en cada una, algo que acertás y algo que no. Si acertás, la siguiente es bastante más difícil; si fallás, rodea el error para entender de dónde viene.
 
-Si acertás, sube la dificultad; si fallás, rodea el error para entender de dónde viene. **«No sé» no cuenta como error**: es una laguna y se enseña.
+No tiene un número fijo de preguntas, pero no repregunta lo que ya quedó claro. En un tema ya visto, sin la lista, arranca por lo que te costaba. **«No sé» no cuenta como error**: es una laguna y se enseña.
 
-**Si querés que te explique ya**, apretá Esc en la pregunta y escribí algo como «explicame qué es el retardo de propagación». El diagnóstico se corta y empieza a enseñar.
+**Si querés que te explique ya**, apretá Esc en la pregunta y escribí algo como «explicame qué es el retardo de propagación». El diagnóstico se corta y empieza a enseñar; lo que quedó sin medir lo comprueba al llegar a ese paso, en vez de darlo por sabido.
+
+**Desde cero** saltea la lista, repasa todos los pasos del tema y arma un objetivo y un plan nuevos. **Fortalecer lo flojo** pregunta primero por lo que figura como fallado, arma el plan sólo con eso y sus bases, y practica cada paso.
 
 ### Objetivo y plan
 
@@ -100,14 +105,16 @@ Objetivo y plan quedan guardados: al retomar el tema no se vuelven a pedir.
 Por cada nodo del plan: motivar → establecer → conectar → verificar con una pregunta.
 
 - **Todo sale del material del curso.** Antes de cada nodo, el tutor lee la página de la bibliografía que lo define y la cita como `[[libro.pdf#page=N]]`. Hacé clic en Obsidian y se abre el PDF en esa página.
+- **Ningún término sin presentar.** Antes de usar un término, un símbolo o la definición del libro, el tutor se fija si ya lo viste. Si no, te lo presenta primero, con un ejemplo y, si el tema se apoya en él, una pregunta.
+- **Cada pregunta llega con su explicación.** Lo que una pregunta comprueba aparece escrito justo antes de ella. Si el tutor intenta preguntar sin haber explicado, la pregunta no aparece hasta que lo explica.
 - **Lo que no sale del material** va marcado «fuera del material del curso» o «sin respaldo en el material».
 - **Manda la notación de la cátedra.** Si el libro escribe distinto, el tutor lo traduce una vez y sigue con la de la cátedra.
 - **«Mostrame esa página»** hace que el tutor la muestre con `ver_pagina`. La página también queda embebida en la nota.
 - Al cerrar un nodo con fórmula aparece una tabla «lo que hicimos ↔ nombre y fórmula del material».
 
-### Las preguntas (quiz)
+### Las preguntas
 
-Ventana con 3 opciones más «No sé»:
+Hay dos tipos. **De múltiple opción**: una ventana con 3 opciones más «No sé».
 
 | Tecla | Hace |
 |---|---|
@@ -117,6 +124,13 @@ Ventana con 3 opciones más «No sé»:
 | Esc | cancelar la pregunta: el tutor espera lo que escribas |
 
 Después de responder ves ✓ o ✗, la correcta y la explicación con su cita. Si fallaste, el tutor te dice qué creencia lleva a la opción que elegiste.
+
+**De desarrollo**: una caja para escribir la respuesta con tus palabras, más «No sé». Enter la manda, Ctrl+J abre otro renglón, Tab va a «No sé» y Esc cancela. Después de responder ves la respuesta esperada; al seguir, el tutor te corrige: si está bien, a medias o mal, qué está bien, qué falta y de dónde viene el error. No te pide las palabras exactas.
+
+**Cuántas de cada tipo** lo elegís con `/preguntas` (en la app, Ajustes → Cómo estudio), y vale desde la próxima pregunta, también con la clase abierta:
+- **Automático** (el recomendado): múltiple opción al principio y más desarrollo a medida que dominás, como pide el examen;
+- **Sólo múltiple opción** o **Sólo desarrollo**;
+- **Más múltiple opción** (3 de cada 4), **Mitad y mitad** o **Más desarrollo** (3 de cada 4 de desarrollo).
 
 Cuando el tutor necesita que elijas algo (objetivo, plan, seguir o practicar), aparece una ventana parecida con botones. Esc equivale a «No».
 
@@ -171,6 +185,7 @@ No hay simulacro de varios temas ni del curso completo.
 | Terminar la clase | `/fin`. Guarda tu progreso con un resumen de toda la sesión, te muestra ese resumen y el próximo paso, y cierra la nota. Si hay una pregunta abierta en pantalla, Esc antes. |
 | Ver cómo vas | `/progreso` (o `/progreso redes`): estado de cada tema y qué estudiar después, según prerequisitos. |
 | Cambiar de tema | `/estudiar <otro tema>`. Te ofrece «Guardar y cambiar», «Cambiar sin guardar» o «Cancelar». |
+| Cambiar el tipo de preguntas | `/preguntas`, o `/preguntas mitad`. Vale desde la próxima pregunta. |
 | Retomar donde quedaste | Cerrá y abrí con `pi-learn -c` (la última sesión) o `pi-learn --resume` (elegís cuál; se llaman `<Curso> · <Tema>`). Desde pi, `/resume`. |
 | Achicar una clase larga | `/compact`. Resume en español con tema, borde, práctica y próximo paso, y la clase sigue. |
 
@@ -215,6 +230,7 @@ Cualquier otro texto en inglés es un defecto: anotalo junto con la nota de la c
 ## 8. Cuánto gasta
 
 - **Crear un curso:** el agente lee programa e índices y arma la propuesta. La indexación de páginas es local y no usa modelo.
+- **Transcribir grabaciones de clase:** nada; se hace en tu computadora con faster-whisper.
 - **Cada clase:** el modelo principal (`settings.json`), un turno por mensaje tuyo.
 - **Primera clase de un tema:** además, el modelo de visión (`modelo_vision` en `curso.config.json`):
   - una llamada por página pendiente;
@@ -226,17 +242,20 @@ Cualquier otro texto en inglés es un defecto: anotalo junto con la nota de la c
 
 ## Resumen de comandos
 
-| Comando | Para qué |
-|---|---|
-| `pi-learn`, `pi-learn -c`, `pi-learn --resume` | abrir, seguir la última sesión, elegir una sesión |
-| `/curso-nuevo <slug>` | crear un curso desde `_entrada/` |
-| `/curso-agregar <slug> [archivos…]` | sumar material a un curso |
-| `/curso-check <slug>` | validar el curso y ver la preparación de cada tema |
-| `/curso-estado <slug>` | ver cómo va la indexación |
-| `/cursos` | listar cursos |
-| `/estudiar [curso] [tema]` | abrir una clase |
-| `/simulacro` | rendir el ejercicio reservado del tema |
-| `/progreso [curso]` | ver el progreso y el próximo tema |
-| `/fin` | guardar y cerrar la clase |
-| `/compact`, `/resume` | resumir la clase, retomar otra sesión (de pi) |
-| `/md-log <nota>`, `/md-unlog` | vincular o desvincular una nota a mano |
+| Comando | Para qué | En la app |
+|---|---|---|
+| `pi-learn`, `pi-learn -c`, `pi-learn --resume` | abrir, seguir la última sesión, elegir una sesión | abrir la app; Inicio, «Seguir la clase»; «Todas las sesiones» |
+| `/curso-nuevo <slug>` | crear un curso desde `_entrada/` | «Crear curso», abajo a la izquierda |
+| `/curso-agregar <slug> [archivos…]` | sumar material a un curso | «Agregar material» en el curso |
+| (sólo en la app) | eliminar un curso; va a la papelera del sistema | «Eliminar el curso» en el curso |
+| `/curso-check <slug>` | validar el curso y ver la preparación de cada tema | pestaña Estado del curso, «Validar el curso» |
+| `/curso-estado <slug>` | ver cómo va la indexación | pestaña Estado; la barra de avance a la izquierda |
+| `/cursos` | listar cursos | la barra de la izquierda |
+| `/estudiar [curso] [tema] [desde-cero\|fortalecer]` | abrir una clase, también desde cero o para fortalecer lo flojo | tocar un tema y «Empezar la clase», «Desde cero» o «Fortalecer lo flojo»; el buscador del curso acepta cualquier texto |
+| `/preguntas [mezcla]` | elegir cuántas preguntas van de múltiple opción y cuántas de desarrollo | Ajustes → Cómo estudio |
+| `/simulacro` | rendir el ejercicio reservado del tema | botón Simulacro de la clase |
+| `/progreso [curso]` | ver el progreso y el próximo tema | la vista del curso y la del tema |
+| `/fin` | guardar y cerrar la clase | botón Terminar clase |
+| `/compact`, `/resume` | resumir la clase, retomar otra sesión (de pi) | menú de la clase; «Todas las sesiones» |
+| `/md-log <nota>`, `/md-unlog` | vincular o desvincular una nota a mano | menú de la clase |
+| `/skill:teach <tema>` | estudiar un tema suelto, sin curso | «Tema libre» |

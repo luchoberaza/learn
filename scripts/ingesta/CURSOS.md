@@ -35,6 +35,16 @@ Desde la raíz del vault:
 .pi/.venv/bin/python .pi/scripts/ingesta/cursos.py cruzar --curso ejemplo
 ```
 
+`inventario` (sin `--curso`) lista los PDFs y las grabaciones de `_entrada/` con su SHA-256: de un PDF, sus páginas; de una grabación, su duración y sus tramos.
+
+### Grabaciones de clase (DA51)
+
+Un video o audio de una clase (mp4, mkv, webm, mov, m4v, mp3, m4a, wav, ogg, opus, flac, aac) es un documento más, de tipo `bibliografia` u `otros`. Sus «páginas» son tramos de 5 minutos: `paginas` es la cantidad de tramos que da `inventario`, y los rangos de `bibliografia` son tramos. La ingesta base los transcribe en local con faster-whisper (modelo `modelo_transcripcion` de `curso.config.json`, `large-v3-turbo` por defecto, que se descarga la primera vez: unos 1,6 GB), sin red ni costo. Cada tramo empieza en el primer silencio a partir de su minuto nominal. Cada párrafo trae la hora en que empieza, `[12:05] …`, y se cita al segundo con `[[cursos/<slug>/fuentes/<tipo>/clase.mp4#t=725]]`. Nada de una grabación va al modelo de visión. Los rangos por tema se asignan después de la ingesta, leyendo la transcripción.
+
+```bash
+.pi/.venv/bin/python .pi/scripts/ingesta/cursos.py inventario
+```
+
 `cruzar` toma, por tema, las siglas y los términos con guion de cada objetivo y de cada ítem asignado («ancho de banda-retardo», ICMP) y los busca en las páginas transcriptas de su bibliografía. Lista los que no aparecen, con las páginas del libro donde sí están, y los que el rango sólo menciona de pasada cuando el libro les dedica una sección numerada fuera del rango. `paginas_sin_texto` cuenta páginas del rango sin transcripción: con ellas el cruce es incompleto. Es una ayuda de curación, no un error de validación.
 
 `aplicar --base <huella devuelta> --huella <huella propuesta>` es la operación interna usada por `guardar_curso` tras la confirmación. No es un atajo del agente para eludirla. El CLI sirve también al usuario local, que ya tiene permisos de edición del vault.

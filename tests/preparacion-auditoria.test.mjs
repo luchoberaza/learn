@@ -6,7 +6,10 @@ import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 import { acotar, dossier, leerPaginas } from "../extensions/curso/material.ts";
 import { registrarPreparacion } from "../extensions/curso/preparacion.ts";
-import { agentDir, loadProject, piDir } from "../scripts/lib/pi-sdk.mjs";
+import { agentDir, loadProject, piDir, importDependenciaPi, pythonDelVenv } from "../scripts/lib/pi-sdk.mjs";
+// Las llamadas simuladas anotan su consumo en una carpeta temporal, no en el registro real de la máquina (DA48).
+const consumoTemporal = process.env.LEARN_CONSUMO_DIR = mkdtempSync(join(tmpdir(), "learn-consumo-"));
+process.on("exit", () => rmSync(consumoTemporal, { recursive: true, force: true }));
 
 function curso(t) {
   const vault = mkdtempSync(join(tmpdir(), "pi-preparacion-")), raiz = join(vault, "cursos/redes");
@@ -20,9 +23,9 @@ function curso(t) {
 }
 
 test("guardar_items acepta solucion_de y puntos en el esquema que ve el modelo", async () => {
-  const p = await loadProject(), raiz = process.env.PI_MANAGED_INSTALL_ROOT || join(agentDir, "install");
+  const p = await loadProject();
   try {
-    const { validateToolArguments } = await import(join(raiz, "releases", readFileSync(join(raiz, "current-version"), "utf8").trim(), "node_modules/@earendil-works/pi-ai/dist/index.js"));
+    const { validateToolArguments } = await importDependenciaPi("@earendil-works/pi-ai");
     const tool = p.session.getAllTools().find(x => x.name === "guardar_items");
     const items = [{ id: "4", paginas: [2], enunciado: "Explique.", puntos: 8 }, { id: "4-solucion", paginas: [3], enunciado: "Respuesta.", solucion_de: "4" }, { id: "5", paginas: [3], enunciado: "Calcule.", puntos: "10 (a: 4, b: 6)" }];
     assert.deepEqual(validateToolArguments(tool, { name: "guardar_items", arguments: { curso: "redes", doc: "sol-prc20230918", items } }).items, items);
@@ -153,11 +156,11 @@ function modeloSimulado(llamadas, guion = {}) {
 function preparacion(t) {
   const vault = mkdtempSync(join(tmpdir(), "pi-preparacion-e2e-")), recursos = join(vault, ".pi"), raiz = join(vault, "cursos/ejemplo");
   t.after(() => rmSync(vault, { recursive: true, force: true }));
-  const r = spawnSync(join(piDir, ".venv/bin/python"), ["-c", CURSO, vault], { encoding: "utf8", env: { ...process.env, PYTHONPATH: join(piDir, "tests/ingesta"), PYTHONDONTWRITEBYTECODE: "1" }, timeout: 30000 });
+  const r = spawnSync(pythonDelVenv(piDir), ["-c", CURSO, vault], { encoding: "utf8", env: { ...process.env, PYTHONPATH: join(piDir, "tests/ingesta"), PYTHONDONTWRITEBYTECODE: "1" }, timeout: 30000 });
   assert.equal(r.status, 0, r.stderr);
   mkdirSync(recursos);
   writeFileSync(join(recursos, "curso.config.json"), JSON.stringify({ modelo_vision: "openai/gpt-6-luna", max_paginas_vision_sin_confirmar: 1, umbral_calidad_pagina: 0.6 }));
-  const cargar = () => JSON.parse(spawnSync(join(piDir, ".venv/bin/python"), [join(piDir, "scripts/ingesta/sesion.py"), "cargar", "--vault", vault, "--curso", "ejemplo"], { encoding: "utf8" }).stdout);
+  const cargar = () => JSON.parse(spawnSync(pythonDelVenv(piDir), [join(piDir, "scripts/ingesta/sesion.py"), "cargar", "--vault", vault, "--curso", "ejemplo"], { encoding: "utf8" }).stdout);
   const e = { activo: { a: { curso: "ejemplo", tema: "derivacion", log: "cursos/ejemplo/sesiones/1.md" }, d: cargar(), r: raiz }, refrescos: [], estados: [], avisos: [], mensajes: [], llamadas: [], eventos: new Map() };
   const pi = { on: (n, h) => e.eventos.set(n, h), sendMessage: (m, o) => e.mensajes.push([m, o]) };
   e.ctx = { hasUI: true, ui: { setStatus: (k, v) => e.estados.push([k, v]), notify: (m, tipo) => e.avisos.push([tipo, m]), confirm: assert.fail },
@@ -165,7 +168,7 @@ function preparacion(t) {
   e.prep = registrarPreparacion(pi, { actual: () => e.activo, refrescar: () => { e.refrescos.push(e.llamadas.length); return ""; } }, vault, recursos);
   e.turno = async (log = e.activo.a.log) => { e.activo.a.log = log; await e.eventos.get("before_agent_start")({}, e.ctx); await e.prep.ultima(); };
   e.json = f => JSON.parse(readFileSync(join(raiz, "_procesado", f), "utf8"));
-  e.yaml = f => JSON.parse(spawnSync(join(piDir, ".venv/bin/python"), ["-c", "import sys,yaml,json; print(json.dumps(yaml.safe_load(open(sys.argv[1]))))", join(raiz, "_procesado", f)], { encoding: "utf8" }).stdout);
+  e.yaml = f => JSON.parse(spawnSync(pythonDelVenv(piDir), ["-c", "import sys,yaml,json; print(json.dumps(yaml.safe_load(open(sys.argv[1]))))", join(raiz, "_procesado", f)], { encoding: "utf8" }).stdout);
   e.vault = vault; e.raiz = raiz;
   return e;
 }

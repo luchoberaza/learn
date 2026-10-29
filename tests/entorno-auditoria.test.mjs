@@ -2,9 +2,9 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { cpSync, mkdtempSync, mkdirSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { delimiter, join } from "node:path";
 import { spawnSync } from "node:child_process";
-import { agentDir, importPi, piDir, vaultDir } from "../scripts/lib/pi-sdk.mjs";
+import { agentDir, importPi, leerConfigLocal, piDir, vaultDir, pythonDelVenv } from "../scripts/lib/pi-sdk.mjs";
 
 const lanzador = join(piDir, "config/fish/pi-learn.fish"), instalacion = process.env.PI_MANAGED_INSTALL_ROOT || join(agentDir, "install");
 process.env.PI_OFFLINE = "1";
@@ -20,7 +20,7 @@ function hogar(t) {
   writeFileSync(join(paquete, "index.js"), 'export default function (pi) { pi.on("before_agent_start", e => { e.systemPromptOptions.sections.ponytail = "lazy senior developer"; }); }\n');
   writeFileSync(join(paquete, "skills/ponytail/SKILL.md"), "---\nname: ponytail\ndescription: Ajena al tutor.\n---\nAjena.\n");
   writeFileSync(join(home, ".agents/skills/teach/SKILL.md"), "---\nname: teach\ndescription: Teach global ajena.\n---\nAjena.\n");
-  symlinkSync(vaultDir, join(home, "Projects/pi-learning"));
+  symlinkSync(vaultDir, join(home, "Projects/pi-learning"), process.platform === "win32" ? "junction" : undefined);
   return { home, agente };
 }
 
@@ -59,7 +59,7 @@ async function cargar(t, { home, agente }, argumentos) {
   } finally { process.env.HOME = anterior; }
 }
 
-test("H14: pi-learn abre el tutor sin ponytail ni skills globales y con las skills del proyecto", async t => {
+test("H14: pi-learn abre el tutor sin ponytail ni skills globales y con las skills del proyecto", { skip: process.platform === "win32" && "pi-learn es el lanzador de Linux (fish + tmux); en Windows se abre con la app" }, async t => {
   const h = hogar(t);
   const pi = piLearn(t, { home: h.home }).llamadas.find(l => l[0] === "pi").slice(1, -2);
   const { skills, secciones } = await cargar(t, h, pi);
@@ -77,20 +77,20 @@ test("H09: el thinking del tutor queda oculto como setting de proyecto", async t
   assert.equal(sdk.SettingsManager.create(vaultDir, agente, { projectTrusted: true }).getHideThinkingBlock(), true);
 });
 
-test("X06: el hijo del researcher recibe su orden a los 300 ms y se respeta un valor propio", t => {
+test("X06: el hijo del researcher recibe su orden a los 300 ms y se respeta un valor propio", { skip: process.platform === "win32" && "pi-learn es el lanzador de Linux (fish + tmux); en Windows se abre con la app" }, t => {
   const { home } = hogar(t);
   assert.equal(piLearn(t, { home }).llamadas[0].at(-1), "DELAY=300");
   assert.equal(piLearn(t, { home, env: { PI_SUBAGENT_SHELL_READY_DELAY_MS: "900" } }).llamadas[0].at(-1), "DELAY=900");
 });
 
-test("X03: en el servidor de pi-learn una sesión sin cliente no sobrevive", t => {
+test("X03: en el servidor de pi-learn una sesión sin cliente no sobrevive", { skip: process.platform === "win32" && "pi-learn es el lanzador de Linux (fish + tmux); en Windows se abre con la app" }, t => {
   const dir = mkdtempSync(join(tmpdir(), "pi-tmux-")), tmux = (...a) => spawnSync("tmux", ["-S", join(dir, "s"), ...a], { encoding: "utf8" });
   t.after(() => { tmux("kill-server"); rmSync(dir, { recursive: true, force: true }); });
   assert.equal(tmux("-f", join(piDir, "config/tmux.conf"), "new-session", "-d", "-s", "alumno", "--", "sleep", "30").status, 0);
   assert.notEqual(tmux("has-session", "-t", "=alumno").status, 0);
 });
 
-test("X03: pi-learn reutiliza la sesión de tmux de la carpeta y avisa si no puede usar los argumentos", t => {
+test("X03: pi-learn reutiliza la sesión de tmux de la carpeta y avisa si no puede usar los argumentos", { skip: process.platform === "win32" && "pi-learn es el lanzador de Linux (fish + tmux); en Windows se abre con la app" }, t => {
   const { home } = hogar(t), otra = mkdtempSync(join(tmpdir(), "pi-otra-"));
   t.after(() => rmSync(otra, { recursive: true, force: true }));
   const nueva = l => l.slice(l.indexOf("new-session"), l.indexOf("--"));
@@ -105,7 +105,7 @@ test("X03: pi-learn reutiliza la sesión de tmux de la carpeta y avisa si no pue
   assert.ok(!piLearn(t, { home, dentro: false }).llamadas.some(l => l.includes("has-session")));
 });
 
-test("H41: sin los paquetes fijados pi-learn avisa en una línea y arranca pi sin red de inicio", t => {
+test("H41: sin los paquetes fijados pi-learn avisa en una línea y arranca pi sin red de inicio", { skip: process.platform === "win32" && "pi-learn es el lanzador de Linux (fish + tmux); en Windows se abre con la app" }, t => {
   const { home } = hogar(t), sin = mkdtempSync(join(tmpdir(), "pi-sinpaquetes-")), recursos = join(sin, "Projects/pi-learning/.pi");
   t.after(() => rmSync(sin, { recursive: true, force: true }));
   mkdirSync(join(recursos, "config"), { recursive: true });
@@ -135,7 +135,9 @@ test("H80/H14/H09: el doctor del proyecto ve el prompt, las skills y el thinking
   assert.match(r.stdout, /^✓ Prompt del tutor: sin secciones ajenas/m);
   assert.match(r.stdout, /^✓ Skills de cursos: teach, curso-nuevo y curso-agregar, sin colisiones/m);
   assert.match(r.stdout, /^✓ Thinking oculto/m);
-  assert.match(r.stdout, /^[✓✗] Credenciales principal: openai-codex\/gpt-6\.1-sol: /m);
+  // El de settings.json, salvo que esta máquina tenga el suyo en curso.config.local.json (DA49).
+  const principal = leerConfigLocal(piDir).modelo_principal || "openai-codex/gpt-6.1-sol";
+  assert.match(r.stdout, new RegExp(`^[✓✗] Credenciales principal: ${principal.replace(/[.]/g, "[.]")}: `, "m"));
 });
 
 test("preventivo: la lista blanca de secciones del doctor cubre las que agrega el curso, también la de /simulacro", () => {
@@ -150,14 +152,17 @@ test("preventivo: la lista blanca de secciones del doctor cubre las que agrega e
 test("H80/H14/H09: el doctor marca credenciales, secciones, colisiones y thinking, y avisa por otra versión de pi", t => {
   const h = hogar(t), v = mkdtempSync(join(tmpdir(), "pi-doctor-")), copia = join(v, ".pi");
   t.after(() => rmSync(v, { recursive: true, force: true }));
-  cpSync(piDir, copia, { recursive: true, filter: f => !/\/\.(git|venv)$/.test(f) });
+  // Como una máquina nueva: sin el venv ni los modelos propios de esta (curso.config.local.json, DA40 y DA49). Lo que se
+  // instala o se compila en app/ (dependencias, instaladores) no lo mira el doctor y pesa cientos de MB.
+  cpSync(piDir, copia, { recursive: true, filter: f => !/[\\/]\.(git|venv)$|[\\/]curso\.config\.local\.json$|[\\/]app[\\/](node_modules|dist|out)$/.test(f) });
   for (const d of ["cursos", "_entrada", ".pi/skills/otra-teach", "bin"]) mkdirSync(join(v, d), { recursive: true });
   const settings = JSON.parse(readFileSync(join(copia, "settings.json"), "utf8"));
   writeFileSync(join(copia, "settings.json"), JSON.stringify({ ...settings, hideThinkingBlock: undefined, packages: settings.packages.filter(p => typeof p === "string") }));
   writeFileSync(join(copia, "skills/otra-teach/SKILL.md"), "---\nname: teach\ndescription: Duplicada.\n---\nDuplicada.\n");
-  writeFileSync(join(v, "bin/pi"), "#!/bin/sh\necho 1.5.0\n", { mode: 0o755 });
+  if (process.platform === "win32") writeFileSync(join(v, "bin/pi.cmd"), "@echo 1.5.0\r\n");
+  else writeFileSync(join(v, "bin/pi"), "#!/bin/sh\necho 1.5.0\n", { mode: 0o755 });
   const r = spawnSync(process.execPath, [join(copia, "scripts/doctor"), "--sin-red"], { cwd: v, encoding: "utf8", timeout: 60000,
-    env: { ...process.env, HOME: h.home, PI_CODING_AGENT_DIR: h.agente, PI_MANAGED_INSTALL_ROOT: instalacion, PATH: `${join(v, "bin")}:${process.env.PATH}` } });
+    env: { ...process.env, HOME: h.home, USERPROFILE: h.home, PI_CODING_AGENT_DIR: h.agente, PI_MANAGED_INSTALL_ROOT: instalacion, PATH: `${join(v, "bin")}${delimiter}${process.env.PATH}` } });
   assert.match(r.stdout, /^! pi: 1\.5\.0, distinta de la fijada 1\.4\.0; verificá APIs antes de usar/m);
   assert.doesNotMatch(r.stdout, /^✗ pi:/m);
   assert.match(r.stdout, /^✗ Prompt del tutor: secciones ajenas: ponytail;/m);
@@ -168,16 +173,18 @@ test("H80/H14/H09: el doctor marca credenciales, secciones, colisiones y thinkin
 });
 
 test("comprobar: respeta ruta_tesseract y dice cómo recrear el venv con Python de uv", t => {
-  const v = mkdtempSync(join(tmpdir(), "pi-comprobar-")), ingesta = join(v, ".pi/scripts/ingesta"), falso = join(v, "bin/tesseract");
+  const v = mkdtempSync(join(tmpdir(), "pi-comprobar-")), ingesta = join(v, ".pi/scripts/ingesta");
+  let falso = join(v, "bin/tesseract");
   t.after(() => rmSync(v, { recursive: true, force: true }));
-  cpSync(join(piDir, "scripts/ingesta"), ingesta, { recursive: true, filter: f => !/__pycache__|\/benchmark(\/|$)/.test(f) });
+  cpSync(join(piDir, "scripts/ingesta"), ingesta, { recursive: true, filter: f => !/__pycache__|[\\/]benchmark([\\/]|$)/.test(f) });
   mkdirSync(join(v, "bin"));
-  writeFileSync(falso, '#!/bin/sh\n[ "$1" = --version ] && echo "tesseract 5.5.2" || printf "List of available languages (1):\\neng\\n"\n', { mode: 0o755 });
+  if (process.platform === "win32") { falso += ".bat"; writeFileSync(falso, '@echo off\r\nif "%1"=="--version" (echo tesseract 5.5.2& exit /b 0)\r\necho List of available languages ^(1^):\r\necho eng\r\n'); }
+  else writeFileSync(falso, '#!/bin/sh\n[ "$1" = --version ] && echo "tesseract 5.5.2" || printf "List of available languages (1):\\neng\\n"\n', { mode: 0o755 });
   const config = JSON.parse(readFileSync(join(piDir, "curso.config.json"), "utf8"));
   writeFileSync(join(v, ".pi/curso.config.json"), JSON.stringify({ ...config, ruta_tesseract: falso }));
-  const lanzar = "import runpy, sys; sys.path.insert(0, sys.argv[1].rsplit('/', 1)[0]); runpy.run_path(sys.argv[1], run_name='__main__')";
+  const lanzar = "import os, runpy, sys; sys.path.insert(0, os.path.dirname(sys.argv[1])); runpy.run_path(sys.argv[1], run_name='__main__')";
   const correr = codigo => {
-    const r = spawnSync(join(piDir, ".venv/bin/python"), ["-c", codigo, join(ingesta, "comprobar.py")], { encoding: "utf8", env: { ...process.env, PYTHONDONTWRITEBYTECODE: "1" } });
+    const r = spawnSync(pythonDelVenv(piDir), ["-c", codigo, join(ingesta, "comprobar.py")], { encoding: "utf8", env: { ...process.env, PYTHONDONTWRITEBYTECODE: "1" } });
     assert.equal(r.status, 0, r.stderr);
     return Object.fromEntries(JSON.parse(r.stdout).chequeos.map(c => [c.nombre, c]));
   };
@@ -188,7 +195,7 @@ test("comprobar: respeta ruta_tesseract y dice cómo recrear el venv con Python 
     /UV_PROJECT_ENVIRONMENT=\$PWD\/\.pi\/\.venv uv sync --project \.pi\/scripts\/ingesta --python 3\.13\.13 --python-preference only-managed --locked/);
 });
 
-test("H14: los argumentos de pi-learn van primero y no tapan los subcomandos de pi", t => {
+test("H14: los argumentos de pi-learn van primero y no tapan los subcomandos de pi", { skip: process.platform === "win32" && "pi-learn es el lanzador de Linux (fish + tmux); en Windows se abre con la app" }, t => {
   const { home } = hogar(t);
   // pi 1.4.0 rechaza -ns en sus subcomandos («Unknown option -ns for "update"»).
   for (const sub of [["update", "--self"], ["config"], ["auth", "check", "--provider", "openai-codex"]]) {

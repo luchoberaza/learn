@@ -4,12 +4,13 @@ import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { piDir } from "../../scripts/lib/pi-sdk.mjs";
+import { piDir, pythonDelVenv } from "../../scripts/lib/pi-sdk.mjs";
+import { anotarConsumo } from "../../scripts/lib/consumo.mjs";
 import { elegir } from "../comun/elegir.ts";
 
 export function python(accion: string, datos: object, signal?: AbortSignal, script: "vision.py" | "progreso.py" | "preparacion.py" = "vision.py"): Promise<any> {
   return new Promise((resolve, reject) => {
-    const hijo = spawn(join(piDir, ".venv/bin/python"), [join(piDir, "scripts/ingesta", script), accion],
+    const hijo = spawn(pythonDelVenv(piDir), [join(piDir, "scripts/ingesta", script), accion],
       { stdio: ["pipe", "pipe", "pipe"], signal, timeout: 30000 });
     let salida = "", error = "";
     hijo.stdout.on("data", bloque => { salida += bloque; });
@@ -89,6 +90,7 @@ export async function transcribir(ctx: Pick<ExtensionContext, "modelRegistry" | 
         { type: "text", text: preparada.prompt },
         { type: "image", mimeType: "image/png", data: imagen.toString("base64") },
       ] }] }, { maxTokens: 8000, reasoning: "off", maxRetries: 0, signal: llamada }).result();
+      anotarConsumo({ origen: "preparación", proveedor: modelo.provider, modelo: modelo.id, usage: respuesta.usage });
       if (!usage) usage = structuredClone(respuesta.usage);
       else {
         for (const k of ["input", "output", "cacheRead", "cacheWrite", "cacheWrite1h", "reasoning", "totalTokens"] as const) usage[k] = (usage[k] || 0) + (respuesta.usage[k] || 0);

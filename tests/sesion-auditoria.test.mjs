@@ -237,6 +237,8 @@ test("H16: si md-log no confirma o sesiones/ no se puede escribir, la clase sigu
   assert.ok(eventos.some(([n, p]) => n === "md-log:unlink" && !p.file));
   await e.sesion.cerrar(e.ctx);
   assert.equal(e.sesion.actual(), undefined);
+  // Windows ignora chmod de carpetas: ahí no se puede simular sesiones/ sin permiso.
+  if (process.platform === "win32") return;
   const f = entorno(t);
   chmodSync(join(f.raiz, "sesiones"), 0o555);
   await f.estudiar("calculo derivacion");

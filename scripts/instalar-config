@@ -2,12 +2,13 @@
 import { copyFileSync, existsSync, mkdirSync, readFileSync, constants } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
-import { piDir, webConfigPath } from "./lib/pi-sdk.mjs";
+import { piDir, webConfigPath, WINDOWS } from "./lib/pi-sdk.mjs";
 
 // Nunca reemplaza una configuración distinta: requiere revisión del usuario.
+// El lanzador fish es de Linux: en Windows se abre con la app, así que sólo se instala la configuración web.
 let fallos = 0;
 for (const [source, destination] of [
-  [join(piDir, "config/fish/pi-learn.fish"), join(homedir(), ".config/fish/functions/pi-learn.fish")],
+  ...(WINDOWS ? [] : [[join(piDir, "config/fish/pi-learn.fish"), join(homedir(), ".config/fish/functions/pi-learn.fish")]]),
   [join(piDir, "config/web-search.json"), webConfigPath()],
 ]) {
   if (existsSync(destination)) {

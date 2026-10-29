@@ -33,7 +33,7 @@ class CursosAuditoriaTest(unittest.TestCase):
     def test_h40_propuesta_dentro_del_curso_pide_la_raiz_del_vault(self):
         dentro = self.raiz / "_procesado/propuesta.json"
         dentro.parent.mkdir(parents=True)
-        dentro.write_text(self.propuesta.read_text())
+        dentro.write_text(self.propuesta.read_text(encoding="utf-8"), encoding="utf-8", newline="\n")
         with self.assertRaisesRegex(ValueError, "raíz del vault"):
             revisar(self.vault, "ejemplo", dentro)
 
@@ -43,9 +43,9 @@ class CursosAuditoriaTest(unittest.TestCase):
         i = copy.deepcopy(self.indice)
         i["documentos"].append({**i["documentos"][0], "id": "otro", "archivo": "fuentes/bibliografia/otro.pdf"})
         self.escribir(i)
-        paquete = json.loads(self.propuesta.read_text())
+        paquete = json.loads(self.propuesta.read_text(encoding="utf-8"))
         paquete["origenes"] = {"otro": {"archivo": "_entrada/otro.pdf", "sha256": sha256(nuevo)}}
-        self.propuesta.write_text(json.dumps(paquete))
+        self.propuesta.write_text(json.dumps(paquete), encoding="utf-8", newline="\n")
         return nuevo, self.raiz / "fuentes/bibliografia/otro.pdf"
 
     def test_h38_curso_nuevo_cortado_no_aparece_y_se_puede_repetir(self):
@@ -75,7 +75,7 @@ class CursosAuditoriaTest(unittest.TestCase):
         _, destino = self.ampliar()
         def interferir(entrada, salida):
             salida.write(entrada.read())
-            (self.raiz / "curso.md").write_text(self.contrato + "\nEdición durante la copia\n")
+            (self.raiz / "curso.md").write_text(self.contrato + "\nEdición durante la copia\n", encoding="utf-8", newline="\n")
         with patch("cursos.shutil.copyfileobj", side_effect=interferir):
             with self.assertRaises(Conflicto):
                 self.crear()
@@ -101,7 +101,7 @@ class CursosAuditoriaTest(unittest.TestCase):
         i["temas"][0].update(bibliografia=[], evaluaciones=[{"doc": "libro", "items": refs}])
         carpeta = self.raiz / "_procesado/libro"
         carpeta.mkdir(parents=True, exist_ok=True)
-        (carpeta / "items.yaml").write_text(yaml.safe_dump({"doc": "libro", "items": items}))
+        (carpeta / "items.yaml").write_text(yaml.safe_dump({"doc": "libro", "items": items}), encoding="utf-8", newline="\n")
         return self.guardar_indice(i)
 
     def test_h18_validar_acepta_la_solucion_integrada_sin_documento_de_soluciones(self):
@@ -137,7 +137,7 @@ class CursosAuditoriaTest(unittest.TestCase):
         i["temas"].append(otro)
         carpeta = self.raiz / "_procesado/parcial"
         carpeta.mkdir(parents=True)
-        (carpeta / "items.yaml").write_text(yaml.safe_dump({"doc": "parcial", "items": [{"id": "1", "paginas": [1], "enunciado": "Derive."}]}))
+        (carpeta / "items.yaml").write_text(yaml.safe_dump({"doc": "parcial", "items": [{"id": "1", "paginas": [1], "enunciado": "Derive."}]}), encoding="utf-8", newline="\n")
         r = self.guardar_indice(i)
         avisos = "\n".join(r["avisos"])
         self.assertIn("Tema integracion sin preguntas de evaluaciones", avisos)
@@ -150,24 +150,24 @@ class CursosAuditoriaTest(unittest.TestCase):
         self.crear()
         banco = self.raiz / "_procesado/libro"
         (banco / "paginas").mkdir(parents=True)
-        (banco / "paginas/0001.md").write_text("Texto")
-        (banco / "calidad.json").write_text(json.dumps({"paginas": {"1": {"ruta": "digital", "pendiente": False}}}))
+        (banco / "paginas/0001.md").write_text("Texto", encoding="utf-8", newline="\n")
+        (banco / "calidad.json").write_text(json.dumps({"paginas": {"1": {"ruta": "digital", "pendiente": False}}}), encoding="utf-8", newline="\n")
         r = manifiesto(self.vault, "ejemplo", todo=False)
         archivo = self.vault / "_procesado/manifiesto-ejemplo.json"
         self.assertEqual(r["manifiesto"], "_procesado/manifiesto-ejemplo.json")
         self.assertIn("ingestar.py iniciar --manifiesto _procesado/manifiesto-ejemplo.json --salida cursos/ejemplo/_procesado", r["siguiente"])
-        m = json.loads(archivo.read_text())
+        m = json.loads(archivo.read_text(encoding="utf-8"))
         self.assertEqual(m, {"version": 1, "documentos": [{"id": "libro", "titulo": "Libro", "tipo": "bibliografia",
                                                            "archivo": "cursos/ejemplo/fuentes/bibliografia/libro.pdf", "paginas": [2]}]})
         shutil.rmtree(banco)
         ejecutar({**m, "motores": {c: "pymupdf" for c in ["digital", "escaneada", "mixta"]}}, self.vault, self.raiz / "_procesado")
         self.assertEqual(manifiesto(self.vault, "ejemplo", todo=False)["paginas"], 1)
-        self.assertEqual(json.loads(archivo.read_text())["documentos"][0]["paginas"], [1])
+        self.assertEqual(json.loads(archivo.read_text(encoding="utf-8"))["documentos"][0]["paginas"], [1])
         salida = subprocess.run([sys.executable, str(Path(test_cursos.__file__).parents[2] / "scripts/ingesta/cursos.py"), "manifiesto",
-                                 "--curso", "ejemplo", "--vault", str(self.vault), "--todo"], capture_output=True, text=True)
+                                 "--curso", "ejemplo", "--vault", str(self.vault), "--todo"], capture_output=True, text=True, encoding="utf-8")
         self.assertEqual(salida.returncode, 0, salida.stderr)
         self.assertEqual(json.loads(salida.stdout)["paginas"], 3)
-        self.assertEqual(json.loads(archivo.read_text())["documentos"][0]["paginas"], "todas")
+        self.assertEqual(json.loads(archivo.read_text(encoding="utf-8"))["documentos"][0]["paginas"], "todas")
         self.assertFalse((self.raiz / "_procesado/manifiesto-ejemplo.json").exists())
 
     def test_h21_cruzar_senala_terminos_fuera_del_rango_y_donde_estan(self):
@@ -189,15 +189,15 @@ class CursosAuditoriaTest(unittest.TestCase):
         (self.raiz / "_procesado/parcial").mkdir(parents=True)
         (self.raiz / "_procesado/parcial/items.yaml").write_text(yaml.safe_dump({"doc": "parcial", "items": [
             {"id": "2", "paginas": [1], "enunciado": "Explique Go-Back-N con una ventana de 3 (8 puntos)."},
-            {"id": "2-sol", "paginas": [1], "enunciado": "Usa TCP y RDT.", "solucion_de": "2"}]}))
+            {"id": "2-sol", "paginas": [1], "enunciado": "Usa TCP y RDT.", "solucion_de": "2"}]}), encoding="utf-8", newline="\n")
         self.assertTrue(self.guardar_indice(i)["ok"])
         paginas = self.raiz / "_procesado/libro/paginas"
         paginas.mkdir(parents=True)
         for n, texto in [(1, "Los routers usan mensajes ICMP (véase la Sección 5.6)."), (12, "5.6 Protocolo de mensajes de control (ICMP)\nCalcule el producto ancho de banda-\n  retardo, R · dprop.")]:
-            (paginas / f"{n:04}.md").write_text(f"<!-- p. PDF {n} · [[cursos/ejemplo/x.pdf#page={n}]] -->\n\n{texto}\n")
+            (paginas / f"{n:04}.md").write_text(f"<!-- p. PDF {n} · [[cursos/ejemplo/x.pdf#page={n}]] -->\n\n{texto}\n", encoding="utf-8", newline="\n")
         (self.raiz / "_procesado/libro/estructura.json").write_text(json.dumps({"secciones": [
             {"nivel": 1, "titulo": "Los routers usan mensajes ICMP", "paginas": [1, 1]},
-            {"nivel": 1, "titulo": "5.6 Protocolo de mensajes de control (ICMP)", "paginas": [12, 12]}]}))
+            {"nivel": 1, "titulo": "5.6 Protocolo de mensajes de control (ICMP)", "paginas": [12, 12]}]}), encoding="utf-8", newline="\n")
         r = cruzar(self.vault, "ejemplo")
         self.assertEqual(r["temas"], [{"tema": "derivacion", "paginas_sin_texto": 10, "faltan": [
             {"termino": "ancho de banda-retardo", "de": "O1.1", "en": {"libro": [12]}},
@@ -207,7 +207,7 @@ class CursosAuditoriaTest(unittest.TestCase):
     def test_h05_pagina_transcripta_sin_registro_es_pendiente_y_no_falta(self):
         self.crear()
         (self.raiz / "_procesado/libro/paginas").mkdir(parents=True)
-        (self.raiz / "_procesado/libro/paginas/0001.md").write_text("Texto")
+        (self.raiz / "_procesado/libro/paginas/0001.md").write_text("Texto", encoding="utf-8", newline="\n")
         r = validar(self.raiz, "ejemplo")
         self.assertEqual((r["ok"], r["errores"]), (True, []))
         self.assertEqual(r["pendientes"], [{"doc": "libro", "pagina": 1}, {"doc": "libro", "pagina": 2}])
@@ -223,7 +223,7 @@ class VisionAuditoriaTest(unittest.TestCase):
         enunciado = {"id": "5", "paginas": [1], "enunciado": TEXTO}
         solucion = {"id": "5-solucion", "paginas": [1], "enunciado": "Son 16 paquetes.", "solucion_de": "5"}
         self.assertEqual(self.items([enunciado, solucion])["ids"], ["5", "5-solucion"])
-        self.assertEqual(yaml.safe_load((self.raiz / "practico/items.yaml").read_text())["items"][1]["solucion_de"], "5")
+        self.assertEqual(yaml.safe_load((self.raiz / "practico/items.yaml").read_text(encoding="utf-8"))["items"][1]["solucion_de"], "5")
         for malos in [[enunciado, {**solucion, "solucion_de": "9"}], [enunciado, {**solucion, "solucion_de": "5-solucion"}],
                       [{**enunciado, "solucion_de": "5-solucion"}, solucion], [enunciado, {**solucion, "solucion_de": ["5"]}]]:
             with self.subTest(items=malos), self.assertRaisesRegex(ValueError, "solucion_de"):
@@ -235,7 +235,7 @@ class VisionAuditoriaTest(unittest.TestCase):
                  {"id": "2", "paginas": [1], "enunciado": TEXTO, "puntos": 7.5},
                  {"id": "3", "paginas": [1], "enunciado": TEXTO, "puntos": "10 (a: 4, b: 6)"}]
         self.items(items)
-        self.assertEqual([i["puntos"] for i in yaml.safe_load((self.raiz / "practico/items.yaml").read_text())["items"]], [12, 7.5, "10 (a: 4, b: 6)"])
+        self.assertEqual([i["puntos"] for i in yaml.safe_load((self.raiz / "practico/items.yaml").read_text(encoding="utf-8"))["items"]], [12, 7.5, "10 (a: 4, b: 6)"])
         for puntos in [-1, True, "", "x" * 41, [12], float("inf")]:
             with self.subTest(puntos=puntos), self.assertRaisesRegex(ValueError, "puntos"):
                 self.items([{**items[0], "puntos": puntos}])
@@ -243,7 +243,7 @@ class VisionAuditoriaTest(unittest.TestCase):
     def test_h39_fallo_de_vision_no_degrada_una_pagina_digital_buena(self):
         self.manifiesto["documentos"].append({"id": "libro", "titulo": "Libro", "tipo": "bibliografia", "archivo": "muestra.pdf", "paginas": [3]})
         ejecutar(self.manifiesto, self.vault, self.raiz)
-        calidad = lambda: json.loads((self.raiz / "libro/calidad.json").read_text())["paginas"]["3"]
+        calidad = lambda: json.loads((self.raiz / "libro/calidad.json").read_text(encoding="utf-8"))["paginas"]["3"]
         self.assertEqual(calidad()["ruta"], "digital")
         datos = self.preparar(doc="libro", pagina=3)
         with bloquear(self.raiz, self.vault):

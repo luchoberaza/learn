@@ -21,9 +21,12 @@
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent"
 import { Type } from "@sinclair/typebox"
+import { dirname } from "node:path"
+import { fileURLToPath } from "node:url"
 import {
   applyEdit,
   existsSync,
+  findChrome,
   join,
   mkdirSync,
   publish,
@@ -35,6 +38,7 @@ import {
   writeFileSync,
 } from "./_common.ts"
 
+const SVG_CHROME_JS = join(dirname(fileURLToPath(import.meta.url)), "svg-chrome.mjs")
 const GROUP = "svg"
 const BODY_FILE = "diagram.svg"
 const RENDER_TIMEOUT_MS = 60_000
@@ -57,6 +61,12 @@ async function renderSvg(svgPath: string, outPath: string, workDir: string) {
     timeoutMs: RENDER_TIMEOUT_MS,
   })
   if (magick.code === 0 && existsSync(outPath)) return { ok: true as const, res: magick }
+  // Last resort: the installed Chrome/Edge via mermaid-cli's puppeteer (no rsvg-convert or magick on Windows).
+  const chrome = findChrome()
+  if (chrome && existsSync(SVG_CHROME_JS)) {
+    const viaChrome = await run(process.execPath, [SVG_CHROME_JS, svgPath, outPath, chrome], { cwd: workDir, timeoutMs: RENDER_TIMEOUT_MS })
+    if (viaChrome.code === 0 && existsSync(outPath)) return { ok: true as const, res: viaChrome }
+  }
   return { ok: false as const, res: res.code !== null ? res : magick }
 }
 

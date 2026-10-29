@@ -5,7 +5,7 @@ import { createHash } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
-import { loadProject, piDir, vaultDir } from "./lib/pi-sdk.mjs";
+import { loadProject, piDir, vaultDir, pythonDelVenv } from "./lib/pi-sdk.mjs";
 import { transcribir } from "../extensions/curso/ingesta.ts";
 
 assert.ok(process.argv.length <= 3 && (!process.argv[2] || process.argv[2] === "--escaneo"), "Uso: node .pi/scripts/probar-vision [--escaneo]");
@@ -17,7 +17,7 @@ const salida = join(vaultDir, `_procesado/fase2/${escaneo ? "piloto-escaneo" : "
 const archivo = documento.archivo;
 const hash = () => createHash("sha256").update(readFileSync(join(vaultDir, archivo))).digest("hex");
 const antes = hash();
-const base = spawnSync(join(piDir, ".venv/bin/python"), ["-c", `from pathlib import Path
+const base = spawnSync(pythonDelVenv(piDir), ["-c", `from pathlib import Path
 from pipeline import ejecutar
 import sys,json
 ejecutar({'version':1,'documentos':[json.loads(sys.argv[3])]},Path(sys.argv[1]),Path(sys.argv[2]))`, vaultDir, salida, JSON.stringify(documento)],

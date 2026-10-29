@@ -1,0 +1,126 @@
+/* Ventana, barra lateral y pantallas genéricas. */
+
+/* Los anchos de la barra lateral y del panel de página (DA54) llegan como variables desde App.tsx. El panel nunca pasa
+   del 60 % de la ventana ni deja la pantalla con menos de 360 px (como anchoPanel en lib/escala.ts). */
+.ventana {
+  --lat: 256px; --panel: max(340px, 34vw);
+  --ancho-panel: clamp(300px, var(--panel), max(300px, min(60vw, calc(100vw - var(--lat) - 360px))));
+  height: 100vh; display: grid; grid-template-columns: var(--lat) minmax(0, 1fr); background: var(--bg);
+}
+.ventana.con-panel { grid-template-columns: var(--lat) minmax(0, 1fr) var(--ancho-panel); }
+/* La barra de pestañas arriba y, debajo, la pantalla y los PDF abiertos en pestañas, uno encima del otro. */
+.zona { min-width: 0; min-height: 0; display: grid; grid-template-rows: auto minmax(0, 1fr); }
+/* El lugar de la pantalla: los cortes (@container) miden lo que dejan la barra lateral y el panel de página, no la
+   ventana entera. Las pantallas no tienen ancho fijo: ocupan todo ese lugar. */
+.marco-pantalla { min-width: 0; min-height: 0; display: grid; grid-template: minmax(0, 1fr) / minmax(0, 1fr); container-type: inline-size; }
+.marco-pantalla > * { grid-area: 1 / 1; }
+.capa-pantalla, .pestana-pdf { min-width: 0; min-height: 0; display: grid; grid-template: minmax(0, 1fr) / minmax(0, 1fr); }
+/* Lo que no se ve queda montado y con su tamaño: al volver, la clase y el PDF siguen donde estaban. */
+.oculta { visibility: hidden; }
+.estado-pestana-pdf { display: grid; place-items: center; }
+
+/* ---------- pestañas (DA56) ---------- */
+.barra-pestanas { display: flex; align-items: flex-end; gap: 2px; min-width: 0; padding: 6px 8px 0; background: var(--side); border-bottom: 1px solid var(--line); overflow-x: auto; scrollbar-width: none; }
+.barra-pestanas::-webkit-scrollbar { display: none; }
+.pestana { position: relative; display: flex; align-items: center; flex: 0 1 210px; min-width: 84px; height: 33px; border: 1px solid transparent; border-bottom: 0; border-radius: 8px 8px 0 0; color: var(--muted); }
+.pestana:hover { color: var(--strong); background: var(--wash); }
+.pestana.activa { color: var(--strong); background: var(--bg); border-color: var(--line); margin-bottom: -1px; height: 34px; }
+.pestana.activa::before { content: ""; position: absolute; left: 10px; right: 10px; top: -1px; height: 2px; border-radius: 0 0 2px 2px; background: var(--accent); }
+.pestana.arrastrada { opacity: .5; }
+.pestana.marca-antes::after, .pestana.marca-despues::after { content: ""; position: absolute; top: 6px; bottom: 6px; width: 2px; border-radius: 1px; background: var(--focus); }
+.pestana.marca-antes::after { left: -2px; }
+.pestana.marca-despues::after { right: -2px; }
+.pestana-boton { flex: 1; min-width: 0; height: 100%; display: flex; align-items: center; gap: 7px; padding: 0 4px 0 12px; font-size: 13px; color: inherit; border-radius: 8px 8px 0 0; }
+.pestana-boton svg { width: 14px; height: 14px; flex-shrink: 0; color: var(--muted); }
+.pestana-titulo { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pestana-cerrar { display: grid; place-items: center; flex-shrink: 0; width: 22px; height: 22px; margin-right: 6px; border-radius: 5px; color: var(--muted); opacity: 0; }
+.pestana-cerrar svg { width: 13px; height: 13px; }
+.pestana:hover .pestana-cerrar, .pestana.activa .pestana-cerrar, .pestana-cerrar:focus-visible { opacity: 1; }
+.pestana-cerrar:hover { background: var(--wash-fuerte); color: var(--strong); }
+.pestana-nueva { flex-shrink: 0; align-self: center; width: 28px; height: 28px; margin: 0 0 3px 2px; }
+
+/* ---------- barra lateral ---------- */
+.lateral { position: relative; min-width: 0; background: var(--side); border-right: 1px solid var(--line); display: flex; flex-direction: column; padding: 22px 0 14px; min-height: 0; }
+/* Plegada (DA54): una franja con el botón para volver a mostrarla y la búsqueda. */
+.lateral.plegada { align-items: center; gap: 6px; padding: 12px 0; }
+.lateral.plegada .latido { margin-top: 8px; }
+.marca { display: flex; align-items: center; gap: 10px; padding: 0 12px 18px 22px; }
+.marca .plegar { margin-left: auto; width: 28px; height: 28px; }
+.cinta { width: 12px; height: 20px; background: var(--accent); clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 74%, 0 100%); flex-shrink: 0; }
+.marca span { font-family: var(--leer); font-weight: 600; font-size: 19px; color: var(--strong); letter-spacing: -.2px; }
+.buscar { display: flex; align-items: center; justify-content: space-between; margin: 0 12px 14px; padding: 7px 10px; border: 1px solid var(--line); border-radius: 7px; color: var(--muted); font-size: 13px; }
+.buscar:hover { border-color: var(--deco); color: var(--text); }
+.lateral-desplazable { flex: 1; overflow-y: auto; min-height: 0; padding-bottom: 8px; }
+.nav { display: flex; align-items: center; gap: 8px; width: calc(100% - 24px); margin: 0 12px 2px; padding: 8px 10px; border-radius: 7px; color: var(--muted); font-size: 14px; }
+.nav:hover { color: var(--strong); background: var(--wash); }
+.nav.on { background: var(--wash); color: var(--strong); }
+.curso-lateral { margin-top: 14px; }
+.curso-nombre { display: block; width: 100%; padding: 4px 22px; margin-bottom: 4px; font-family: var(--leer); font-size: 15px; font-weight: 600; color: var(--strong); }
+.curso-nombre:hover, .curso-nombre.on { color: var(--accent); }
+.temas { list-style: none; margin: 0 12px 6px; }
+.temas button { display: flex; align-items: center; gap: 10px; width: 100%; padding: 6px 10px; border-radius: 7px; color: var(--text); font-size: 13.5px; }
+.temas button:hover { background: var(--wash); color: var(--strong); }
+.temas button.on { background: var(--wash); color: var(--strong); }
+.temas button.bloqueado { color: var(--muted); }
+.tema-nombre { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; }
+.latido { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); flex-shrink: 0; animation: latido 1.4s ease-in-out infinite; }
+@keyframes latido { 50% { opacity: .3; } }
+.tareas { padding: 12px 22px 10px; border-top: 1px solid var(--line); display: grid; gap: 10px; max-height: 34vh; overflow-y: auto; }
+.tarea { font-size: 12.5px; color: var(--muted); line-height: 1.45; padding: 0 22px; }
+.tareas .tarea { padding: 0; }
+.foco-mini { padding: 0 22px 10px; font-size: 12.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.pie-lateral { padding: 12px 22px 0; border-top: 1px solid var(--line); display: flex; justify-content: space-between; font-size: 13px; }
+.pie-lateral button { color: var(--muted); }
+.pie-lateral button:hover, .pie-lateral button.on { color: var(--strong); }
+
+/* ---------- tirador de los bordes (DA54) ---------- */
+.tirador { position: absolute; top: 0; bottom: 0; width: 9px; z-index: 6; cursor: col-resize; touch-action: none; }
+.lateral > .tirador { right: -5px; }
+.panel-pagina > .tirador { left: -5px; }
+.tirador::after { content: ""; position: absolute; top: 0; bottom: 0; left: 4px; width: 1px; transition: background .12s; }
+.tirador:hover::after, .tirador.en-uso::after, .tirador:focus-visible::after { left: 3px; width: 3px; background: var(--focus); }
+.tirador:focus-visible { outline: none; }
+body.arrastrando { cursor: col-resize; user-select: none; }
+body.arrastrando * { cursor: col-resize !important; }
+
+/* ---------- pantallas ---------- */
+.pantalla { min-width: 0; min-height: 0; overflow-y: auto; }
+.pantalla.centrada { display: grid; place-items: center; padding: 40px; }
+.pagina-lectura { padding: 48px 64px 80px; }
+.pagina-ancha { padding: 48px 64px 80px; }
+.titulo-pantalla { font-family: var(--leer); font-weight: 500; font-size: 32px; line-height: 1.15; letter-spacing: -.5px; color: var(--strong); margin-bottom: 10px; }
+.subtitulo { font-weight: 600; font-size: 18px; color: var(--strong); margin-bottom: 12px; }
+.miga-pantalla { margin-bottom: 14px; }
+.acciones { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
+.acciones.fin { justify-content: flex-end; margin-top: 20px; gap: 12px; }
+.cabecera { margin-bottom: 26px; }
+.cabecera .acciones { margin-top: 18px; }
+.paso { margin-bottom: 38px; }
+.campo.grande { font-size: 17px; padding: 12px 14px; font-family: var(--leer); }
+.fila-campo { display: flex; gap: 10px; align-items: center; margin-top: 14px; }
+.fila-campo .campo { flex: 1; }
+.ruta-grande { font-family: var(--mono); font-size: 13px; color: var(--strong); background: var(--raised); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; margin: 12px 0 14px; word-break: break-all; }
+.ayuda.mal { color: var(--bad); }
+.tarea-boton { text-align: left; color: var(--accent); }
+.tarea-boton:hover { text-decoration: underline; }
+
+/* ---------- Medidor de consumo (DA48) ---------- */
+.consumo-lateral { position: relative; padding: 8px 14px 10px; border-top: 1px solid var(--line); }
+.consumo-boton { display: grid; gap: 3px; width: 100%; text-align: left; padding: 6px 8px; border-radius: 8px; }
+.consumo-boton:hover, .consumo-boton[aria-expanded="true"] { background: var(--wash); }
+.consumo-modelo { font-size: 13px; color: var(--strong); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.consumo-texto { font-size: 12.5px; color: var(--text); font-variant-numeric: tabular-nums; }
+.consumo-detalle { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; line-height: 1.4; }
+.consumo-barra { margin: 3px 0 1px; }
+.consumo-barra i { background: var(--ok); }
+.nivel-aviso > .consumo-barra i { background: var(--warn); }
+.nivel-mal > .consumo-barra i { background: var(--bad); }
+.consumo-boton.nivel-mal .consumo-texto { color: var(--bad); }
+.menu-flotante.menu-modelos { left: 8px; right: auto; top: auto; bottom: calc(100% + 4px); width: min(380px, calc(100vw - 32px)); max-height: 64vh; display: flex; flex-direction: column; }
+.menu-modelos > .campo { margin: 4px 4px 6px; }
+.menu-modelos-lista { overflow-y: auto; display: grid; min-height: 0; }
+.menu-grupo { font-size: 12px; color: var(--muted); padding: 8px 10px 4px; }
+.menu-modelos button[role=menuitem] { display: flex; justify-content: space-between; align-items: baseline; gap: 14px; width: 100%; }
+.menu-modelos button small { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.menu-modelos button.actual { color: var(--strong); background: var(--wash); }
+.menu-modelos .menu-pie { border-top: 1px solid var(--line); margin-top: 4px; border-radius: 0 0 7px 7px; color: var(--accent); }

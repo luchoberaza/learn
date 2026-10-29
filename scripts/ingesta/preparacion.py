@@ -10,6 +10,7 @@ import sys
 from almacen import guardar_json, leer_json, ruta_segura, sha256
 from cursos import carpeta, cargar_yaml, texto
 from pipeline import ahora
+from transcripcion import es_grabacion
 
 BANCOS = ("evaluaciones", "ejercicios")
 
@@ -75,8 +76,11 @@ def trabajo(vault: Path, curso: str, tema: str, maximo: int) -> dict:
         return [p for p in paginas if falta(qs.get(str(p)))]
 
     cola, segmentar, bancos = [], [], {}
+    grabaciones = {d["id"] for d in indice["documentos"] if es_grabacion(d.get("archivo", ""))}
     for r in t.get("bibliografia", []):
-        cola.append((r["doc"], faltan(r["doc"], range(r["paginas"][0], r["paginas"][1] + 1), False)))
+        pendientes = faltan(r["doc"], range(r["paginas"][0], r["paginas"][1] + 1), False)
+        # Una grabación se transcribe en la ingesta base (DA51): ningún tramo va al modelo de visión.
+        cola.append((r["doc"], [] if r["doc"] in grabaciones else pendientes))
     en_indice = {(r["doc"], i) for x in indice["temas"] for c in BANCOS for r in x.get(c, []) for i in r.get("items", [])}
     for tipo in BANCOS:
         for d in indice["documentos"]:

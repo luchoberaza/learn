@@ -46,7 +46,7 @@ class VisionTest(unittest.TestCase):
             return vision.guardar_items(self.raiz, self.vault, {"doc": "practico", "items": items})
 
     def q(self):
-        return json.loads((self.raiz / "practico/calidad.json").read_text())["paginas"]["1"]
+        return json.loads((self.raiz / "practico/calidad.json").read_text(encoding="utf-8"))["paginas"]["1"]
 
     def test_render_cache_y_fuente_intacta(self):
         fuente = self.vault / "muestra.pdf"
@@ -74,11 +74,11 @@ class VisionTest(unittest.TestCase):
         self.assertEqual(salida["ruta"], "vision")
         self.assertFalse(salida["pendiente"])
         self.assertEqual(self.q()["vision"]["revision_humana"], "pendiente")
-        markdown = (self.raiz / "practico/paginas/0001.md").read_text()
+        markdown = (self.raiz / "practico/paginas/0001.md").read_text(encoding="utf-8")
         self.assertIn("$f(x)=x^2$", markdown)
         self.assertIn("[[muestra.pdf#page=1]]", markdown)
-        self.assertIn("justificar", (self.raiz / "busqueda.json").read_text())
-        self.assertIn("| vision |", (self.raiz / "informe-ingesta.md").read_text())
+        self.assertIn("justificar", (self.raiz / "busqueda.json").read_text(encoding="utf-8"))
+        self.assertIn("| vision |", (self.raiz / "informe-ingesta.md").read_text(encoding="utf-8"))
 
     def test_repetir_no_gasta_y_base_no_degrada_vision(self):
         self.guardar()
@@ -97,7 +97,7 @@ class VisionTest(unittest.TestCase):
         texto = TEXTO + r" 9. Si $B$ da á $C$ \$5, tendrá \$6 menos que $C$; pero si $C$"
         self.guardar(preparada, texto=texto)
         self.assertFalse(self.q()["pendiente"])
-        self.assertIn(texto, (self.raiz / "practico/paginas/0001.md").read_text())
+        self.assertIn(texto, (self.raiz / "practico/paginas/0001.md").read_text(encoding="utf-8"))
 
     def test_ilegible_y_latex_roto_no_se_aprueban(self):
         self.guardar(texto=TEXTO + " [ilegible]")
@@ -126,10 +126,10 @@ class VisionTest(unittest.TestCase):
         with self.assertRaises(Conflicto):
             self.guardar(datos, texto="Respuesta de otra llamada")
         archivo = self.raiz / "practico/paginas/0001.md"
-        archivo.write_text("Mis anotaciones")
+        archivo.write_text("Mis anotaciones", encoding="utf-8", newline="\n")
         with self.assertRaises(Conflicto):
             self.preparar()
-        self.assertEqual(archivo.read_text(), "Mis anotaciones")
+        self.assertEqual(archivo.read_text(encoding="utf-8"), "Mis anotaciones")
 
     def test_reanuda_corte_entre_registro_y_markdown(self):
         datos = self.preparar()
@@ -143,7 +143,7 @@ class VisionTest(unittest.TestCase):
                 self.guardar(datos)
         self.assertTrue(self.preparar()["cache"])
         self.assertEqual(self.q()["ruta"], "vision")
-        self.assertIn("justificar", (self.raiz / "busqueda.json").read_text())
+        self.assertIn("justificar", (self.raiz / "busqueda.json").read_text(encoding="utf-8"))
 
     def test_rechaza_rutas_paginas_y_fuentes_cambiadas(self):
         for datos in [{"doc": "../escape"}, {"pagina": 0}, {"pagina": True}, {"pagina": 4}]:
@@ -162,7 +162,7 @@ class VisionTest(unittest.TestCase):
         self.guardar(self.preparar(pagina=3))
         resultado = self.items([item])
         self.assertEqual(resultado["ids"], ["3b"])
-        datos = yaml.safe_load((self.raiz / "practico/items.yaml").read_text())
+        datos = yaml.safe_load((self.raiz / "practico/items.yaml").read_text(encoding="utf-8"))
         self.assertEqual(datos["items"][0]["paginas"], [1, 3])
         self.assertEqual(set(datos["sha256_paginas"]), {"1", "3"})
 
@@ -177,7 +177,7 @@ class VisionTest(unittest.TestCase):
                 {"id": "S1", "paginas": [1], "enunciado": "Solución artificial de prueba"}]})
         item = {"id": "1", "paginas": [1], "enunciado": TEXTO, "solucion": {"doc": "solucionario", "id": "S1"}}
         self.assertEqual(self.items([item])["items"], 1)
-        (self.raiz / "solucionario/items.yaml").write_text("items: [YAML roto")
+        (self.raiz / "solucionario/items.yaml").write_text("items: [YAML roto", encoding="utf-8", newline="\n")
         with self.assertRaisesRegex(ValueError, "YAML válido"):
             self.items([item])
 
@@ -190,10 +190,10 @@ class VisionTest(unittest.TestCase):
                 self.items(items)
         self.items([item])
         archivo = self.raiz / "practico/items.yaml"
-        archivo.write_text("Mis ítems curados")
+        archivo.write_text("Mis ítems curados", encoding="utf-8", newline="\n")
         with self.assertRaises(Conflicto):
             self.items([item])
-        self.assertEqual(archivo.read_text(), "Mis ítems curados")
+        self.assertEqual(archivo.read_text(encoding="utf-8"), "Mis ítems curados")
 
 
 if __name__ == "__main__":

@@ -33,7 +33,7 @@ import { execFileSync } from "node:child_process";
 import { homedir } from "node:os";
 import { elegir } from "./comun/elegir.ts";
 
-const QA_TOOLS = new Set(["quiz", "ask_user_question"]);
+const QA_TOOLS = new Set(["quiz", "ask_user_question", "pregunta_desarrollo"]);
 const SIN_CONVERSOR = "es HEIC o BMP y no hay ImageMagick para convertirla; mandala en JPEG o PNG.";
 
 // La extensión puede mentir (un PNG guardado como .jpg) y el celular manda HEIC: decide la firma.
@@ -152,6 +152,8 @@ export default function mdLog(pi: ExtensionAPI) {
 		if (!logFile) throw new Error("No hay nota vinculada.");
 		let bytes: Buffer;
 		if (typeof image === "string") {
+			// Windows no tiene O_NOFOLLOW: ahí el enlace simbólico se rechaza antes de abrir.
+			if (!fs.constants.O_NOFOLLOW && fs.lstatSync(image).isSymbolicLink()) throw new Error("La imagen debe ser un archivo regular.");
 			const fd = fs.openSync(image, fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW | fs.constants.O_NONBLOCK);
 			try {
 				if (!fs.fstatSync(fd).isFile()) throw new Error("La imagen debe ser un archivo regular.");
@@ -217,11 +219,12 @@ export default function mdLog(pi: ExtensionAPI) {
 				const adjuntoExplicito = linea.trim().startsWith("@");
 				let ruta = linea.trim().replace(/^@/, "");
 				if ((ruta.startsWith('"') && ruta.endsWith('"')) || (ruta.startsWith("'") && ruta.endsWith("'"))) ruta = ruta.slice(1, -1);
-				if ((adjuntoExplicito || /^(?:\/|~\/|\.{1,2}\/)/.test(ruta)) && /\.(?:png|jpe?g|webp|gif|heic|heif|bmp)$/i.test(ruta)) {
-					return insertarImagen(path.resolve(contexto?.cwd || ".", ruta.startsWith("~/") ? path.join(homedir(), ruta.slice(2)) : ruta));
+				// En Windows la ruta también puede ser C:\… o venir con \ (así la pega pi con Ctrl+V).
+				if ((adjuntoExplicito || /^(?:\/|~[\\/]|\.{1,2}[\\/]|[A-Za-z]:[\\/])/.test(ruta)) && /\.(?:png|jpe?g|webp|gif|heic|heif|bmp)$/i.test(ruta)) {
+					return insertarImagen(path.resolve(contexto?.cwd || ".", /^~[\\/]/.test(ruta) ? path.join(homedir(), ruta.slice(2)) : ruta));
 				}
 				// Pi 1.3 pega una ruta en el editor, también en medio de una respuesta.
-				return linea.replace(/\/[^\s"'`<>]*\bpi-clipboard-[a-f0-9-]{36}\.(?:png|jpe?g|webp|gif)(?=$|[\s"'`<>),;:])/gi, ruta => insertarImagen(ruta));
+				return linea.replace(/(?:[A-Za-z]:)?[\\/][^\s"'`<>]*\bpi-clipboard-[a-f0-9-]{36}\.(?:png|jpe?g|webp|gif)(?=$|[\s"'`<>),;:])/gi, ruta => insertarImagen(ruta));
 			}).join("\n");
 		}).filter(Boolean);
 		return partes.length ? `> [!quote] VOS\n\n${partes.join("\n\n")}` : null;
@@ -253,6 +256,8 @@ export default function mdLog(pi: ExtensionAPI) {
 	function assistantBlock(text: string): string {
 		return `> [!abstract] PI\n\n${text}`;
 	}
+	// La explicación que trae una pregunta (clase, DA52) el alumno la leyó como texto del tutor: va así, antes de la pregunta.
+	const conClase = (clase: unknown, pregunta: string) => (typeof clase === "string" && clase.trim() ? `${assistantBlock(clase.trim())}\n\n${pregunta}` : pregunta);
 
 	// Misma limpieza que quiz.ts (D5): la página citada puede traer la respuesta, así que antes de responder no van enlaces.
 	function sinEnlaces(texto: string): string {
@@ -342,6 +347,21 @@ export default function mdLog(pi: ExtensionAPI) {
 		return callout(type, title, body);
 	}
 
+	// pregunta_desarrollo (DA52): lo que escribió el alumno y, recién después, la respuesta esperada.
+	function answerCalloutDesarrollo(details: any): string {
+		const status = details?.status;
+		if (status === "cancelled") {
+			return callout("warning", "Desarrollo — cancelada", [details.motivo ? `(cortada ${details.motivo})` : "(omitida por el usuario)"]);
+		}
+		if (status !== "answered") return callout("warning", "Desarrollo — no disponible", [details?.message || ""]);
+		const body: string[] = details?.dontKnow === true ? ["Tu respuesta: No sé"] : String(details?.answer ?? "").split("\n");
+		if (details?.expected) {
+			body.push("", "Respuesta esperada:");
+			for (const line of String(details.expected).split("\n")) body.push(line);
+		}
+		return callout(details?.dontKnow === true ? "question" : "example", details?.dontKnow === true ? "Desarrollo — No sé" : "Desarrollo — tu respuesta", body);
+	}
+
 	function answerCalloutAsk(details: any): string {
 		const status = details?.status;
 		if (status === "cancelled") {
@@ -409,9 +429,18 @@ export default function mdLog(pi: ExtensionAPI) {
 	pi.on("tool_execution_update", async (event, _ctx) => {
 		if (!logFile) return;
 		const toolName = (event as any).toolName;
-		if (toolName !== "quiz") return;
+		if (toolName !== "quiz" && toolName !== "pregunta_desarrollo") return;
 		const toolCallId = (event as any).toolCallId;
 		if (loggedQuizQuestion.has(toolCallId)) return;
+		// La de desarrollo no tiene opciones: su pregunta llega limpia en details, sin la respuesta esperada.
+		if (toolName === "pregunta_desarrollo") {
+			const d = (event as any).partialResult?.details;
+			if (typeof d?.question !== "string") return;
+			loggedQuizQuestion.add(toolCallId);
+			const block = conClase(d.clase, questionCallout("Desarrollo", d.question, d.context, []));
+			await withLock(() => appendToFile(block));
+			return;
+		}
 		const shuffled = (event as any).partialResult?.details?.options as Array<{ index: number; label: string }> | undefined;
 		if (!shuffled || shuffled.length === 0) return;
 		loggedQuizQuestion.add(toolCallId);
@@ -419,7 +448,7 @@ export default function mdLog(pi: ExtensionAPI) {
 		const question: string = sinEnlaces(input.question || "");
 		const context = contextoQuiz((event as any).partialResult?.details, input);
 		const options = shuffled.map((o) => ({ label: o.label }));
-		const block = questionCallout("Quiz", question, context, options);
+		const block = conClase((event as any).partialResult?.details?.clase, questionCallout("Quiz", question, context, options));
 		await withLock(() => appendToFile(block));
 	});
 
@@ -438,10 +467,10 @@ export default function mdLog(pi: ExtensionAPI) {
 		if (!QA_TOOLS.has(toolName)) return;
 		const details = (event as any).details;
 		// Rechazado por forma antes de mostrarse: el alumno no vio ninguna pregunta.
-		if (toolName === "quiz" && details?.status === "unavailable" && !loggedQuizQuestion.has((event as any).toolCallId)) return;
+		if (toolName !== "ask_user_question" && details?.status === "unavailable" && !loggedQuizQuestion.has((event as any).toolCallId)) return;
 		const block = toolName === "quiz"
 			? answerCalloutQuiz(details)
-			: answerCalloutAsk(details);
+			: toolName === "pregunta_desarrollo" ? answerCalloutDesarrollo(details) : answerCalloutAsk(details);
 		await withLock(() => appendToFile(block));
 	});
 
@@ -582,7 +611,11 @@ export default function mdLog(pi: ExtensionAPI) {
 				if (pagina && pagina !== blocks.at(-1)) blocks.push(pagina);
 				if (!QA_TOOLS.has(msg.toolName)) continue;
 				// Un quiz no disponible nunca llegó a mostrarse.
-				if (msg.toolName === "quiz" && msg.details?.status === "unavailable") continue;
+				if (msg.toolName !== "ask_user_question" && msg.details?.status === "unavailable") continue;
+				if (msg.toolName === "pregunta_desarrollo") {
+					blocks.push(conClase(msg.details?.clase, questionCallout("Desarrollo", msg.details?.question ?? "", msg.details?.context, [])), answerCalloutDesarrollo(msg.details));
+					continue;
+				}
 				const tc = toolCallArgs.get(msg.toolCallId);
 				// Question block. For quiz, use the persisted result's `details.options`
 				// — the TRUE post-shuffle display order the user actually saw — rather
@@ -599,7 +632,7 @@ export default function mdLog(pi: ExtensionAPI) {
 						? shuffled.map((o) => ({ label: o.label }))
 						: (Array.isArray(a.options) ? a.options : []);
 					blocks.push(tc.name === "quiz"
-						? questionCallout(label, sinEnlaces(a.question || ""), contextoQuiz(msg.details, a), options)
+						? conClase(msg.details?.clase, questionCallout(label, sinEnlaces(a.question || ""), contextoQuiz(msg.details, a), options))
 						: questionCallout(label, a.question || "", a.details?.trim() || undefined, options));
 				}
 				if (msg.toolName === "quiz") {

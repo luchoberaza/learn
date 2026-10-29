@@ -10,7 +10,7 @@ import { registrarSimulacro } from "../extensions/curso/simulacro.ts";
 import { registrarProgreso } from "../extensions/curso/progreso.ts";
 import { prepararInvestigacion } from "../extensions/curso/researcher.ts";
 import { tokenizar } from "../scripts/ingesta/bm25.ts";
-import { piDir, vaultDir } from "../scripts/lib/pi-sdk.mjs";
+import { piDir, vaultDir, pythonDelVenv } from "../scripts/lib/pi-sdk.mjs";
 
 // Regresiones de la etapa I (fidelidad y evaluación): curso sintético y curso real, sin modelos.
 const COPIA_PARCIAL = "**Pregunta 2 (8 puntos)**\nSuponga un enlace de microondas a 10 Mbps entre un satélite geoestacionario (a 36000 Km) y su estación base. El satélite toma una fotografía por minuto. La velocidad de propagación es $2,4 \\times 10^8$ metros/segundo.\na) ¿Cuál es el retardo de propagación?\nb) ¿Cuál es el producto ancho de banda-retardo?";
@@ -85,7 +85,7 @@ test("F1, F2: el dossier muestra la bibliografía del tema con su tool y su rang
   assert.match(dossier(c.raiz, c.d, c.tema, 3000, 1500), /^Bibliografía del tema: ninguna; lo que no conste en el material va marcado «sin respaldo en el material»\.$/m);
 });
 
-const redes = () => JSON.parse(execFileSync(join(piDir, ".venv/bin/python"), [join(piDir, "scripts/ingesta/sesion.py"), "cargar", "--vault", vaultDir, "--curso", "redes"], { env: { ...process.env, PYTHONDONTWRITEBYTECODE: "1" } }));
+const redes = () => JSON.parse(execFileSync(pythonDelVenv(piDir), [join(piDir, "scripts/ingesta/sesion.py"), "cargar", "--vault", vaultDir, "--curso", "redes"], { env: { ...process.env, PYTHONDONTWRITEBYTECODE: "1" } }));
 
 test("E3 con el curso real: el Ej. 10 del Práctico 1, casi copia de la Pregunta 3 del parcial 2023, no se ve mientras esa pregunta esté reservada", t => {
   if (!existsSync(join(vaultDir, "cursos/redes/_procesado/practico-1/items.yaml"))) return t.skip("sin el curso redes");

@@ -1,6 +1,5 @@
 """Regresiones de la auditoría de progreso, con datos sintéticos y sin modelos."""
 from datetime import datetime, timedelta, timezone
-import fcntl
 import hashlib
 import json
 import os
@@ -16,7 +15,7 @@ import yaml
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'scripts/ingesta'))
 import test_cursos
 import test_progreso
-from almacen import Conflicto, bloquear, esperar
+from almacen import Conflicto, abrir_bloqueo, bloquear, esperar, tomar_bloqueo
 from progreso import leer, registrar
 from sesion import cargar, renderizar
 
@@ -34,7 +33,7 @@ class ProgresoAuditoriaTest(unittest.TestCase):
         return registrar(self.vault, 'ejemplo', 'derivacion', self.log, datos or self.datos, **kw)
 
     def tema(self):
-        return yaml.safe_load((self.raiz / 'progreso.yaml').read_text())['temas']['derivacion']
+        return yaml.safe_load((self.raiz / 'progreso.yaml').read_text(encoding="utf-8"))['temas']['derivacion']
 
     def test_h06_leer_y_registrar_no_usan_el_bloqueo_de_la_ingesta(self):
         with bloquear(self.raiz / '_procesado', self.vault):
@@ -45,8 +44,8 @@ class ProgresoAuditoriaTest(unittest.TestCase):
     def test_h06_registrar_espera_el_bloqueo_de_progreso(self):
         listo = threading.Event()
         def retener():
-            fd = os.open(self.raiz / '.progreso.lock', os.O_CREAT | os.O_RDWR, 0o600)
-            fcntl.flock(fd, fcntl.LOCK_EX)
+            fd = abrir_bloqueo(self.raiz / '.progreso.lock')
+            tomar_bloqueo(fd)
             listo.set()
             time.sleep(1)
             os.close(fd)
@@ -68,7 +67,7 @@ class ProgresoAuditoriaTest(unittest.TestCase):
         for concepto in ['primera evidencia', 'segunda evidencia']:
             datos = {**self.datos, 'borde': {'domina': [concepto], 'falla': []}}
             entrada = json.dumps({'vault': str(self.vault), 'curso': 'ejemplo', 'tema': 'derivacion', 'log': self.log, 'datos': datos})
-            p = subprocess.Popen([sys.executable, str(SCRIPT), 'registrar'], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            p = subprocess.Popen([sys.executable, str(SCRIPT), 'registrar'], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding="utf-8")
             procesos.append((p, entrada))
         for p, entrada in procesos:
             p.stdin.write(entrada)
@@ -80,21 +79,21 @@ class ProgresoAuditoriaTest(unittest.TestCase):
     def test_h40_salida_ajena_nombra_archivos_y_no_bloquea_progreso(self):
         salida = self.vault / 'cursos/nuevo/_procesado'
         salida.mkdir(parents=True)
-        (salida / 'manifiesto.json').write_text('{}')
+        (salida / 'manifiesto.json').write_text('{}', encoding="utf-8", newline="\n")
         with self.assertRaisesRegex(RuntimeError, r'mové manifiesto\.json a _procesado/ de la raíz del vault'):
             with bloquear(salida, self.vault): pass
-        (salida / 'apuntes.md').write_text('x')
+        (salida / 'apuntes.md').write_text('x', encoding="utf-8", newline="\n")
         with self.assertRaisesRegex(RuntimeError, r'apuntes\.md, manifiesto\.json'):
             with bloquear(salida, self.vault): pass
         (self.raiz / '_procesado/control.json').unlink()
-        (self.raiz / '_procesado/manifiesto.json').write_text('{}')
+        (self.raiz / '_procesado/manifiesto.json').write_text('{}', encoding="utf-8", newline="\n")
         self.assertTrue(leer(self.vault, 'ejemplo')['disponible'])
         self.guardar()
 
     def test_h31_item_resegmentado_queda_huerfano_sin_invalidar_progreso(self):
         self.guardar()
         self.guardar({**self.datos, 'resumen': 'Segundo guardado', 'ejercicios': []})
-        (self.raiz / '_procesado/practico/items.yaml').write_text('items:\n- {id: "1a", enunciado: Derivar}\n')
+        (self.raiz / '_procesado/practico/items.yaml').write_text('items:\n- {id: "1a", enunciado: Derivar}\n', encoding="utf-8", newline="\n")
         antes = (self.raiz / 'progreso.yaml').read_bytes()
         r = leer(self.vault, 'ejemplo')
         self.assertTrue(r['disponible'])
@@ -106,8 +105,8 @@ class ProgresoAuditoriaTest(unittest.TestCase):
         self.assertEqual(t['ejercicios'][0]['item'], '1')
 
     def test_h13_ids_tolerantes_guardan_el_resto_y_avisan(self):
-        (self.raiz / 'indice.yaml').write_text(yaml.safe_dump({'documentos': [{'id': 'practico', 'tipo': 'ejercicios'}, {'id': 'practico-2', 'tipo': 'ejercicios'}, {'id': 'libro', 'tipo': 'bibliografia'}], 'temas': [{'id': 'derivacion'}, {'id': 'limites'}]}))
-        (self.raiz / '_procesado/practico/items.yaml').write_text(yaml.safe_dump({'items': [{'id': str(n), 'enunciado': 'x'} for n in range(1, 11)]}))
+        (self.raiz / 'indice.yaml').write_text(yaml.safe_dump({'documentos': [{'id': 'practico', 'tipo': 'ejercicios'}, {'id': 'practico-2', 'tipo': 'ejercicios'}, {'id': 'libro', 'tipo': 'bibliografia'}], 'temas': [{'id': 'derivacion'}, {'id': 'limites'}]}), encoding="utf-8", newline="\n")
+        (self.raiz / '_procesado/practico/items.yaml').write_text(yaml.safe_dump({'items': [{'id': str(n), 'enunciado': 'x'} for n in range(1, 11)]}), encoding="utf-8", newline="\n")
         ej = lambda doc, item: {'doc': doc, 'item': item, 'fecha': self.b.hoy, 'resultado': 'parcial'}
         datos = {**self.datos, 'ejercicios': [ej('practico', '2(a–c)'), ej('practico', 'Ejercicio 3'), {**ej('practico', '4g'), 'notas': 'Sin unidades'}, ej('practico', '10'), ej('practico', '99'), ej('practico-2', 'Ejercicio 5'), ej('libro', '1')]}
         r = self.guardar(datos)
@@ -122,12 +121,13 @@ class ProgresoAuditoriaTest(unittest.TestCase):
         self.assertFalse([a for a in leer(self.vault, 'ejemplo')['avisos'] if 'huérfano' in a])
 
     def test_h31_segmentar_un_documento_no_vuelve_huerfanos_sus_intentos_sin_segmentar(self):
-        (self.raiz / 'indice.yaml').write_text(yaml.safe_dump({'documentos': [{'id': 'practico', 'tipo': 'ejercicios'}, {'id': 'practico-2', 'tipo': 'ejercicios'}], 'temas': [{'id': 'derivacion'}, {'id': 'limites'}]}))
+        (self.raiz / 'indice.yaml').write_text(yaml.safe_dump({'documentos': [{'id': 'practico', 'tipo': 'ejercicios'}, {'id': 'practico-2', 'tipo': 'ejercicios'}], 'temas': [{'id': 'derivacion'}, {'id': 'limites'}]}), encoding="utf-8", newline="\n")
         self.guardar({'resumen': 'Sin banco', 'ejercicios': [{'doc': 'practico-2', 'item': '2(a–c)', 'resultado': 'parcial'}]})
         (self.raiz / '_procesado/practico-2').mkdir()
-        (self.raiz / '_procesado/practico-2/items.yaml').write_text('items:\n- {id: "2", enunciado: x}\n')
+        (self.raiz / '_procesado/practico-2/items.yaml').write_text('items:\n- {id: "2", enunciado: x}\n', encoding="utf-8", newline="\n")
         self.assertFalse([a for a in leer(self.vault, 'ejemplo')['avisos'] if 'huérfano' in a])
 
+    @unittest.skipUnless(hasattr(time, 'tzset'), 'Windows no puede cambiar la zona horaria del proceso (time.tzset)')
     def test_h53_fechas_locales_y_completadas_por_el_backend(self):
         # 22:30 en Montevideo es 01:30 UTC del día siguiente.
         instante = datetime(2026, 10, 23, 1, 30, tzinfo=timezone.utc).timestamp()
@@ -156,9 +156,9 @@ class ProgresoAuditoriaTest(unittest.TestCase):
         self.guardar({'resumen': 'Delta 2', 'errores_de_concepto': [{'descripcion': 'confunde la función interna', 'resuelto': True}]})
         self.assertEqual(self.tema()['errores_de_concepto'], [{**antes['errores_de_concepto'][0], 'resuelto': True}])
         log = f'sesiones/{self.b.hoy}-limites.md'
-        (self.raiz / log).write_text('x')
+        (self.raiz / log).write_text('x', encoding="utf-8", newline="\n")
         registrar(self.vault, 'ejemplo', 'limites', log, {'resumen': 'Sólo resumen', 'errores_de_concepto': [{'descripcion': 'nuevo error'}]})
-        t = yaml.safe_load((self.raiz / 'progreso.yaml').read_text())['temas']['limites']
+        t = yaml.safe_load((self.raiz / 'progreso.yaml').read_text(encoding="utf-8"))['temas']['limites']
         self.assertEqual((t['estado'], t['errores_de_concepto'][0]['resuelto']), ('en_curso', False))
         with self.assertRaises(ValueError):
             self.guardar({'borde': {'domina': ['sin resumen']}})
@@ -186,7 +186,7 @@ class ProgresoAuditoriaTest(unittest.TestCase):
                   'errores_de_concepto': [{'descripcion': 'invierte L/R', 'resuelto': True}]}
         self.guardar(actual)
         viejo = 'sesiones/2026-01-01-derivacion.md'
-        (self.raiz / viejo).write_text('Log de una sesión anterior sin cierre.')
+        (self.raiz / viejo).write_text('Log de una sesión anterior sin cierre.', encoding="utf-8", newline="\n")
         huella = hashlib.sha256((self.raiz / viejo).read_bytes()).hexdigest()
         reconstruir = lambda datos: registrar(self.vault, 'ejemplo', 'derivacion', viejo, datos, cierre=True, reconstruido=True, huella_log=huella)
         reconstruir({'resumen': 'Sesión vieja', 'estado': 'repasar', 'proximo_paso': 'Repasar desde cero', 'conceptos_firmes': ['otra cosa'],
@@ -202,7 +202,7 @@ class ProgresoAuditoriaTest(unittest.TestCase):
     def test_h53_una_reconstruccion_fecha_la_evidencia_con_el_dia_del_log(self):
         manana = (datetime.now() + timedelta(days=1)).date().isoformat()
         for log, dia in [('sesiones/2026-01-01-derivacion.md', '2026-01-01'), (f'sesiones/{manana}-derivacion.md', self.b.hoy)]:
-            (self.raiz / log).write_text(f'Log {log} sin cierre.')
+            (self.raiz / log).write_text(f'Log {log} sin cierre.', encoding="utf-8", newline="\n")
             huella = hashlib.sha256((self.raiz / log).read_bytes()).hexdigest()
             registrar(self.vault, 'ejemplo', 'derivacion', log, {'resumen': 'Sesión anterior', 'ejercicios': [{'doc': 'practico', 'item': '1', 'resultado': 'correcto'}],
                       'errores_de_concepto': [{'descripcion': f'error de {log}'}]}, cierre=True, reconstruido=True, huella_log=huella)
@@ -231,11 +231,11 @@ class ProgresoAuditoriaTest(unittest.TestCase):
     def test_x01_disco_lleno_da_una_linea_en_espanol_y_conserva_el_progreso(self):
         antes = (self.raiz / 'progreso.yaml').read_bytes()
         codigo = ("import errno, runpy, sys; from unittest.mock import patch\n"
-                  "sys.path.insert(0, sys.argv[1].rsplit('/', 1)[0]); sys.argv = [sys.argv[1], 'registrar']\n"
+                  "sys.path.insert(0, __import__('os').path.dirname(sys.argv[1])); sys.argv = [sys.argv[1], 'registrar']\n"
                   "with patch('os.fsync', side_effect=OSError(errno.ENOSPC, 'No space left on device')):\n"
                   "    runpy.run_path(sys.argv[0], run_name='__main__')")
         entrada = json.dumps({'vault': str(self.vault), 'curso': 'ejemplo', 'tema': 'derivacion', 'log': self.log, 'datos': self.datos})
-        r = subprocess.run([sys.executable, '-c', codigo, str(SCRIPT)], input=entrada, capture_output=True, text=True, timeout=30)
+        r = subprocess.run([sys.executable, '-c', codigo, str(SCRIPT)], input=entrada, capture_output=True, text=True, timeout=30, encoding="utf-8")
         self.assertEqual((r.returncode, r.stderr), (1, 'Disco lleno: no se guardó el progreso; liberá espacio y repetí /fin.\n'))
         self.assertEqual((self.raiz / 'progreso.yaml').read_bytes(), antes)
         self.assertFalse(list(self.raiz.glob('.ingesta-*')))
@@ -260,11 +260,11 @@ class SesionAuditoriaTest(unittest.TestCase):
     def test_x01_disco_lleno_al_renderizar_da_una_linea_en_espanol(self):
         script = SCRIPT.with_name('sesion.py')
         codigo = ("import errno, runpy, sys; from unittest.mock import patch\n"
-                  "sys.path.insert(0, sys.argv[1].rsplit('/', 1)[0]); sys.argv = sys.argv[1:]\n"
+                  "sys.path.insert(0, __import__('os').path.dirname(sys.argv[1])); sys.argv = sys.argv[1:]\n"
                   "with patch('os.fsync', side_effect=OSError(errno.ENOSPC, 'No space left on device')):\n"
                   "    runpy.run_path(sys.argv[0], run_name='__main__')")
         r = subprocess.run([sys.executable, '-c', codigo, str(script), 'renderizar', '--vault', str(self.base.vault), '--curso', 'ejemplo', '--doc', 'libro', '--pagina', '1'],
-                           capture_output=True, text=True, timeout=30)
+                           capture_output=True, text=True, timeout=30, encoding="utf-8")
         self.assertEqual((r.returncode, r.stderr), (1, 'Disco lleno: no se pudo preparar el material; liberá espacio y reintentá.\n'))
 
 
